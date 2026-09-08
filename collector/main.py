@@ -39,7 +39,7 @@ def main() -> None:
         raise ValueError("DATABASE_URL is not configured")
 
     engine = create_database(database_url)
-    targets = load_targets(args.channels)
+    targets = load_targets(PROJECT_ROOT / args.channels)
 
     with YouTubeClient() as client, Session(engine) as session:
         for target in targets:
