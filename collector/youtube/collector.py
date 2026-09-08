@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from collector.classification import VideoClassification
 from collector.youtube.client import YouTubeClient
 
 
@@ -29,6 +30,7 @@ class VideoObservation:
     comment_count: int | None
     concurrent_viewers: int | None
     is_live: bool
+    classification: str
     live_started_at: str | None
     live_ended_at: str | None
 
@@ -42,9 +44,22 @@ def _integer(value: Any) -> int | None:
         return None
 
 
-def normalize_video(video: dict[str, Any], channel_id: str, observed_at: datetime) -> VideoObservation:
+def normalize_video(
+    video: dict[str, Any],
+    channel_id: str,
+    observed_at: datetime,
+) -> VideoObservation:
     stats = video.get("statistics", {})
     live = video.get("liveStreamingDetails", {})
+
+    is_live = "actualStartTime" in live and "actualEndTime" not in live
+
+    classification = (
+        VideoClassification.LIVE.value
+        if is_live
+        else VideoClassification.UNKNOWN.value
+    )
+
     return VideoObservation(
         video_id=video["id"],
         channel_id=channel_id,
@@ -55,7 +70,8 @@ def normalize_video(video: dict[str, Any], channel_id: str, observed_at: datetim
         like_count=_integer(stats.get("likeCount")),
         comment_count=_integer(stats.get("commentCount")),
         concurrent_viewers=_integer(live.get("concurrentViewers")),
-        is_live="actualStartTime" in live and "actualEndTime" not in live,
+        is_live=is_live,
+        classification=classification,
         live_started_at=live.get("actualStartTime"),
         live_ended_at=live.get("actualEndTime"),
     )
@@ -70,11 +86,17 @@ def collect_channel(
     channel = client.get_channel(target.channel_id)
     uploads_id = channel["contentDetails"]["relatedPlaylists"]["uploads"]
     uploads = client.list_uploads(uploads_id, max_results=max_videos)
+
     video_ids = [
         item.get("contentDetails", {}).get("videoId")
         for item in uploads.get("items", [])
     ]
     video_ids = [video_id for video_id in video_ids if video_id]
+
     videos = client.get_videos(video_ids)
     observed_at = datetime.now(timezone.utc)
-    return [normalize_video(video, target.channel_id, observed_at) for video in videos]
+
+    return [
+        normalize_video(video, target.channel_id, observed_at)
+        for video in videos
+    ]

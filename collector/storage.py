@@ -47,6 +47,11 @@ class Observation(Base):
     comment_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     concurrent_viewers: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_live: Mapped[bool] = mapped_column(Boolean, default=False)
+    classification: Mapped[str] = mapped_column(
+        String(32),
+        default="UNKNOWN",
+        index=True,
+    )
     source: Mapped[str] = mapped_column(String(50), default="youtube_data_api")
     collector_version: Mapped[str] = mapped_column(String(32), default="0.1.0")
 
@@ -56,7 +61,10 @@ class CollectionRun(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     status: Mapped[str] = mapped_column(String(32))
     channels_attempted: Mapped[int] = mapped_column(Integer, default=0)
     videos_observed: Mapped[int] = mapped_column(Integer, default=0)
@@ -79,7 +87,12 @@ def save_observations(
     observations: list[VideoObservation],
 ) -> int:
     """Persist channel/video metadata and append-only observations."""
-    channel = session.query(Channel).filter_by(youtube_channel_id=channel_youtube_id).one_or_none()
+    channel = (
+        session.query(Channel)
+        .filter_by(youtube_channel_id=channel_youtube_id)
+        .one_or_none()
+    )
+
     if channel is None:
         channel = Channel(
             youtube_channel_id=channel_youtube_id,
@@ -91,8 +104,14 @@ def save_observations(
         session.flush()
 
     saved = 0
+
     for item in observations:
-        video = session.query(Video).filter_by(youtube_video_id=item.video_id).one_or_none()
+        video = (
+            session.query(Video)
+            .filter_by(youtube_video_id=item.video_id)
+            .one_or_none()
+        )
+
         if video is None:
             video = Video(
                 youtube_video_id=item.video_id,
@@ -116,8 +135,10 @@ def save_observations(
                 comment_count=item.comment_count,
                 concurrent_viewers=item.concurrent_viewers,
                 is_live=item.is_live,
+                classification=item.classification,
             )
         )
+
         saved += 1
 
     session.commit()
