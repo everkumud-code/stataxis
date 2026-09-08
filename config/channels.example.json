@@ -1,0 +1,10 @@
+{
+  "channels": [
+    {
+      "channel_id": "REPLACE_WITH_YOUTUBE_CHANNEL_ID",
+      "name": "Example News Channel",
+      "language": "Hindi",
+      "network": "Example Network"
+    }
+  ]
+}
