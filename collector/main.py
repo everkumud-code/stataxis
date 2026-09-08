@@ -19,7 +19,10 @@ from collector.youtube.collector import ChannelTarget, collect_channel
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
 logger = logging.getLogger("stx-collector")
 
 
@@ -29,9 +32,19 @@ def load_targets(path: Path) -> list[ChannelTarget]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run a STAXIS YouTube collection pass")
-    parser.add_argument("--channels", type=Path, default=Path("config/channels.json"))
-    parser.add_argument("--max-videos", type=int, default=25)
+    parser = argparse.ArgumentParser(
+        description="Run a STAXIS YouTube collection pass"
+    )
+    parser.add_argument(
+        "--channels",
+        type=Path,
+        default=Path("config/channels.json"),
+    )
+    parser.add_argument(
+        "--max-videos",
+        type=int,
+        default=25,
+    )
     args = parser.parse_args()
 
     database_url = os.getenv("DATABASE_URL")
@@ -43,7 +56,12 @@ def main() -> None:
 
     with YouTubeClient() as client, Session(engine) as session:
         for target in targets:
-            observations = collect_channel(client, target, args.max_videos)
+            observations = collect_channel(
+                client,
+                target,
+                args.max_videos,
+            )
+
             saved = save_observations(
                 session=session,
                 channel_name=target.name,
@@ -52,16 +70,19 @@ def main() -> None:
                 language=target.language,
                 observations=observations,
             )
+
             logger.info(
                 "%s: collected=%d saved=%d observations",
                 target.name,
                 len(observations),
                 saved,
             )
+
             for observation in observations:
                 logger.info(
-                    "%s | views=%s | live=%s | concurrent=%s",
+                    "%s | classification=%s | views=%s | live=%s | concurrent=%s",
                     observation.title,
+                    observation.classification,
                     observation.view_count,
                     observation.is_live,
                     observation.concurrent_viewers,

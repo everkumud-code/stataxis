@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from collector.classification import VideoClassification
+from collector.classification import classify_video
 from collector.youtube.client import YouTubeClient
 
 
@@ -52,13 +52,8 @@ def normalize_video(
     stats = video.get("statistics", {})
     live = video.get("liveStreamingDetails", {})
 
-    is_live = "actualStartTime" in live and "actualEndTime" not in live
-
-    classification = (
-        VideoClassification.LIVE.value
-        if is_live
-        else VideoClassification.UNKNOWN.value
-    )
+    classification = classify_video(video)
+    is_live = classification == "LIVE"
 
     return VideoObservation(
         video_id=video["id"],
