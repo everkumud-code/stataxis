@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 import httpx
+from dotenv import load_dotenv
 
 
 BASE_URL = "https://www.googleapis.com/youtube/v3"
+
+# Load the project's local .env without requiring the user to configure
+# Windows environment variables. The .env file is ignored by Git.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(PROJECT_ROOT / ".env")
 
 
 class YouTubeAPIError(RuntimeError):
