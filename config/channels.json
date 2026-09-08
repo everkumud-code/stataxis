@@ -5,6 +5,30 @@
       "name": "Aaj Tak",
       "language": "Hindi",
       "network": "TV Today Network"
+    },
+    {
+      "channel_id": "UCttspZesZIDEwwpVIgoZtWQ",
+      "name": "IndiaTV",
+      "language": "Hindi",
+      "network": "India TV"
+    },
+    {
+      "channel_id": "UCx8Z14PpntdaxCt2hakbQLQ",
+      "name": "The Lallantop",
+      "language": "Hindi",
+      "network": "India Today Group"
+    },
+    {
+      "channel_id": "UCZFMm1mMw0F81Z37aaEzTUA",
+      "name": "NDTV",
+      "language": "English",
+      "network": "NDTV"
+    },
+    {
+      "channel_id": "UC-JFyL0zDFOsPMpuWu39rPA",
+      "name": "Thanthi TV",
+      "language": "Tamil",
+      "network": "Daily Thanthi"
     }
   ]
 }

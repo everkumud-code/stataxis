@@ -1,0 +1,144 @@
+{
+  "candidates": [
+    {
+      "name": "IndiaTV",
+      "language": "Hindi",
+      "network": "India TV",
+      "channel_id": "UCttspZesZIDEwwpVIgoZtWQ",
+      "discovery_source": "secondary_research",
+      "verification_status": "registered",
+      "verified_title": "IndiaTV",
+      "verified_channel_id": "UCttspZesZIDEwwpVIgoZtWQ",
+      "uploads_playlist_id": "UUttspZesZIDEwwpVIgoZtWQ"
+    },
+    {
+      "name": "Zee News",
+      "language": "Hindi",
+      "network": "Zee Media",
+      "channel_id": "",
+      "discovery_source": "secondary_research",
+      "verification_status": "pending"
+    },
+    {
+      "name": "News18 India",
+      "language": "Hindi",
+      "network": "Network18",
+      "channel_id": "",
+      "discovery_source": "secondary_research",
+      "verification_status": "pending"
+    },
+    {
+      "name": "The Lallantop",
+      "language": "Hindi",
+      "network": "India Today Group",
+      "channel_id": "UCx8Z14PpntdaxCt2hakbQLQ",
+      "discovery_source": "secondary_research",
+      "verification_status": "registered",
+      "verified_title": "The Lallantop",
+      "verified_channel_id": "UCx8Z14PpntdaxCt2hakbQLQ",
+      "uploads_playlist_id": "UUx8Z14PpntdaxCt2hakbQLQ"
+    },
+    {
+      "name": "Republic Bharat",
+      "language": "Hindi",
+      "network": "Republic Media Network",
+      "channel_id": "",
+      "discovery_source": "secondary_research",
+      "verification_status": "pending"
+    },
+    {
+      "name": "ABP LIVE",
+      "language": "Hindi",
+      "network": "ABP Network",
+      "channel_id": "",
+      "discovery_source": "secondary_research",
+      "verification_status": "pending"
+    },
+    {
+      "name": "Oneindia Hindi",
+      "language": "Hindi",
+      "network": "Oneindia",
+      "channel_id": "",
+      "discovery_source": "secondary_research",
+      "verification_status": "pending"
+    },
+    {
+      "name": "BBC News Hindi",
+      "language": "Hindi",
+      "network": "BBC",
+      "channel_id": "",
+      "discovery_source": "secondary_research",
+      "verification_status": "pending"
+    },
+    {
+      "name": "NDTV",
+      "language": "English",
+      "network": "NDTV",
+      "channel_id": "UCZFMm1mMw0F81Z37aaEzTUA",
+      "discovery_source": "secondary_research",
+      "verification_status": "registered",
+      "verified_title": "NDTV",
+      "verified_channel_id": "UCZFMm1mMw0F81Z37aaEzTUA",
+      "uploads_playlist_id": "UUZFMm1mMw0F81Z37aaEzTUA"
+    },
+    {
+      "name": "ABP Ananda",
+      "language": "Bengali",
+      "network": "ABP Network",
+      "channel_id": "",
+      "discovery_source": "secondary_research",
+      "verification_status": "pending"
+    },
+    {
+      "name": "ABP Majha",
+      "language": "Marathi",
+      "network": "ABP Network",
+      "channel_id": "",
+      "discovery_source": "secondary_research",
+      "verification_status": "pending"
+    },
+    {
+      "name": "TV9 Marathi",
+      "language": "Marathi",
+      "network": "TV9 Network",
+      "channel_id": "",
+      "discovery_source": "secondary_research",
+      "verification_status": "pending"
+    },
+    {
+      "name": "Polimer News",
+      "language": "Tamil",
+      "network": "Polimer Media",
+      "channel_id": "",
+      "discovery_source": "secondary_research",
+      "verification_status": "pending"
+    },
+    {
+      "name": "Thanthi TV",
+      "language": "Tamil",
+      "network": "Daily Thanthi",
+      "channel_id": "UC-JFyL0zDFOsPMpuWu39rPA",
+      "discovery_source": "secondary_research",
+      "verification_status": "registered",
+      "verified_title": "Thanthi TV",
+      "verified_channel_id": "UC-JFyL0zDFOsPMpuWu39rPA",
+      "uploads_playlist_id": "UU-JFyL0zDFOsPMpuWu39rPA"
+    },
+    {
+      "name": "TV9 Kannada",
+      "language": "Kannada",
+      "network": "TV9 Network",
+      "channel_id": "",
+      "discovery_source": "secondary_research",
+      "verification_status": "pending"
+    },
+    {
+      "name": "Manorama News",
+      "language": "Malayalam",
+      "network": "Malayala Manorama",
+      "channel_id": "",
+      "discovery_source": "secondary_research",
+      "verification_status": "pending"
+    }
+  ]
+}
