@@ -17,6 +17,28 @@ def test_classify_active_live_video():
     assert classify_video(video) == VideoClassification.LIVE.value
 
 
+def test_classify_active_live_video_without_broadcast_content():
+    video = {
+        "snippet": {},
+        "liveStreamingDetails": {
+            "actualStartTime": "2026-09-08T10:00:00Z",
+        },
+    }
+
+    assert classify_video(video) == VideoClassification.UNKNOWN.value
+
+
+def test_classify_upcoming_video():
+    video = {
+        "snippet": {
+            "liveBroadcastContent": "upcoming",
+        },
+        "liveStreamingDetails": {},
+    }
+
+    assert classify_video(video) == VideoClassification.UPCOMING.value
+
+
 def test_classify_completed_live_video():
     video = {
         "snippet": {
@@ -50,8 +72,23 @@ def test_classify_unknown_video():
     assert classify_video(video) == VideoClassification.UNKNOWN.value
 
 
+def test_classify_upcoming_video_with_zero_duration():
+    video = {
+        "snippet": {
+            "liveBroadcastContent": "upcoming",
+        },
+        "contentDetails": {
+            "duration": "P0D",
+        },
+        "liveStreamingDetails": {},
+    }
+
+    assert classify_video(video) == VideoClassification.UPCOMING.value
+
+
 def test_video_classification_values():
     assert VideoClassification.LIVE.value == "LIVE"
+    assert VideoClassification.UPCOMING.value == "UPCOMING"
     assert VideoClassification.COMPLETED_LIVE.value == "COMPLETED_LIVE"
     assert VideoClassification.REGULAR_VIDEO.value == "REGULAR_VIDEO"
     assert VideoClassification.SHORT.value == "SHORT"
