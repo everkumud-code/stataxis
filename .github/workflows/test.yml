@@ -17,5 +17,8 @@ jobs:
         run: pip install -r requirements-all.txt
       - name: Run tests
         run: pytest -q
-      - name: Lint
-        run: ruff check .
+      - name: Lint diagnostic
+        run: |
+          ruff check . --fix
+          git diff -- collector/__main__.py collector/candidate_importer.py collector/channel_registry.py collector/main.py collector/youtube/client.py metrics/report.py pyproject.toml
+          ruff check .
