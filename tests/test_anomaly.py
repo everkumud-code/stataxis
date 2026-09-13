@@ -45,23 +45,28 @@ def test_zero_mad_detects_a_deviation_from_constant_baseline():
 
 
 def test_missing_values_are_not_zero():
-    result = detect_anomalies(_points([100, 101, None, 99, 100, None, 250]), minimum_points=5)
+    result = detect_anomalies(
+        _points([100, 101, None, 99, 100, None, 98, 250]),
+        minimum_points=5,
+    )
     assert result[2].sufficient_data is False
-    assert result[5].sufficient_data is True
+    assert result[5].sufficient_data is False
     assert result[5].value is None
     assert result[-1].sufficient_data is True
-    assert result[-1].is_anomaly is False
+    assert result[-1].is_anomaly is True
 
 
 def test_rolling_window_limits_baseline_history():
     result = detect_anomalies(
-        _points([100, 100, 100, 100, 100, 200, 201]),
+        _points([100, 100, 100, 100, 100, 200, 200, 201]),
         minimum_points=3,
         window=3,
     )
     assert result[5].is_anomaly is True
-    assert result[6].baseline == 200
-    assert result[6].is_anomaly is False
+    assert result[6].baseline == 100
+    assert result[6].is_anomaly is True
+    assert result[7].baseline == 200
+    assert result[7].is_anomaly is False
 
 
 def test_invalid_parameters_are_rejected():
