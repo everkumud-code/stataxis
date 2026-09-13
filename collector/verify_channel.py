@@ -1,7 +1,7 @@
 import argparse
 
-from collector.youtube.client import YouTubeClient
 from collector.channel_registry import add_channel
+from collector.youtube.client import YouTubeClient
 
 
 def verify_channel(channel_id: str) -> dict:
@@ -95,19 +95,13 @@ def main():
 
         if args.add:
             if not args.name:
-                raise ValueError(
-                    "--name is required when using --add"
-                )
+                raise ValueError("--name is required when using --add")
 
             if not args.language:
-                raise ValueError(
-                    "--language is required when using --add"
-                )
+                raise ValueError("--language is required when using --add")
 
             if not args.network:
-                raise ValueError(
-                    "--network is required when using --add"
-                )
+                raise ValueError("--network is required when using --add")
 
             add_channel(
                 channel_id=result["channel_id"],
@@ -129,7 +123,7 @@ def main():
         print("=" * 60)
         print()
 
-    except Exception as exc:
+    except ValueError as exc:
         print()
         print("STAXIS CHANNEL VERIFICATION")
         print("=" * 60)
