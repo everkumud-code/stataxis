@@ -35,6 +35,18 @@ class CompetitiveStanding:
     momentum_rank: int | None
 
 
+@dataclass(frozen=True)
+class HeadToHeadResult:
+    """Evidence available for a direct comparison between two channels."""
+
+    channel_a: CompetitionPoint
+    channel_b: CompetitionPoint
+    value_leader: str | None
+    value_gap: float | None
+    momentum_leader: str | None
+    momentum_gap: float | None
+
+
 def _rank_map(points: list[CompetitionPoint]) -> dict[str, int]:
     """Return competition ranks (1, 1, 3) for available values."""
     ordered = sorted(
@@ -103,7 +115,6 @@ def build_competition(
     current_gaps = _gap_map(current)
     momentum_ranks = _momentum_rank_map(current)
 
-    previous_by_id = {point.channel_id: point for point in previous or []}
     previous_ranks = _rank_map(previous or [])
     previous_shares = _share_map(previous or [])
     previous_gaps = _gap_map(previous or [])
@@ -133,10 +144,6 @@ def build_competition(
             else None
         )
 
-        # Keep this lookup explicit so a channel missing from the previous window
-        # remains a missing historical comparison rather than becoming zero.
-        previous_by_id.get(point.channel_id)
-
         standings.append(
             CompetitiveStanding(
                 channel_id=point.channel_id,
@@ -163,4 +170,45 @@ def build_competition(
             item.rank if item.rank is not None else float("inf"),
             item.name.lower(),
         ),
+    )
+
+
+def compare_head_to_head(
+    points: list[CompetitionPoint],
+    channel_a_id: str,
+    channel_b_id: str,
+) -> HeadToHeadResult:
+    """Compare two channels without inventing missing observations."""
+    by_id = {point.channel_id: point for point in points}
+    try:
+        channel_a = by_id[channel_a_id]
+        channel_b = by_id[channel_b_id]
+    except KeyError as exc:
+        raise ValueError(f"unknown channel: {exc.args[0]}") from exc
+
+    value_leader = None
+    value_gap = None
+    if channel_a.value is not None and channel_b.value is not None:
+        if channel_a.value > channel_b.value:
+            value_leader = channel_a.channel_id
+        elif channel_b.value > channel_a.value:
+            value_leader = channel_b.channel_id
+        value_gap = abs(channel_a.value - channel_b.value)
+
+    momentum_leader = None
+    momentum_gap = None
+    if channel_a.momentum is not None and channel_b.momentum is not None:
+        if channel_a.momentum > channel_b.momentum:
+            momentum_leader = channel_a.channel_id
+        elif channel_b.momentum > channel_a.momentum:
+            momentum_leader = channel_b.channel_id
+        momentum_gap = abs(channel_a.momentum - channel_b.momentum)
+
+    return HeadToHeadResult(
+        channel_a=channel_a,
+        channel_b=channel_b,
+        value_leader=value_leader,
+        value_gap=value_gap,
+        momentum_leader=momentum_leader,
+        momentum_gap=momentum_gap,
     )
