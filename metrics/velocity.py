@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from itertools import pairwise
 
 from metrics.engine import ObservationPoint, audience_momentum, view_velocity
 
@@ -33,7 +34,7 @@ def calculate_velocity(points: list[ObservationPoint]) -> list[VelocityPoint]:
         )
     ]
 
-    for previous, current in zip(points, points[1:]):
+    for previous, current in pairwise(points):
         results.append(
             VelocityPoint(
                 observed_at=current.observed_at,
