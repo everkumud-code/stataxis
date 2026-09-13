@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from collector.classification import classify_video
@@ -89,7 +89,7 @@ def collect_channel(
     video_ids = [video_id for video_id in video_ids if video_id]
 
     videos = client.get_videos(video_ids)
-    observed_at = datetime.now(timezone.utc)
+    observed_at = datetime.now(UTC)
 
     return [
         normalize_video(video, target.channel_id, observed_at)
