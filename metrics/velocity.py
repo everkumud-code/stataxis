@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from metrics.engine import ObservationPoint, audience_momentum, view_velocity
 
@@ -11,7 +12,7 @@ from metrics.engine import ObservationPoint, audience_momentum, view_velocity
 class VelocityPoint:
     """Velocity calculated for the interval ending at an observation."""
 
-    observed_at: object
+    observed_at: datetime
     view_velocity_per_minute: float | None
     audience_momentum_per_minute: float | None
 
@@ -20,8 +21,6 @@ def calculate_velocity(points: list[ObservationPoint]) -> list[VelocityPoint]:
     """Calculate adjacent-interval velocity without inventing missing data.
 
     The first observation has no prior interval, so both metrics are ``None``.
-    Input points must be chronological; invalid or reversed intervals are left
-    as unavailable by the underlying rate calculations.
     """
     if not points:
         return []
@@ -47,6 +46,6 @@ def calculate_velocity(points: list[ObservationPoint]) -> list[VelocityPoint]:
 
 
 def latest_velocity(points: list[ObservationPoint]) -> VelocityPoint | None:
-    """Return the velocity for the latest available observation interval."""
+    """Return the velocity for the latest observation interval."""
     velocities = calculate_velocity(points)
     return velocities[-1] if velocities else None
