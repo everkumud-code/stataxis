@@ -4,7 +4,6 @@ from pathlib import Path
 from collector.channel_registry import add_channel, channel_exists
 from collector.verify_channel import verify_channel
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CANDIDATES_FILE = PROJECT_ROOT / "config" / "channel_candidates.json"
 
