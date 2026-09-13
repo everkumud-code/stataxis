@@ -9,7 +9,6 @@ from typing import Any, Self
 import httpx
 from dotenv import load_dotenv
 
-
 BASE_URL = "https://www.googleapis.com/youtube/v3"
 
 # Load the project's local .env without requiring the user to configure
