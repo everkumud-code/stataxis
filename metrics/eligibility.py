@@ -21,4 +21,3 @@ def eligible_for_any_ranking(classification: str) -> bool:
         VideoClassification.REGULAR_VIDEO.value,
         VideoClassification.LIVE.value,
     }
-}
