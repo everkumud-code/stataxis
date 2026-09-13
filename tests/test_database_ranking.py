@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -41,7 +41,7 @@ def _add_video(
 
 def test_current_rankings_separate_vod_views_from_live_audience():
     engine = create_database("sqlite:///:memory:")
-    observed_at = datetime(2026, 9, 13, 10, 0, tzinfo=timezone.utc)
+    observed_at = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
 
     with Session(engine) as session:
         channel = Channel(
@@ -52,51 +52,11 @@ def test_current_rankings_separate_vod_views_from_live_audience():
         session.add(channel)
         session.flush()
 
-        _add_video(
-            session,
-            channel,
-            "regular-1",
-            VideoClassification.REGULAR_VIDEO.value,
-            100,
-            None,
-            observed_at,
-        )
-        _add_video(
-            session,
-            channel,
-            "live-1",
-            VideoClassification.LIVE.value,
-            None,
-            50,
-            observed_at,
-        )
-        _add_video(
-            session,
-            channel,
-            "upcoming-1",
-            VideoClassification.UPCOMING.value,
-            999,
-            None,
-            observed_at,
-        )
-        _add_video(
-            session,
-            channel,
-            "completed-live-1",
-            VideoClassification.COMPLETED_LIVE.value,
-            888,
-            777,
-            observed_at,
-        )
-        _add_video(
-            session,
-            channel,
-            "unknown-1",
-            VideoClassification.UNKNOWN.value,
-            666,
-            555,
-            observed_at,
-        )
+        _add_video(session, channel, "regular-1", VideoClassification.REGULAR_VIDEO.value, 100, None, observed_at)
+        _add_video(session, channel, "live-1", VideoClassification.LIVE.value, None, 50, observed_at)
+        _add_video(session, channel, "upcoming-1", VideoClassification.UPCOMING.value, 999, None, observed_at)
+        _add_video(session, channel, "completed-live-1", VideoClassification.COMPLETED_LIVE.value, 888, 777, observed_at)
+        _add_video(session, channel, "unknown-1", VideoClassification.UNKNOWN.value, 666, 555, observed_at)
         session.commit()
 
         rankings = build_current_channel_rankings(session)
@@ -112,8 +72,8 @@ def test_current_rankings_separate_vod_views_from_live_audience():
 
 def test_current_rankings_use_latest_observation_for_each_video():
     engine = create_database("sqlite:///:memory:")
-    first = datetime(2026, 9, 13, 10, 0, tzinfo=timezone.utc)
-    latest = datetime(2026, 9, 13, 10, 5, tzinfo=timezone.utc)
+    first = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
+    latest = datetime(2026, 9, 13, 10, 5, tzinfo=UTC)
 
     with Session(engine) as session:
         channel = Channel(
@@ -160,7 +120,7 @@ def test_current_rankings_use_latest_observation_for_each_video():
 
 def test_current_live_rankings_order_by_live_audience():
     engine = create_database("sqlite:///:memory:")
-    observed_at = datetime(2026, 9, 13, 10, 0, tzinfo=timezone.utc)
+    observed_at = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
 
     with Session(engine) as session:
         for channel_id, name, concurrent in [
