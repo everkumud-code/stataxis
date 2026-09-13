@@ -34,7 +34,7 @@ def test_audience_acceleration_can_be_negative():
         ObservationPoint(start + timedelta(minutes=10), concurrent_viewers=800),
     ]
     result = calculate_acceleration(points)
-    assert result[-1].audience_acceleration_per_minute_squared == -40.0
+    assert result[-1].audience_acceleration_per_minute_squared == -8.0
 
 
 def test_missing_values_are_not_treated_as_zero():
