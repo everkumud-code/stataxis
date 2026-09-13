@@ -1,4 +1,9 @@
-from metrics.ranking import ChannelSnapshot, build_snapshot, rank_channels
+from metrics.ranking import (
+    ChannelSnapshot,
+    build_snapshot,
+    rank_channels,
+    rank_channels_by_live,
+)
 
 
 def test_build_snapshot_aggregates_views_and_concurrency():
@@ -70,3 +75,16 @@ def test_rank_channels_orders_by_total_views_then_average():
     ranked = rank_channels(channels)
 
     assert [item.channel_id for item in ranked] == ["a", "c", "b"]
+
+
+def test_rank_channels_by_live_orders_by_average_then_peak():
+    channels = [
+        ChannelSnapshot("a", "Alpha", "Hindi", 0, 0, None, 100, 300),
+        ChannelSnapshot("b", "Beta", "Hindi", 0, 0, None, 200, 250),
+        ChannelSnapshot("c", "Gamma", "Hindi", 0, 0, None, 200, 400),
+        ChannelSnapshot("d", "Delta", "Hindi", 0, 0, None, None, None),
+    ]
+
+    ranked = rank_channels_by_live(channels)
+
+    assert [item.channel_id for item in ranked] == ["c", "b", "a", "d"]
