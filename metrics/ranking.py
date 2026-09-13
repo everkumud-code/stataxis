@@ -22,12 +22,24 @@ class ChannelSnapshot:
 
 
 def rank_channels(channels: list[ChannelSnapshot]) -> list[ChannelSnapshot]:
-    """Rank channels by total observed views, then average views, then name."""
+    """Rank channels by total observed VOD views, then average views, then name."""
     return sorted(
         channels,
         key=lambda item: (
             -item.total_views,
             -(item.average_views if item.average_views is not None else -1),
+            item.name.lower(),
+        ),
+    )
+
+
+def rank_channels_by_live(channels: list[ChannelSnapshot]) -> list[ChannelSnapshot]:
+    """Rank channels by average live concurrent viewers, then peak, then name."""
+    return sorted(
+        channels,
+        key=lambda item: (
+            -(item.average_concurrent if item.average_concurrent is not None else -1),
+            -(item.peak_concurrent if item.peak_concurrent is not None else -1),
             item.name.lower(),
         ),
     )
