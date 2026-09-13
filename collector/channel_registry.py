@@ -29,10 +29,7 @@ def save_channels(channels: list[dict]) -> None:
 
 
 def channel_exists(channel_id: str) -> bool:
-    return any(
-        channel["channel_id"] == channel_id
-        for channel in load_channels()
-    )
+    return any(channel["channel_id"] == channel_id for channel in load_channels())
 
 
 def add_channel(
@@ -44,9 +41,7 @@ def add_channel(
     channels = load_channels()
 
     if channel_exists(channel_id):
-        raise ValueError(
-            f"Channel already exists: {channel_id}"
-        )
+        raise ValueError(f"Channel already exists: {channel_id}")
 
     channels.append(
         {
