@@ -15,7 +15,6 @@ from collector.storage import create_database, save_observations
 from collector.youtube.client import YouTubeClient
 from collector.youtube.collector import ChannelTarget, collect_channel
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
 
