@@ -17,8 +17,8 @@ class MetricChange:
 
 
 def compare_metric(
-    previous: float | int | None,
-    current: float | int | None,
+    previous: float | None,
+    current: float | None,
 ) -> MetricChange:
     """Compare two metric values without inventing missing observations.
 
