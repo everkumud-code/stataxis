@@ -10,7 +10,12 @@ from metrics.eligibility import (
     eligible_for_live_concurrent,
     eligible_for_vod_views,
 )
-from metrics.ranking import ChannelSnapshot, build_snapshot, rank_channels
+from metrics.ranking import (
+    ChannelSnapshot,
+    build_snapshot,
+    rank_channels,
+    rank_channels_by_live,
+)
 
 
 def latest_observations_by_video(session: Session) -> list[Observation]:
@@ -33,13 +38,8 @@ def latest_observations_by_video(session: Session) -> list[Observation]:
     return list(session.scalars(stmt).all())
 
 
-def build_current_channel_rankings(session: Session) -> list[ChannelSnapshot]:
-    """Aggregate eligible current observations and rank channels.
-
-    This is deliberately a current-snapshot ranking, not yet a historical
-    STX score. Historical scoring will be added after enough repeated passes
-    exist to make growth and consistency metrics statistically meaningful.
-    """
+def _build_current_snapshots(session: Session) -> list[ChannelSnapshot]:
+    """Build eligible current channel snapshots without choosing a ranking mode."""
     observations = latest_observations_by_video(session)
 
     if not observations:
@@ -75,9 +75,7 @@ def build_current_channel_rankings(session: Session) -> list[ChannelSnapshot]:
             bucket["views"].append(observation.view_count)
 
         if eligible_for_live_concurrent(observation.classification):
-            bucket["concurrent"].append(
-                observation.concurrent_viewers
-            )
+            bucket["concurrent"].append(observation.concurrent_viewers)
 
     snapshots: list[ChannelSnapshot] = []
 
@@ -97,4 +95,17 @@ def build_current_channel_rankings(session: Session) -> list[ChannelSnapshot]:
             )
         )
 
-    return rank_channels(snapshots)
+    return snapshots
+
+
+def build_current_channel_rankings(session: Session) -> list[ChannelSnapshot]:
+    """Build the current VOD-view ranking from eligible observations.
+
+    This is deliberately a current snapshot, not yet a historical STX score.
+    """
+    return rank_channels(_build_current_snapshots(session))
+
+
+def build_current_live_channel_rankings(session: Session) -> list[ChannelSnapshot]:
+    """Build the current live-audience ranking from eligible observations."""
+    return rank_channels_by_live(_build_current_snapshots(session))
