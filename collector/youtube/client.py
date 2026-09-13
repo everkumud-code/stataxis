@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import httpx
 from dotenv import load_dotenv
@@ -39,7 +39,7 @@ class YouTubeClient:
     def close(self) -> None:
         self.client.close()
 
-    def __enter__(self) -> "YouTubeClient":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_: object) -> None:
