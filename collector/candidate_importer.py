@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from collector.verify_channel import verify_channel
 from collector.channel_registry import add_channel, channel_exists
+from collector.verify_channel import verify_channel
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -89,7 +89,7 @@ def process_candidates(add_verified: bool = False) -> None:
                 print("Registry:  ADDED")
                 added += 1
 
-        except Exception as exc:
+        except ValueError as exc:
             candidate["verification_status"] = "failed"
             candidate["verification_error"] = str(exc)
 
