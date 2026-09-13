@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -15,7 +15,7 @@ def test_observations_are_append_only() -> None:
     observation = VideoObservation(
         video_id="video1",
         channel_id="channel1",
-        observed_at=datetime.now(timezone.utc),
+        observed_at=datetime.now(UTC),
         title="Test",
         published_at=None,
         view_count=100,
@@ -43,7 +43,7 @@ def test_observations_are_append_only() -> None:
         observation_2 = VideoObservation(
             video_id="video1",
             channel_id="channel1",
-            observed_at=datetime.now(timezone.utc),
+            observed_at=datetime.now(UTC),
             title="Test",
             published_at=None,
             view_count=150,
