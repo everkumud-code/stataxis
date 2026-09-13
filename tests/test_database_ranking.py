@@ -4,7 +4,10 @@ from sqlalchemy.orm import Session
 
 from collector.classification import VideoClassification
 from collector.storage import Channel, Observation, Video, create_database
-from metrics.database_ranking import build_current_channel_rankings
+from metrics.database_ranking import (
+    build_current_channel_rankings,
+    build_current_live_channel_rankings,
+)
 
 
 def _add_video(
@@ -153,3 +156,37 @@ def test_current_rankings_use_latest_observation_for_each_video():
 
     assert rankings[0].total_views == 150
     assert rankings[0].video_count == 1
+
+
+def test_current_live_rankings_order_by_live_audience():
+    engine = create_database("sqlite:///:memory:")
+    observed_at = datetime(2026, 9, 13, 10, 0, tzinfo=timezone.utc)
+
+    with Session(engine) as session:
+        for channel_id, name, concurrent in [
+            ("channel-a", "Alpha", 100),
+            ("channel-b", "Beta", 200),
+            ("channel-c", "Gamma", 150),
+        ]:
+            channel = Channel(
+                youtube_channel_id=channel_id,
+                name=name,
+                language="Hindi",
+            )
+            session.add(channel)
+            session.flush()
+            _add_video(
+                session,
+                channel,
+                f"{channel_id}-live",
+                VideoClassification.LIVE.value,
+                None,
+                concurrent,
+                observed_at,
+            )
+
+        session.commit()
+        rankings = build_current_live_channel_rankings(session)
+
+    assert [item.name for item in rankings] == ["Beta", "Gamma", "Alpha"]
+    assert [item.average_concurrent for item in rankings] == [200, 150, 100]
