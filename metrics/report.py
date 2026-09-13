@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from collector.storage import create_database
 from metrics.database_ranking import build_current_channel_rankings
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
 
