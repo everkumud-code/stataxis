@@ -1,10 +1,10 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from metrics.engine import ObservationPoint, audience_momentum, average, peak, view_velocity
 
 
 def test_view_velocity_per_minute():
-    start = datetime(2026, 9, 8, 10, 0, tzinfo=timezone.utc)
+    start = datetime(2026, 9, 8, 10, 0, tzinfo=UTC)
     previous = ObservationPoint(observed_at=start, view_count=1000)
     current = ObservationPoint(
         observed_at=start + timedelta(minutes=2),
@@ -14,7 +14,7 @@ def test_view_velocity_per_minute():
 
 
 def test_audience_momentum_per_minute():
-    start = datetime(2026, 9, 8, 10, 0, tzinfo=timezone.utc)
+    start = datetime(2026, 9, 8, 10, 0, tzinfo=UTC)
     previous = ObservationPoint(observed_at=start, concurrent_viewers=500)
     current = ObservationPoint(
         observed_at=start + timedelta(minutes=5),
@@ -29,7 +29,7 @@ def test_average_and_peak_ignore_missing_values():
 
 
 def test_rates_return_none_when_required_data_is_missing():
-    start = datetime(2026, 9, 8, 10, 0, tzinfo=timezone.utc)
+    start = datetime(2026, 9, 8, 10, 0, tzinfo=UTC)
     previous = ObservationPoint(observed_at=start, view_count=None)
     current = ObservationPoint(observed_at=start + timedelta(minutes=1), view_count=100)
     assert view_velocity(previous, current) is None
