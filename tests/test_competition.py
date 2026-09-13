@@ -2,6 +2,7 @@ from metrics.competition import (
     CompetitionPoint,
     build_competition,
     compare_head_to_head,
+    summarize_competition,
 )
 
 
@@ -108,3 +109,51 @@ def test_head_to_head_rejects_unknown_channel():
         assert "missing" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_competitive_summary_identifies_top_movers_and_leaders():
+    previous = [
+        CompetitionPoint("a", "Alpha", 900, momentum=2),
+        CompetitionPoint("b", "Beta", 700, momentum=5),
+        CompetitionPoint("c", "Gamma", 400, momentum=1),
+    ]
+    current = [
+        CompetitionPoint("a", "Alpha", 700, momentum=3),
+        CompetitionPoint("b", "Beta", 1000, momentum=8),
+        CompetitionPoint("c", "Gamma", 300, momentum=2),
+    ]
+    summary = summarize_competition(build_competition(current, previous))
+    assert summary.leader_id == "b"
+    assert summary.momentum_leader_id == "b"
+    assert summary.biggest_rank_gainer_id == "b"
+    assert summary.biggest_rank_loser_id == "a"
+    assert summary.biggest_share_gainer_id == "b"
+    assert summary.biggest_share_loser_id == "a"
+    assert summary.biggest_gap_closer_id == "b"
+    assert summary.biggest_gap_widener_id == "a"
+    assert summary.channels_with_data == 3
+
+
+def test_competitive_summary_does_not_force_a_tied_extreme():
+    previous = [
+        CompetitionPoint("a", "Alpha", 500),
+        CompetitionPoint("b", "Beta", 400),
+        CompetitionPoint("c", "Gamma", 300),
+    ]
+    current = [
+        CompetitionPoint("a", "Alpha", 400),
+        CompetitionPoint("b", "Beta", 300),
+        CompetitionPoint("c", "Gamma", 200),
+    ]
+    summary = summarize_competition(build_competition(current, previous))
+    assert summary.biggest_rank_gainer_id is None
+    assert summary.biggest_rank_loser_id is None
+
+
+def test_competitive_summary_handles_no_ranked_channels():
+    summary = summarize_competition(
+        build_competition([CompetitionPoint("a", "Alpha", None, momentum=None)])
+    )
+    assert summary.leader_id is None
+    assert summary.momentum_leader_id is None
+    assert summary.channels_with_data == 0
