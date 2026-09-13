@@ -1,10 +1,10 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from collector.youtube.collector import normalize_video
 
 
 def test_normalize_live_video() -> None:
-    observed_at = datetime(2026, 9, 8, tzinfo=timezone.utc)
+    observed_at = datetime(2026, 9, 8, tzinfo=UTC)
 
     video = {
         "id": "abc123",
@@ -30,21 +30,18 @@ def test_normalize_live_video() -> None:
     assert result.channel_id == "channel1"
     assert result.title == "Breaking News"
     assert result.published_at == "2026-09-08T10:00:00Z"
-
     assert result.view_count == 12345
     assert result.like_count == 678
     assert result.comment_count == 90
-
     assert result.concurrent_viewers == 4321
     assert result.is_live is True
     assert result.classification == "LIVE"
-
     assert result.live_started_at == "2026-09-08T10:01:00Z"
     assert result.live_ended_at is None
 
 
 def test_normalize_regular_video() -> None:
-    observed_at = datetime(2026, 9, 8, tzinfo=timezone.utc)
+    observed_at = datetime(2026, 9, 8, tzinfo=UTC)
 
     video = {
         "id": "regular123",
@@ -58,9 +55,7 @@ def test_normalize_regular_video() -> None:
             "likeCount": "100",
             "commentCount": "20",
         },
-        "contentDetails": {
-            "duration": "PT10M30S",
-        },
+        "contentDetails": {"duration": "PT10M30S"},
     }
 
     result = normalize_video(video, "channel1", observed_at)
@@ -68,21 +63,18 @@ def test_normalize_regular_video() -> None:
     assert result.video_id == "regular123"
     assert result.channel_id == "channel1"
     assert result.title == "Regular News Video"
-
     assert result.view_count == 5000
     assert result.like_count == 100
     assert result.comment_count == 20
-
     assert result.concurrent_viewers is None
     assert result.is_live is False
     assert result.classification == "REGULAR_VIDEO"
-
     assert result.live_started_at is None
     assert result.live_ended_at is None
 
 
 def test_normalize_upcoming_video() -> None:
-    observed_at = datetime(2026, 9, 8, tzinfo=timezone.utc)
+    observed_at = datetime(2026, 9, 8, tzinfo=UTC)
 
     video = {
         "id": "upcoming123",
@@ -91,11 +83,7 @@ def test_normalize_upcoming_video() -> None:
             "publishedAt": "2026-09-08T15:00:00Z",
             "liveBroadcastContent": "upcoming",
         },
-        "statistics": {
-            "viewCount": "0",
-            "likeCount": "0",
-            "commentCount": "0",
-        },
+        "statistics": {"viewCount": "0", "likeCount": "0", "commentCount": "0"},
         "liveStreamingDetails": {},
     }
 
@@ -109,7 +97,7 @@ def test_normalize_upcoming_video() -> None:
 
 
 def test_normalize_completed_live_video() -> None:
-    observed_at = datetime(2026, 9, 8, tzinfo=timezone.utc)
+    observed_at = datetime(2026, 9, 8, tzinfo=UTC)
 
     video = {
         "id": "completed123",
@@ -136,13 +124,12 @@ def test_normalize_completed_live_video() -> None:
     assert result.concurrent_viewers is None
     assert result.is_live is False
     assert result.classification == "COMPLETED_LIVE"
-
     assert result.live_started_at == "2026-09-08T10:01:00Z"
     assert result.live_ended_at == "2026-09-08T11:01:00Z"
 
 
 def test_normalize_unknown_video() -> None:
-    observed_at = datetime(2026, 9, 8, tzinfo=timezone.utc)
+    observed_at = datetime(2026, 9, 8, tzinfo=UTC)
 
     video = {
         "id": "unknown123",
