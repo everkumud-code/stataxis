@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from itertools import pairwise
 
 from metrics.engine import ObservationPoint
 from metrics.velocity import VelocityPoint, calculate_velocity
@@ -59,7 +60,7 @@ def calculate_acceleration(points: list[ObservationPoint]) -> list[AccelerationP
         )
     ]
 
-    for previous, current in zip(velocities, velocities[1:]):
+    for previous, current in pairwise(velocities):
         elapsed = _interval_seconds(previous, current)
         results.append(
             AccelerationPoint(
