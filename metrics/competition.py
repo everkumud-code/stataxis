@@ -47,6 +47,21 @@ class HeadToHeadResult:
     momentum_gap: float | None
 
 
+@dataclass(frozen=True)
+class CompetitiveSummary:
+    """Top-level competitive signals derived from a standings snapshot."""
+
+    leader_id: str | None
+    momentum_leader_id: str | None
+    biggest_rank_gainer_id: str | None
+    biggest_rank_loser_id: str | None
+    biggest_share_gainer_id: str | None
+    biggest_share_loser_id: str | None
+    biggest_gap_closer_id: str | None
+    biggest_gap_widener_id: str | None
+    channels_with_data: int
+
+
 def _rank_map(points: list[CompetitionPoint]) -> dict[str, int]:
     """Return competition ranks (1, 1, 3) for available values."""
     ordered = sorted(
@@ -170,6 +185,49 @@ def build_competition(
             item.rank if item.rank is not None else float("inf"),
             item.name.lower(),
         ),
+    )
+
+
+def _unique_extreme_id(
+    standings: list[CompetitiveStanding],
+    attribute: str,
+    maximize: bool,
+) -> str | None:
+    """Return an extreme movement only when it is uniquely supported by data."""
+    candidates = [
+        item for item in standings if getattr(item, attribute) is not None
+    ]
+    if not candidates:
+        return None
+    target = (max if maximize else min)(getattr(item, attribute) for item in candidates)
+    winners = [item for item in candidates if getattr(item, attribute) == target]
+    return winners[0].channel_id if len(winners) == 1 else None
+
+
+def summarize_competition(
+    standings: list[CompetitiveStanding],
+) -> CompetitiveSummary:
+    """Summarize competitive movement without forcing conclusions on ties."""
+    ranked = [item for item in standings if item.rank is not None]
+    momentum = [item for item in standings if item.momentum_rank is not None]
+
+    leader_id = ranked[0].channel_id if ranked else None
+    momentum_leader_id = (
+        min(momentum, key=lambda item: item.momentum_rank).channel_id
+        if momentum
+        else None
+    )
+
+    return CompetitiveSummary(
+        leader_id=leader_id,
+        momentum_leader_id=momentum_leader_id,
+        biggest_rank_gainer_id=_unique_extreme_id(standings, "rank_change", True),
+        biggest_rank_loser_id=_unique_extreme_id(standings, "rank_change", False),
+        biggest_share_gainer_id=_unique_extreme_id(standings, "share_change", True),
+        biggest_share_loser_id=_unique_extreme_id(standings, "share_change", False),
+        biggest_gap_closer_id=_unique_extreme_id(standings, "gap_change", False),
+        biggest_gap_widener_id=_unique_extreme_id(standings, "gap_change", True),
+        channels_with_data=len(ranked),
     )
 
 
