@@ -3,8 +3,8 @@ import json
 
 from sqlalchemy.orm import Session
 
-from api.channel import channel_intelligence_comparison
-from api.http import get_channel_comparison
+from api.channel import channel_intelligence_comparison, compare_channels
+from api.http import get_channel_comparison, get_channels_comparison
 from collector.storage import Channel, Video, create_database
 from metrics.persistence import IntelligenceSnapshotRecord
 
@@ -73,3 +73,39 @@ def test_channel_comparison_http_adapter_validates_ids_and_missing_channels():
     with Session(engine) as session:
         assert get_channel_comparison(session, 0)[0] == 400
         assert get_channel_comparison(session, 999)[0] == 404
+
+
+def test_compare_channels_ranks_real_current_scores_and_preserves_history():
+    engine = create_database("sqlite:///:memory:")
+    with Session(engine) as session:
+        as_of = datetime(2026, 9, 14, tzinfo=timezone.utc)
+        channels = []
+        for index, (score_now, score_month) in enumerate(((92, 80), (88, 82), (85, 84)), start=1):
+            channel = Channel(youtube_channel_id=f"UC-{index}", name=f"Channel {index}")
+            session.add(channel)
+            session.flush()
+            video = Video(youtube_video_id=f"video-{index}", channel_id=channel.id, title=f"Video {index}")
+            session.add(video)
+            session.flush()
+            session.add_all([
+                _record(video.id, as_of - timedelta(days=30), score_month, 0.8, 3, [{"name": "momentum", "contribution": score_month / 10}]),
+                _record(video.id, as_of, score_now, 0.9, 4, [{"name": "momentum", "contribution": score_now / 10}]),
+            ])
+            channels.append(channel)
+        session.commit()
+
+        result = compare_channels(session, [channels[2].id, channels[0].id, channels[1].id], as_of=as_of)
+        assert [item["name"] for item in result["channels"]] == ["Channel 1", "Channel 2", "Channel 3"]
+        assert [item["rank"] for item in result["channels"]] == [1, 2, 3]
+        assert result["channels"][0]["last_1_month"]["change"]["score_delta"] == 12.0
+        assert result["missing_channel_ids"] == []
+
+
+def test_compare_channels_reports_missing_ids_without_fabricating_scores():
+    engine = create_database("sqlite:///:memory:")
+    with Session(engine) as session:
+        result = compare_channels(session, [999], as_of=datetime(2026, 9, 14, tzinfo=timezone.utc))
+        assert result["channels"] == []
+        assert result["missing_channel_ids"] == [999]
+        assert get_channels_comparison(session, [0])[0] == 400
+        assert get_channels_comparison(session, [999])[0] == 200

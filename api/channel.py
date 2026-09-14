@@ -129,12 +129,7 @@ def channel_intelligence_comparison(
         ("last_1_year", 365),
     ),
 ) -> dict[str, Any] | None:
-    """Compare channel STX intelligence at real historical observation points.
-
-    Each period compares the latest persisted snapshot available at ``as_of`` with
-    the latest snapshot available exactly ``days`` earlier. Missing history stays
-    missing; no values are inferred or backfilled.
-    """
+    """Compare channel STX intelligence at real historical snapshot points."""
     channel = session.get(Channel, channel_id)
     if channel is None:
         return None
@@ -151,11 +146,13 @@ def channel_intelligence_comparison(
         ).all()
     )
 
-    current = _aggregate_records(_latest_records_as_of(records, as_of))
+    current_records = _latest_records_as_of(records, as_of)
+    current = _aggregate_records(current_records)
     comparisons: dict[str, Any] = {}
     for name, days in periods:
         baseline_at = as_of - timedelta(days=days)
-        baseline = _aggregate_records(_latest_records_as_of(records, baseline_at))
+        baseline_records = _latest_records_as_of(records, baseline_at)
+        baseline = _aggregate_records(baseline_records)
         comparisons[name] = {
             "period_days": days,
             "as_of": as_of.isoformat(),
@@ -163,10 +160,7 @@ def channel_intelligence_comparison(
             "current": current,
             "baseline": baseline,
             "change": _comparison_change(current, baseline),
-            "contribution_changes": _contribution_changes(
-                _latest_records_as_of(records, as_of),
-                _latest_records_as_of(records, baseline_at),
-            ),
+            "contribution_changes": _contribution_changes(current_records, baseline_records),
         }
 
     return {
@@ -175,6 +169,58 @@ def channel_intelligence_comparison(
         "name": channel.name,
         "as_of": as_of.isoformat(),
         "comparisons": comparisons,
+    }
+
+
+def compare_channels(
+    session: Session,
+    channel_ids: Iterable[int],
+    *,
+    as_of: datetime | None = None,
+) -> dict[str, Any]:
+    """Build a ranked multi-channel STX report from persisted intelligence.
+
+    This composes the existing historical comparison for each requested channel,
+    preserving missing periods and ranking only channels with a current score.
+    """
+    ids = list(dict.fromkeys(int(channel_id) for channel_id in channel_ids))
+    if not ids:
+        return {"as_of": _utc(as_of or datetime.now(UTC)).isoformat(), "channels": []}
+    if len(ids) > 12:
+        raise ValueError("a maximum of 12 channels can be compared")
+
+    resolved_as_of = _utc(as_of or datetime.now(UTC))
+    channels = []
+    missing_ids = []
+    for channel_id in ids:
+        payload = channel_intelligence_comparison(session, channel_id, as_of=resolved_as_of)
+        if payload is None:
+            missing_ids.append(channel_id)
+            continue
+        month = payload["comparisons"]["last_1_month"]
+        year = payload["comparisons"]["last_1_year"]
+        channels.append({
+            "channel_id": payload["channel_id"],
+            "youtube_channel_id": payload["youtube_channel_id"],
+            "name": payload["name"],
+            "current": payload["comparisons"]["last_1_month"]["current"],
+            "last_3_weeks": payload["comparisons"]["last_3_weeks"],
+            "last_1_month": month,
+            "last_1_year": year,
+        })
+
+    channels.sort(key=lambda item: (
+        item["current"] is not None,
+        item["current"]["score"] if item["current"] else float("-inf"),
+        item["current"]["confidence"] if item["current"] else float("-inf"),
+    ), reverse=True)
+    for rank, item in enumerate(channels, start=1):
+        item["rank"] = rank
+
+    return {
+        "as_of": resolved_as_of.isoformat(),
+        "channels": channels,
+        "missing_channel_ids": missing_ids,
     }
 
 

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from api.access import UserRole
 from api.catalog import list_channels
-from api.channel import channel_intelligence_comparison, channel_intelligence_overview, channel_view_series
+from api.channel import channel_intelligence_comparison, channel_intelligence_overview, channel_view_series, compare_channels
 from api.export import ObservationExportFilters, export_response
 from api.intelligence import latest_video_intelligence
 
@@ -32,6 +32,16 @@ def get_channel_comparison(session: Session, channel_id: int) -> tuple[int, dict
     if payload is None:
         return 404, {"error": "channel not found"}
     return 200, payload
+
+
+def get_channels_comparison(session: Session, channel_ids: list[int]) -> tuple[int, dict[str, Any]]:
+    if not channel_ids:
+        return 400, {"error": "at least one channel_id is required"}
+    if any(channel_id <= 0 for channel_id in channel_ids):
+        return 400, {"error": "channel_id must be a positive integer"}
+    if len(channel_ids) > 12:
+        return 400, {"error": "a maximum of 12 channels can be compared"}
+    return 200, compare_channels(session, channel_ids)
 
 
 def get_channel_overview(session: Session, channel_id: int) -> tuple[int, dict[str, Any]]:
@@ -61,7 +71,7 @@ def get_channel_catalog(session: Session) -> tuple[int, dict[str, Any]]:
 
 
 def wsgi_application(session_factory: Callable[[], Session]):
-    """Expose health, catalog, intelligence, time-series and report endpoints."""
+    """Expose health, catalog, intelligence, comparison, series and report endpoints."""
 
     def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         method = environ.get("REQUEST_METHOD", "GET")
@@ -77,6 +87,24 @@ def wsgi_application(session_factory: Callable[[], Session]):
             session = session_factory()
             try:
                 status, payload = get_channel_catalog(session)
+            finally:
+                session.close()
+            return _json_response(start_response, status, payload)
+
+        if path == "/api/v1/channels/compare":
+            if method != "GET":
+                return _json_response(start_response, 405, {"error": "method not allowed"})
+            query = parse_qs(environ.get("QUERY_STRING", ""))
+            raw_ids = query.get("ids", [])
+            channel_ids: list[int] = []
+            try:
+                for raw in raw_ids:
+                    channel_ids.extend(int(part.strip()) for part in raw.split(",") if part.strip())
+            except ValueError:
+                return _json_response(start_response, 400, {"error": "ids must contain positive integer channel IDs"})
+            session = session_factory()
+            try:
+                status, payload = get_channels_comparison(session, channel_ids)
             finally:
                 session.close()
             return _json_response(start_response, status, payload)
