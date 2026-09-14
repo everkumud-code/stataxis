@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
@@ -11,6 +12,7 @@ from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
 from collector.storage import Channel, Observation, Video
+from metrics.persistence import IntelligenceSnapshotRecord
 
 
 @dataclass(frozen=True)
@@ -61,40 +63,65 @@ def export_observations_xlsx(
     session: Session,
     filters: ObservationExportFilters,
 ) -> bytes:
-    """Build an Excel workbook containing exactly the filtered observations."""
+    """Build an Excel workbook containing filtered data and latest intelligence."""
     rows = filtered_observations(session, filters)
     workbook = Workbook()
+
     data = workbook.active
     data.title = "StatAxis Data"
-    headers = [
-        "Observed At", "Video ID", "YouTube Video ID", "Title", "Channel",
-        "Language", "Region", "Classification", "Live", "Views", "Likes",
-        "Comments", "Concurrent Viewers", "Source",
-    ]
-    data.append(headers)
+    data.append([
+        "Observed At", "Video ID", "YouTube Video ID", "Title", "Channel", "Language",
+        "Region", "Classification", "Live", "Views", "Likes", "Comments",
+        "Concurrent Viewers", "Source",
+    ])
+    video_ids = set()
     for observation, video, channel in rows:
+        video_ids.add(video.id)
         data.append([
             observation.observed_at, video.id, video.youtube_video_id, video.title,
             channel.name, channel.language, channel.region, observation.classification,
             observation.is_live, observation.view_count, observation.like_count,
             observation.comment_count, observation.concurrent_viewers, observation.source,
         ])
-    data.freeze_panes = "A2"
-    data.auto_filter.ref = data.dimensions
-    for column in data.columns:
-        width = min(max(len(str(cell.value or "")) for cell in column) + 2, 48)
-        data.column_dimensions[column[0].column_letter].width = width
+    _format_sheet(data)
 
     intelligence = workbook.create_sheet("StatAxis Intelligence")
     intelligence.append([
-        "Video ID", "STX Index", "Confidence", "Available Signals",
-        "Generated At", "StatAxis View",
+        "Video ID", "YouTube Video ID", "Title", "STX Index", "Confidence",
+        "Available Signals", "Generated At", "StatAxis View", "Signal Contributions",
     ])
-    for _, video, _ in rows:
-        intelligence.append([video.id, None, None, None, None, ""])
-    intelligence.freeze_panes = "A2"
-    intelligence.auto_filter.ref = intelligence.dimensions
+    if video_ids:
+        stmt = (
+            select(IntelligenceSnapshotRecord, Video)
+            .join(Video, Video.id == IntelligenceSnapshotRecord.video_id)
+            .where(IntelligenceSnapshotRecord.video_id.in_(video_ids))
+            .order_by(IntelligenceSnapshotRecord.generated_at.desc())
+        )
+        latest: dict[int, IntelligenceSnapshotRecord] = {}
+        for record, video in session.execute(stmt):
+            latest.setdefault(video.id, record)
+        for _, video, _ in rows:
+            record = latest.get(video.id)
+            if record is None:
+                continue
+            view = json.loads(record.view_json)
+            contributions = json.loads(record.contributions_json)
+            intelligence.append([
+                video.id, video.youtube_video_id, video.title, record.score,
+                record.confidence, record.available_signals, record.generated_at,
+                view.get("view", view.get("summary", "")), json.dumps(contributions, sort_keys=True),
+            ])
+    _format_sheet(intelligence)
 
     output = BytesIO()
     workbook.save(output)
     return output.getvalue()
+
+
+def _format_sheet(sheet) -> None:
+    """Apply simple spreadsheet usability defaults."""
+    sheet.freeze_panes = "A2"
+    sheet.auto_filter.ref = sheet.dimensions
+    for column in sheet.columns:
+        width = min(max(len(str(cell.value or "")) for cell in column) + 2, 48)
+        sheet.column_dimensions[column[0].column_letter].width = width
