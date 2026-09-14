@@ -36,6 +36,15 @@ class CompetitiveStanding:
 
 
 @dataclass(frozen=True)
+class CompetitivePosition:
+    """Dashboard-ready interpretation of a channel's competitive state."""
+
+    channel_id: str
+    label: str
+    signals: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class HeadToHeadResult:
     """Evidence available for a direct comparison between two channels."""
 
@@ -143,21 +152,9 @@ def build_competition(
         gap = current_gaps.get(point.channel_id)
         previous_gap = previous_gaps.get(point.channel_id)
 
-        rank_change = (
-            previous_rank - rank
-            if previous_rank is not None and rank is not None
-            else None
-        )
-        share_change = (
-            share - previous_share
-            if share is not None and previous_share is not None
-            else None
-        )
-        gap_change = (
-            gap - previous_gap
-            if gap is not None and previous_gap is not None
-            else None
-        )
+        rank_change = previous_rank - rank if previous_rank is not None and rank is not None else None
+        share_change = share - previous_share if share is not None and previous_share is not None else None
+        gap_change = gap - previous_gap if gap is not None and previous_gap is not None else None
 
         standings.append(
             CompetitiveStanding(
@@ -188,15 +185,53 @@ def build_competition(
     )
 
 
-def _unique_extreme_id(
-    standings: list[CompetitiveStanding],
-    attribute: str,
-    maximize: bool,
-) -> str | None:
+def classify_competitive_position(standing: CompetitiveStanding) -> CompetitivePosition:
+    """Translate measured movements into conservative dashboard labels.
+
+    Labels describe observed relative movement; they do not claim audience causality.
+    """
+    if standing.value is None or standing.rank is None:
+        return CompetitivePosition(standing.channel_id, "insufficient data", ())
+
+    signals: list[str] = []
+    if standing.rank == 1:
+        signals.append("leader")
+    if standing.momentum_rank == 1:
+        signals.append("momentum leader")
+    if standing.rank_change is not None and standing.rank_change > 0:
+        signals.append("rank gaining")
+    elif standing.rank_change is not None and standing.rank_change < 0:
+        signals.append("rank losing")
+    if standing.share_change is not None and standing.share_change > 0:
+        signals.append("share gaining")
+    elif standing.share_change is not None and standing.share_change < 0:
+        signals.append("share losing")
+    if standing.gap_change is not None and standing.gap_change < 0:
+        signals.append("closing gap")
+    elif standing.gap_change is not None and standing.gap_change > 0:
+        signals.append("widening gap")
+
+    if standing.rank == 1 and standing.momentum_rank == 1:
+        label = "competitive leader"
+    elif standing.rank_change is not None and standing.rank_change > 0:
+        label = "gaining ground"
+    elif standing.rank_change is not None and standing.rank_change < 0:
+        label = "losing ground"
+    elif standing.momentum_rank == 1:
+        label = "momentum leader"
+    elif standing.gap_change is not None and standing.gap_change < 0:
+        label = "closing the gap"
+    elif standing.gap_change is not None and standing.gap_change > 0:
+        label = "falling behind"
+    else:
+        label = "stable position"
+
+    return CompetitivePosition(standing.channel_id, label, tuple(signals))
+
+
+def _unique_extreme_id(standings: list[CompetitiveStanding], attribute: str, maximize: bool) -> str | None:
     """Return an extreme movement only when it is uniquely supported by data."""
-    candidates = [
-        item for item in standings if getattr(item, attribute) is not None
-    ]
+    candidates = [item for item in standings if getattr(item, attribute) is not None]
     if not candidates:
         return None
     target = (max if maximize else min)(getattr(item, attribute) for item in candidates)
@@ -204,19 +239,13 @@ def _unique_extreme_id(
     return winners[0].channel_id if len(winners) == 1 else None
 
 
-def summarize_competition(
-    standings: list[CompetitiveStanding],
-) -> CompetitiveSummary:
+def summarize_competition(standings: list[CompetitiveStanding]) -> CompetitiveSummary:
     """Summarize competitive movement without forcing conclusions on ties."""
     ranked = [item for item in standings if item.rank is not None]
     momentum = [item for item in standings if item.momentum_rank is not None]
 
     leader_id = ranked[0].channel_id if ranked else None
-    momentum_leader_id = (
-        min(momentum, key=lambda item: item.momentum_rank).channel_id
-        if momentum
-        else None
-    )
+    momentum_leader_id = min(momentum, key=lambda item: item.momentum_rank).channel_id if momentum else None
 
     return CompetitiveSummary(
         leader_id=leader_id,
@@ -231,11 +260,7 @@ def summarize_competition(
     )
 
 
-def compare_head_to_head(
-    points: list[CompetitionPoint],
-    channel_a_id: str,
-    channel_b_id: str,
-) -> HeadToHeadResult:
+def compare_head_to_head(points: list[CompetitionPoint], channel_a_id: str, channel_b_id: str) -> HeadToHeadResult:
     """Compare two channels without inventing missing observations."""
     by_id = {point.channel_id: point for point in points}
     try:
