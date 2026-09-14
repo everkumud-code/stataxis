@@ -7,21 +7,23 @@ import os
 from pathlib import Path
 from typing import Any, Callable
 
-from collector.storage import create_database
+from sqlalchemy.orm import Session
+
 from api.http import wsgi_application
+from collector.storage import create_database
 
 ROOT = Path(__file__).resolve().parent
 DASHBOARD = ROOT / "dashboard"
 DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("STAXIS_DATABASE_URL") or "sqlite:///stataxis.db"
 
 _engine = create_database(DATABASE_URL)
-_api = wsgi_application(lambda: _engine.connect_session() if False else _session())
 
 
-def _session():
-    from sqlalchemy.orm import Session
-
+def _session() -> Session:
     return Session(_engine)
+
+
+_api = wsgi_application(_session)
 
 
 def application(environ: dict[str, Any], start_response: Callable[..., Any]):
