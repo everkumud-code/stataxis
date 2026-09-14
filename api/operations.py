@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
-from collector.storage import CollectionRun
+from collector.storage import CollectionRun, Observation
 from metrics.persistence import IntelligenceSnapshotRecord
 
 
@@ -53,10 +53,20 @@ def intelligence_readiness(session: Session, *, as_of: datetime | None = None, s
     if run is None:
         return {"ready": False, "reason": "no_collection_run", "collection": health, "intelligence": {"videos_observed": 0, "videos_with_intelligence": 0, "coverage": 0.0, "min_snapshot_coverage": min_snapshot_coverage}}
     observed = max(0, int(run["videos_observed"]))
-    query = select(func.count(distinct(IntelligenceSnapshotRecord.video_id))).select_from(IntelligenceSnapshotRecord)
-    if run["finished_at"]:
-        query = query.where(IntelligenceSnapshotRecord.generated_at >= datetime.fromisoformat(run["finished_at"]))
-    query = query.where(IntelligenceSnapshotRecord.generated_at <= resolved_as_of)
+    run_started_at = datetime.fromisoformat(run["started_at"])
+    observed_video_ids = (
+        select(distinct(Observation.video_id))
+        .where(Observation.observed_at >= run_started_at)
+        .where(Observation.observed_at <= resolved_as_of)
+        .subquery()
+    )
+    query = (
+        select(func.count(distinct(IntelligenceSnapshotRecord.video_id)))
+        .select_from(IntelligenceSnapshotRecord)
+        .where(IntelligenceSnapshotRecord.video_id.in_(select(observed_video_ids.c.video_id)))
+        .where(IntelligenceSnapshotRecord.generated_at >= run_started_at)
+        .where(IntelligenceSnapshotRecord.generated_at <= resolved_as_of)
+    )
     with_intelligence = int(session.execute(query).scalar_one() or 0)
     coverage = min(1.0, with_intelligence / observed) if observed else 0.0
     ready = bool(health["fresh"] and observed > 0 and coverage >= min_snapshot_coverage)
