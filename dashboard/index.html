@@ -32,9 +32,9 @@
         <div class="meter"><span id="stx-meter" style="width:0%"></span></div>
         <small>Composite intelligence score · provisional</small>
       </article>
-      <article class="card"><div class="label">AUDIENCE</div><div class="big" id="audience-value">—</div><div class="delta">Observed view count</div><p class="muted">Latest persisted observation</p></article>
-      <article class="card"><div class="label">MOMENTUM</div><div class="big">—</div><div class="signal">STX</div><p class="muted">Derived from persisted signals</p></article>
-      <article class="card"><div class="label">COMPETITIVE POSITION</div><div class="big">—</div><div class="delta">Relative comparison</div><p class="muted">Competitive endpoint ready</p></article>
+      <article class="card"><div class="label">AUDIENCE</div><div class="big" id="audience-value">—</div><div class="delta" id="audience-delta">Observed view count</div><p class="muted">Latest persisted observation</p></article>
+      <article class="card"><div class="label">MOMENTUM</div><div class="big" id="momentum-value">—</div><div class="signal" id="momentum-direction">STX</div><p class="muted" id="momentum-meta">Derived from persisted signals</p></article>
+      <article class="card"><div class="label">COMPETITIVE POSITION</div><div class="big" id="competitive-rank">—</div><div class="delta" id="competitive-share">Relative comparison</div><p class="muted" id="competitive-meta">Current multi-channel position</p></article>
     </section>
 
     <section class="grid main-grid">
@@ -54,7 +54,7 @@
     </section>
 
     <section class="grid lower-grid">
-      <article class="card"><div class="card-head"><div><h2>Competitive View</h2><p class="muted">Current relative position</p></div></div><div class="rows"><div><span>Channel comparison</span><b>API</b><em>→</em></div><div><span>Rank movement</span><b>API</b><em>→</em></div><div><span>Share movement</span><b>API</b><em>→</em></div></div></article>
+      <article class="card"><div class="card-head"><div><h2>Competitive View</h2><p class="muted" id="competition-note">Current relative position</p></div></div><div class="rows" id="competition-rows"><div><span>Channel comparison</span><b>—</b><em>→</em></div><div><span>Rank movement</span><b>—</b><em>→</em></div><div><span>Share movement</span><b>—</b><em>→</em></div></div></article>
       <article class="card"><div class="card-head"><div><h2>Historical Comparison</h2><p class="muted">STX Index change</p></div></div><div class="history"><div><span id="hist-3w-meta">3 Weeks</span><b id="hist-3w">—</b></div><div><span id="hist-1m-meta">1 Month</span><b id="hist-1m">—</b></div><div><span id="hist-1y-meta">1 Year</span><b id="hist-1y">—</b></div></div></article>
       <article class="card"><div class="card-head"><div><h2>Signal Drivers</h2><p class="muted">Contribution to current score</p></div></div><div id="signal-drivers" class="drivers"><div><span>Awaiting data</span><i style="width:22%"></i><b>—</b></div></div></article>
     </section>
