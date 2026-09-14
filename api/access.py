@@ -25,18 +25,19 @@ class VideoAccessPolicy:
     can_add_video: bool
     can_remove_video: bool
     can_evaluate_url: bool
+    can_download_report: bool
     reason: str
 
 
 def video_access_policy(role: UserRole | str) -> VideoAccessPolicy:
-    """Return the least-privilege video capabilities for a dashboard role."""
+    """Return the least-privilege capabilities for a dashboard role."""
     try:
         resolved = UserRole(role)
     except ValueError as exc:
         raise ValueError(f"unknown user role: {role}") from exc
 
     if resolved is UserRole.ADMIN:
-        return VideoAccessPolicy(True, True, True, "admin access")
+        return VideoAccessPolicy(True, True, True, True, "admin access")
 
     if resolved in {
         UserRole.PAID,
@@ -44,9 +45,9 @@ def video_access_policy(role: UserRole | str) -> VideoAccessPolicy:
         UserRole.JOURNALIST,
         UserRole.DATA_SCIENTIST,
     }:
-        return VideoAccessPolicy(False, False, True, "evaluation access")
+        return VideoAccessPolicy(False, False, True, True, "premium access")
 
-    return VideoAccessPolicy(False, False, False, "premium evaluation access required")
+    return VideoAccessPolicy(False, False, False, False, "premium access required")
 
 
 def extract_youtube_video_id(url: str) -> str:
@@ -82,7 +83,12 @@ def extract_youtube_video_id(url: str) -> str:
 
 def require_capability(policy: VideoAccessPolicy, capability: str) -> None:
     """Raise PermissionError unless a policy explicitly grants a capability."""
-    if capability not in {"can_add_video", "can_remove_video", "can_evaluate_url"}:
+    if capability not in {
+        "can_add_video",
+        "can_remove_video",
+        "can_evaluate_url",
+        "can_download_report",
+    }:
         raise ValueError(f"unknown capability: {capability}")
     if not getattr(policy, capability):
         raise PermissionError(policy.reason)
