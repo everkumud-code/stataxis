@@ -26,23 +26,28 @@ def get_video_intelligence(session: Session, video_id: int) -> tuple[int, dict[s
     return 200, payload
 
 
-def get_channel_comparison(session: Session, channel_id: int) -> tuple[int, dict[str, Any]]:
+def get_channel_comparison(session: Session, channel_id: int, *, as_of: datetime | None = None) -> tuple[int, dict[str, Any]]:
     if channel_id <= 0:
         return 400, {"error": "channel_id must be a positive integer"}
-    payload = channel_intelligence_comparison(session, channel_id)
+    payload = channel_intelligence_comparison(session, channel_id, as_of=as_of)
     if payload is None:
         return 404, {"error": "channel not found"}
     return 200, payload
 
 
-def get_channels_comparison(session: Session, channel_ids: list[int]) -> tuple[int, dict[str, Any]]:
+def get_channels_comparison(
+    session: Session,
+    channel_ids: list[int],
+    *,
+    as_of: datetime | None = None,
+) -> tuple[int, dict[str, Any]]:
     if not channel_ids:
         return 400, {"error": "at least one channel_id is required"}
     if any(channel_id <= 0 for channel_id in channel_ids):
         return 400, {"error": "channel_id must be a positive integer"}
     if len(channel_ids) > 12:
         return 400, {"error": "a maximum of 12 channels can be compared"}
-    return 200, compare_channels(session, channel_ids)
+    return 200, compare_channels(session, channel_ids, as_of=as_of)
 
 
 def get_channel_overview(session: Session, channel_id: int) -> tuple[int, dict[str, Any]]:
@@ -116,9 +121,13 @@ def wsgi_application(session_factory: Callable[[], Session]):
                     channel_ids.extend(int(part.strip()) for part in raw.split(",") if part.strip())
             except ValueError:
                 return _json_response(start_response, 400, {"error": "ids must contain positive integer channel IDs"})
+            try:
+                as_of = _query_datetime(query, "as_of")
+            except ValueError as exc:
+                return _json_response(start_response, 400, {"error": str(exc)})
             session = session_factory()
             try:
-                status, payload = get_channels_comparison(session, channel_ids)
+                status, payload = get_channels_comparison(session, channel_ids, as_of=as_of)
             finally:
                 session.close()
             return _json_response(start_response, status, payload)
@@ -136,9 +145,14 @@ def wsgi_application(session_factory: Callable[[], Session]):
                 channel_id = int(raw_id)
             except ValueError:
                 return _json_response(start_response, 400, {"error": "channel_id must be a positive integer"})
+            query = parse_qs(environ.get("QUERY_STRING", ""))
+            try:
+                as_of = _query_datetime(query, "as_of")
+            except ValueError as exc:
+                return _json_response(start_response, 400, {"error": str(exc)})
             session = session_factory()
             try:
-                status, payload = get_channel_comparison(session, channel_id)
+                status, payload = get_channel_comparison(session, channel_id, as_of=as_of)
             finally:
                 session.close()
             return _json_response(start_response, status, payload)
@@ -214,6 +228,16 @@ def wsgi_application(session_factory: Callable[[], Session]):
         return _json_response(start_response, status, payload)
 
     return application
+
+
+def _query_datetime(query: dict[str, list[str]], key: str) -> datetime | None:
+    values = query.get(key)
+    if not values or not values[0].strip():
+        return None
+    try:
+        return datetime.fromisoformat(values[0].strip())
+    except ValueError as exc:
+        raise ValueError(f"{key} must be an ISO datetime") from exc
 
 
 def _report_response(environ: dict[str, Any], start_response: Callable[..., Any], session_factory, method: str):
