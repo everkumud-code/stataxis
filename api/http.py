@@ -14,6 +14,7 @@ from api.catalog import list_channels
 from api.channel import channel_intelligence_comparison, channel_intelligence_overview, channel_view_series, compare_channels
 from api.export import ObservationExportFilters, export_response
 from api.intelligence import latest_video_intelligence
+from api.operations import collection_health
 from api.report import channel_report
 from api.signals import channel_signals
 
@@ -44,6 +45,14 @@ def get_channels_comparison(session: Session, channel_ids: list[int], *, as_of: 
     if len(channel_ids) > 12:
         return 400, {"error": "a maximum of 12 channels can be compared"}
     return 200, compare_channels(session, channel_ids, as_of=as_of)
+
+
+def get_collection_health(session: Session, *, as_of: datetime | None = None, stale_after_minutes: int = 360) -> tuple[int, dict[str, Any]]:
+    try:
+        payload = collection_health(session, as_of=as_of, stale_after_minutes=stale_after_minutes)
+    except ValueError as exc:
+        return 400, {"error": str(exc)}
+    return 200, payload
 
 
 def get_channel_report(
@@ -155,6 +164,26 @@ def wsgi_application(session_factory: Callable[[], Session]):
             session = session_factory()
             try:
                 status, payload = get_channels_comparison(session, channel_ids, as_of=as_of)
+            finally:
+                session.close()
+            return _json_response(start_response, status, payload)
+
+        if path == "/api/v1/operations/collection":
+            if method != "GET":
+                return _json_response(start_response, 405, {"error": "method not allowed"})
+            query = parse_qs(environ.get("QUERY_STRING", ""))
+            try:
+                as_of = _query_datetime(query, "as_of")
+            except ValueError as exc:
+                return _json_response(start_response, 400, {"error": str(exc)})
+            raw_stale = query.get("stale_after_minutes", ["360"])[0]
+            try:
+                stale_after_minutes = int(raw_stale)
+            except ValueError:
+                return _json_response(start_response, 400, {"error": "stale_after_minutes must be an integer"})
+            session = session_factory()
+            try:
+                status, payload = get_collection_health(session, as_of=as_of, stale_after_minutes=stale_after_minutes)
             finally:
                 session.close()
             return _json_response(start_response, status, payload)
