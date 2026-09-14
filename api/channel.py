@@ -9,7 +9,7 @@ from typing import Any, Iterable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from collector.storage import Channel, Video
+from collector.storage import Channel, Observation, Video
 from metrics.persistence import IntelligenceSnapshotRecord
 
 
@@ -50,6 +50,71 @@ def channel_intelligence_overview(session: Session, channel_id: int) -> dict[str
         "youtube_channel_id": channel.youtube_channel_id,
         "name": channel.name,
         "videos": items,
+    }
+
+
+def channel_view_series(
+    session: Session,
+    channel_id: int,
+    *,
+    as_of: datetime | None = None,
+    days: int = 30,
+    max_points: int = 180,
+) -> dict[str, Any] | None:
+    """Return timestamped observed cumulative view-count movement for a channel."""
+    channel = session.get(Channel, channel_id)
+    if channel is None:
+        return None
+    if as_of is None:
+        as_of = datetime.now(UTC)
+    as_of = _utc(as_of)
+    days = max(1, min(int(days), 365))
+    max_points = max(12, min(int(max_points), 500))
+    start_at = as_of - timedelta(days=days)
+
+    rows = session.execute(
+        select(Observation.observed_at, Observation.view_count)
+        .where(
+            Observation.channel_id == channel_id,
+            Observation.observed_at >= start_at,
+            Observation.observed_at <= as_of,
+            Observation.view_count.is_not(None),
+        )
+        .order_by(Observation.observed_at.asc(), Observation.id.asc())
+    ).all()
+
+    if not rows:
+        return {
+            "channel_id": channel.id,
+            "name": channel.name,
+            "metric": "view_count",
+            "as_of": as_of.isoformat(),
+            "start_at": start_at.isoformat(),
+            "points": [],
+        }
+
+    span_seconds = max((as_of - start_at).total_seconds(), 1)
+    bucket_seconds = max(3600, int(span_seconds / max_points))
+    buckets: dict[int, tuple[datetime, int]] = {}
+    for observed_at, view_count in rows:
+        timestamp = _utc(observed_at)
+        bucket = int((timestamp - start_at).total_seconds() // bucket_seconds)
+        existing = buckets.get(bucket)
+        if existing is None or timestamp >= existing[0]:
+            buckets[bucket] = (timestamp, int(view_count))
+
+    points = [
+        {"observed_at": timestamp.isoformat(), "value": value}
+        for timestamp, value in sorted(buckets.values(), key=lambda item: item[0])
+    ]
+    return {
+        "channel_id": channel.id,
+        "name": channel.name,
+        "metric": "view_count",
+        "as_of": as_of.isoformat(),
+        "start_at": start_at.isoformat(),
+        "bucket_seconds": bucket_seconds,
+        "points": points,
     }
 
 
