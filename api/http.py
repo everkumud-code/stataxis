@@ -14,6 +14,7 @@ from api.catalog import list_channels
 from api.channel import channel_intelligence_comparison, channel_intelligence_overview, channel_view_series, compare_channels
 from api.export import ObservationExportFilters, export_response
 from api.intelligence import latest_video_intelligence
+from api.signals import channel_signals
 
 
 def get_video_intelligence(session: Session, video_id: int) -> tuple[int, dict[str, Any]]:
@@ -66,12 +67,25 @@ def get_channel_series(session: Session, channel_id: int, days: int = 30) -> tup
     return 200, payload
 
 
+def get_channel_signals(session: Session, channel_id: int, hours: int = 24) -> tuple[int, dict[str, Any]]:
+    if channel_id <= 0:
+        return 400, {"error": "channel_id must be a positive integer"}
+    try:
+        hours = int(hours)
+    except (TypeError, ValueError):
+        return 400, {"error": "hours must be an integer"}
+    payload = channel_signals(session, channel_id, window_hours=hours)
+    if payload is None:
+        return 404, {"error": "channel not found"}
+    return 200, payload
+
+
 def get_channel_catalog(session: Session) -> tuple[int, dict[str, Any]]:
     return 200, {"channels": list_channels(session)}
 
 
 def wsgi_application(session_factory: Callable[[], Session]):
-    """Expose health, catalog, intelligence, comparison, series and report endpoints."""
+    """Expose health, catalog, intelligence, signal, comparison, series and report endpoints."""
 
     def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         method = environ.get("REQUEST_METHOD", "GET")
@@ -143,6 +157,24 @@ def wsgi_application(session_factory: Callable[[], Session]):
             session = session_factory()
             try:
                 status, payload = get_channel_series(session, channel_id, raw_days)
+            finally:
+                session.close()
+            return _json_response(start_response, status, payload)
+
+        signal_suffix = "/signals"
+        if path.startswith(channel_prefix) and path.endswith(signal_suffix):
+            if method != "GET":
+                return _json_response(start_response, 405, {"error": "method not allowed"})
+            raw_id = path[len(channel_prefix) : -len(signal_suffix)]
+            try:
+                channel_id = int(raw_id)
+            except ValueError:
+                return _json_response(start_response, 400, {"error": "channel_id must be a positive integer"})
+            query = parse_qs(environ.get("QUERY_STRING", ""))
+            raw_hours = query.get("hours", ["24"])[0]
+            session = session_factory()
+            try:
+                status, payload = get_channel_signals(session, channel_id, raw_hours)
             finally:
                 session.close()
             return _json_response(start_response, status, payload)
