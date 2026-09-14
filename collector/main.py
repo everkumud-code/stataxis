@@ -11,6 +11,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 
+from collector.intelligence import process_persisted_observations
 from collector.storage import create_database, save_observations
 from collector.youtube.client import YouTubeClient
 from collector.youtube.collector import ChannelTarget, collect_channel
@@ -86,6 +87,14 @@ def main() -> None:
                     observation.is_live,
                     observation.concurrent_viewers,
                 )
+
+        intelligence = process_persisted_observations(session)
+        logger.info(
+            "intelligence: videos=%d snapshots=%d errors=%d",
+            intelligence.videos_processed,
+            intelligence.snapshots_built,
+            intelligence.errors,
+        )
 
 
 if __name__ == "__main__":
