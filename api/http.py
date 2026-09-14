@@ -14,7 +14,7 @@ from api.catalog import list_channels
 from api.channel import channel_intelligence_comparison, channel_intelligence_overview, channel_view_series, compare_channels
 from api.export import ObservationExportFilters, export_response
 from api.intelligence import latest_video_intelligence
-from api.operations import collection_health
+from api.operations import collection_health, intelligence_readiness
 from api.report import channel_report
 from api.signals import channel_signals
 
@@ -50,6 +50,25 @@ def get_channels_comparison(session: Session, channel_ids: list[int], *, as_of: 
 def get_collection_health(session: Session, *, as_of: datetime | None = None, stale_after_minutes: int = 360) -> tuple[int, dict[str, Any]]:
     try:
         payload = collection_health(session, as_of=as_of, stale_after_minutes=stale_after_minutes)
+    except ValueError as exc:
+        return 400, {"error": str(exc)}
+    return 200, payload
+
+
+def get_intelligence_readiness(
+    session: Session,
+    *,
+    as_of: datetime | None = None,
+    stale_after_minutes: int = 360,
+    min_snapshot_coverage: float = 1.0,
+) -> tuple[int, dict[str, Any]]:
+    try:
+        payload = intelligence_readiness(
+            session,
+            as_of=as_of,
+            stale_after_minutes=stale_after_minutes,
+            min_snapshot_coverage=min_snapshot_coverage,
+        )
     except ValueError as exc:
         return 400, {"error": str(exc)}
     return 200, payload
@@ -126,7 +145,7 @@ def get_channel_catalog(session: Session) -> tuple[int, dict[str, Any]]:
 
 
 def wsgi_application(session_factory: Callable[[], Session]):
-    """Expose health, catalog, intelligence, signal, comparison, series and report endpoints."""
+    """Expose health, catalog, intelligence, signal, comparison, series, report and readiness endpoints."""
 
     def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         method = environ.get("REQUEST_METHOD", "GET")
@@ -184,6 +203,33 @@ def wsgi_application(session_factory: Callable[[], Session]):
             session = session_factory()
             try:
                 status, payload = get_collection_health(session, as_of=as_of, stale_after_minutes=stale_after_minutes)
+            finally:
+                session.close()
+            return _json_response(start_response, status, payload)
+
+        if path == "/api/v1/operations/readiness":
+            if method != "GET":
+                return _json_response(start_response, 405, {"error": "method not allowed"})
+            query = parse_qs(environ.get("QUERY_STRING", ""))
+            try:
+                as_of = _query_datetime(query, "as_of")
+            except ValueError as exc:
+                return _json_response(start_response, 400, {"error": str(exc)})
+            raw_stale = query.get("stale_after_minutes", ["360"])[0]
+            raw_coverage = query.get("min_snapshot_coverage", ["1.0"])[0]
+            try:
+                stale_after_minutes = int(raw_stale)
+                min_snapshot_coverage = float(raw_coverage)
+            except ValueError:
+                return _json_response(start_response, 400, {"error": "stale_after_minutes must be an integer and min_snapshot_coverage must be a number"})
+            session = session_factory()
+            try:
+                status, payload = get_intelligence_readiness(
+                    session,
+                    as_of=as_of,
+                    stale_after_minutes=stale_after_minutes,
+                    min_snapshot_coverage=min_snapshot_coverage,
+                )
             finally:
                 session.close()
             return _json_response(start_response, status, payload)
