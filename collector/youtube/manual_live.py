@@ -38,9 +38,12 @@ def fetch_manual_live(
     videos = client.get_videos([target.video_id])
     if not videos:
         raise ValueError("YouTube video was not found")
+
+    video = videos[0]
+    channel_id = video.get("snippet", {}).get("channelId") or "manual"
     observation = normalize_video(
-        videos[0],
-        channel_id="manual",
+        video,
+        channel_id=channel_id,
         observed_at=datetime.now(UTC),
     )
     return VideoObservation(
