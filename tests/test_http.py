@@ -1,6 +1,7 @@
 import json
+from datetime import UTC, datetime
 
-from api.http import get_video_intelligence, wsgi_application
+from api.http import get_channel_report, get_video_intelligence, wsgi_application
 
 
 class FakeSession:
@@ -106,3 +107,52 @@ def test_wsgi_rejects_invalid_as_of(monkeypatch):
 
     assert captured["status"] == "400 Bad Request"
     assert json.loads(body[0]) == {"error": "as_of must be an ISO datetime"}
+
+
+def test_get_channel_report_validates_ranges(monkeypatch):
+    status, payload = get_channel_report(FakeSession(), 7, series_days=0)
+    assert status == 400
+    assert payload == {"error": "series_days must be between 1 and 365"}
+
+    status, payload = get_channel_report(FakeSession(), 7, signal_hours=169)
+    assert status == 400
+    assert payload == {"error": "signal_hours must be between 1 and 168"}
+
+
+def test_wsgi_channel_report_composes_real_sections(monkeypatch):
+    session = FakeSession()
+    calls = {}
+    expected_overview = {"channel_id": 7, "name": "Aaj Tak"}
+    expected_comparison = {"as_of": "2026-09-01T00:00:00+00:00", "comparisons": {}}
+    expected_series = {"as_of": "2026-09-01T00:00:00+00:00", "points": [{"value": 10}]}
+    expected_signals = {"signals": [{"name": "momentum", "direction": "up"}]}
+
+    monkeypatch.setattr("api.report.channel_intelligence_overview", lambda _session, _id: expected_overview)
+    monkeypatch.setattr("api.report.channel_intelligence_comparison", lambda _session, _id, *, as_of=None: calls.update(as_of=as_of) or expected_comparison)
+    monkeypatch.setattr("api.report.channel_view_series", lambda _session, _id, *, as_of=None, days=30: calls.update(series_days=days, series_as_of=as_of) or expected_series)
+    monkeypatch.setattr("api.report.channel_signals", lambda _session, _id, *, window_hours=24: calls.update(signal_hours=window_hours) or expected_signals)
+
+    app = wsgi_application(lambda: session)
+    captured = {}
+    body = app(
+        {
+            "REQUEST_METHOD": "GET",
+            "PATH_INFO": "/api/v1/channels/7/report",
+            "QUERY_STRING": "as_of=2026-09-01T00:00:00+00:00&series_days=90&signal_hours=48",
+        },
+        lambda status, headers: captured.update(status=status, headers=headers),
+    )
+
+    payload = json.loads(body[0])
+    assert captured["status"] == "200 OK"
+    assert payload["report_version"] == "v1"
+    assert payload["channel"] == expected_overview
+    assert payload["overview"] == expected_overview
+    assert payload["comparison"] == expected_comparison
+    assert payload["view_series"] == expected_series
+    assert payload["signals"] == expected_signals
+    assert calls["as_of"] == datetime(2026, 9, 1, tzinfo=UTC)
+    assert calls["series_as_of"] == datetime(2026, 9, 1, tzinfo=UTC)
+    assert calls["series_days"] == 90
+    assert calls["signal_hours"] == 48
+    assert session.closed is True

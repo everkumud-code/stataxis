@@ -14,6 +14,7 @@ from api.catalog import list_channels
 from api.channel import channel_intelligence_comparison, channel_intelligence_overview, channel_view_series, compare_channels
 from api.export import ObservationExportFilters, export_response
 from api.intelligence import latest_video_intelligence
+from api.report import channel_report
 from api.signals import channel_signals
 
 
@@ -35,12 +36,7 @@ def get_channel_comparison(session: Session, channel_id: int, *, as_of: datetime
     return 200, payload
 
 
-def get_channels_comparison(
-    session: Session,
-    channel_ids: list[int],
-    *,
-    as_of: datetime | None = None,
-) -> tuple[int, dict[str, Any]]:
+def get_channels_comparison(session: Session, channel_ids: list[int], *, as_of: datetime | None = None) -> tuple[int, dict[str, Any]]:
     if not channel_ids:
         return 400, {"error": "at least one channel_id is required"}
     if any(channel_id <= 0 for channel_id in channel_ids):
@@ -48,6 +44,37 @@ def get_channels_comparison(
     if len(channel_ids) > 12:
         return 400, {"error": "a maximum of 12 channels can be compared"}
     return 200, compare_channels(session, channel_ids, as_of=as_of)
+
+
+def get_channel_report(
+    session: Session,
+    channel_id: int,
+    *,
+    as_of: datetime | None = None,
+    series_days: int = 30,
+    signal_hours: int = 24,
+) -> tuple[int, dict[str, Any]]:
+    if channel_id <= 0:
+        return 400, {"error": "channel_id must be a positive integer"}
+    try:
+        series_days = int(series_days)
+        signal_hours = int(signal_hours)
+    except (TypeError, ValueError):
+        return 400, {"error": "series_days and signal_hours must be integers"}
+    if not 1 <= series_days <= 365:
+        return 400, {"error": "series_days must be between 1 and 365"}
+    if not 1 <= signal_hours <= 168:
+        return 400, {"error": "signal_hours must be between 1 and 168"}
+    payload = channel_report(
+        session,
+        channel_id,
+        as_of=as_of,
+        series_days=series_days,
+        signal_hours=signal_hours,
+    )
+    if payload is None:
+        return 404, {"error": "channel not found"}
+    return 200, payload
 
 
 def get_channel_overview(session: Session, channel_id: int) -> tuple[int, dict[str, Any]]:
@@ -136,6 +163,35 @@ def wsgi_application(session_factory: Callable[[], Session]):
             return _report_response(environ, start_response, session_factory, method)
 
         channel_prefix = "/api/v1/channels/"
+        report_suffix = "/report"
+        if path.startswith(channel_prefix) and path.endswith(report_suffix):
+            if method != "GET":
+                return _json_response(start_response, 405, {"error": "method not allowed"})
+            raw_id = path[len(channel_prefix) : -len(report_suffix)]
+            try:
+                channel_id = int(raw_id)
+            except ValueError:
+                return _json_response(start_response, 400, {"error": "channel_id must be a positive integer"})
+            query = parse_qs(environ.get("QUERY_STRING", ""))
+            try:
+                as_of = _query_datetime(query, "as_of")
+            except ValueError as exc:
+                return _json_response(start_response, 400, {"error": str(exc)})
+            raw_series_days = query.get("series_days", ["30"])[0]
+            raw_signal_hours = query.get("signal_hours", ["24"])[0]
+            session = session_factory()
+            try:
+                status, payload = get_channel_report(
+                    session,
+                    channel_id,
+                    as_of=as_of,
+                    series_days=raw_series_days,
+                    signal_hours=raw_signal_hours,
+                )
+            finally:
+                session.close()
+            return _json_response(start_response, status, payload)
+
         channel_suffix = "/comparison"
         if path.startswith(channel_prefix) and path.endswith(channel_suffix):
             if method != "GET":
@@ -195,7 +251,7 @@ def wsgi_application(session_factory: Callable[[], Session]):
 
         if path.startswith(channel_prefix):
             if method != "GET":
-                return _json_response(start_response, 405, {"error": "method not allowed"})
+                return _json_response(start_response, 404, {"error": "not found"})
             raw_id = path[len(channel_prefix) :].strip("/")
             if not raw_id or "/" in raw_id:
                 return _json_response(start_response, 400, {"error": "channel_id must be a positive integer"})
