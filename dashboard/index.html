@@ -20,7 +20,7 @@
       </div>
       <div class="hero-controls">
         <label class="select-wrap" for="channel-select"><span>CHANNEL</span><select id="channel-select" aria-label="Select channel"><option>Loading…</option></select></label>
-        <div class="filters" aria-label="Historical period"><button class="filter active">Today</button><button class="filter">3 Weeks</button><button class="filter">1 Month</button><button class="filter">1 Year</button></div>
+        <div class="filters" aria-label="Historical period"><button class="filter">Today</button><button class="filter">3 Weeks</button><button class="filter active">1 Month</button><button class="filter">1 Year</button></div>
       </div>
     </section>
 
@@ -32,18 +32,18 @@
         <div class="meter"><span id="stx-meter" style="width:0%"></span></div>
         <small>Composite intelligence score · provisional</small>
       </article>
-      <article class="card"><div class="label">AUDIENCE</div><div class="big">—</div><div class="delta">Measurement feed</div><p class="muted">Time-series connector pending</p></article>
+      <article class="card"><div class="label">AUDIENCE</div><div class="big" id="audience-value">—</div><div class="delta">Observed view count</div><p class="muted">Latest persisted observation</p></article>
       <article class="card"><div class="label">MOMENTUM</div><div class="big">—</div><div class="signal">STX</div><p class="muted">Derived from persisted signals</p></article>
       <article class="card"><div class="label">COMPETITIVE POSITION</div><div class="big">—</div><div class="delta">Relative comparison</div><p class="muted">Competitive endpoint ready</p></article>
     </section>
 
     <section class="grid main-grid">
       <article class="card chart-card">
-        <div class="card-head"><div><h2>Audience Movement</h2><p class="muted">Illustrative view · time-series API module next</p></div><span class="legend"><i></i>Audience</span></div>
-        <div class="chart" aria-label="Illustrative audience trend pending live time-series wiring">
-          <div class="axis y"><span>15M</span><span>10M</span><span>5M</span><span>0</span></div>
-          <svg viewBox="0 0 700 240" preserveAspectRatio="none"><path class="gridline" d="M0 30H700 M0 90H700 M0 150H700 M0 210H700"/><path class="trend" d="M0 184 C60 190 82 155 130 170 S210 145 255 162 S330 130 375 138 S445 105 490 118 S545 75 590 94 S650 46 700 62"/><path class="area" d="M0 184 C60 190 82 155 130 170 S210 145 255 162 S330 130 375 138 S445 105 490 118 S545 75 590 94 S650 46 700 62 L700 240 L0 240Z"/></svg>
-          <div class="xlabels"><span>15 Aug</span><span>22 Aug</span><span>29 Aug</span><span>05 Sep</span><span>14 Sep</span></div>
+        <div class="card-head"><div><h2>Observed View Count</h2><p class="muted" id="series-note">Loading persisted observation series…</p></div><span class="legend"><i></i>View count</span></div>
+        <div class="chart" aria-label="Persisted channel view-count trend">
+          <div class="axis y" id="series-axis"><span>—</span><span>—</span><span>—</span></div>
+          <svg id="series-chart" viewBox="0 0 700 240" preserveAspectRatio="none"></svg>
+          <div class="xlabels" id="series-labels"><span>—</span><span>—</span></div>
         </div>
       </article>
       <article class="card">
