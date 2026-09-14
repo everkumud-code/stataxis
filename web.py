@@ -1,0 +1,43 @@
+"""Production WSGI entrypoint for StatAxis dashboard and API."""
+
+from __future__ import annotations
+
+import mimetypes
+import os
+from pathlib import Path
+from typing import Any, Callable
+
+from collector.storage import create_database
+from api.http import wsgi_application
+
+ROOT = Path(__file__).resolve().parent
+DASHBOARD = ROOT / "dashboard"
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("STAXIS_DATABASE_URL") or "sqlite:///stataxis.db"
+
+_engine = create_database(DATABASE_URL)
+_api = wsgi_application(lambda: _engine.connect_session() if False else _session())
+
+
+def _session():
+    from sqlalchemy.orm import Session
+
+    return Session(_engine)
+
+
+def application(environ: dict[str, Any], start_response: Callable[..., Any]):
+    path = environ.get("PATH_INFO", "/")
+    if path.startswith("/api/") or path == "/health":
+        return _api(environ, start_response)
+
+    if path == "/":
+        path = "/index.html"
+    if path.startswith("/") and ".." not in Path(path).parts:
+        file_path = DASHBOARD / path.lstrip("/")
+        if file_path.is_file():
+            body = file_path.read_bytes()
+            content_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
+            start_response("200 OK", [("Content-Type", content_type), ("Content-Length", str(len(body)))])
+            return [body]
+
+    start_response("404 Not Found", [("Content-Type", "text/plain; charset=utf-8")])
+    return [b"Not found"]
