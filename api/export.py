@@ -11,6 +11,7 @@ from openpyxl import Workbook
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
+from api.access import UserRole, require_capability, video_access_policy
 from collector.storage import Channel, Observation, Video
 from metrics.persistence import IntelligenceSnapshotRecord
 
@@ -116,6 +117,17 @@ def export_observations_xlsx(
     output = BytesIO()
     workbook.save(output)
     return output.getvalue()
+
+
+def export_for_role(
+    session: Session,
+    role: UserRole | str,
+    filters: ObservationExportFilters,
+) -> bytes:
+    """Authorize and export dashboard data; Excel export is Admin-only."""
+    policy = video_access_policy(role)
+    require_capability(policy, "can_add_video")
+    return export_observations_xlsx(session, filters)
 
 
 def _format_sheet(sheet) -> None:
