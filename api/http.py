@@ -96,6 +96,8 @@ def wsgi_application(session_factory: Callable[[], Session]):
             if method != "GET":
                 return _json_response(start_response, 405, {"error": "method not allowed"})
             raw_id = path[len(channel_prefix) :].strip("/")
+            if not raw_id or "/" in raw_id:
+                return _json_response(start_response, 400, {"error": "channel_id must be a positive integer"})
             try:
                 channel_id = int(raw_id)
             except ValueError:
