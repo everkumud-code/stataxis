@@ -11,10 +11,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 
-from collector.intelligence import process_persisted_observations
-from collector.storage import create_database, save_observations
+from collector.run import run_collection_pass
+from collector.storage import create_database
 from collector.youtube.client import YouTubeClient
-from collector.youtube.collector import ChannelTarget, collect_channel
+from collector.youtube.collector import ChannelTarget
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
@@ -55,45 +55,19 @@ def main() -> None:
     targets = load_targets(PROJECT_ROOT / args.channels)
 
     with YouTubeClient() as client, Session(engine) as session:
-        for target in targets:
-            observations = collect_channel(
-                client,
-                target,
-                args.max_videos,
-            )
-
-            saved = save_observations(
-                session=session,
-                channel_name=target.name,
-                channel_youtube_id=target.channel_id,
-                network=target.network,
-                language=target.language,
-                observations=observations,
-            )
-
-            logger.info(
-                "%s: collected=%d saved=%d observations",
-                target.name,
-                len(observations),
-                saved,
-            )
-
-            for observation in observations:
-                logger.info(
-                    "%s | classification=%s | views=%s | live=%s | concurrent=%s",
-                    observation.title,
-                    observation.classification,
-                    observation.view_count,
-                    observation.is_live,
-                    observation.concurrent_viewers,
-                )
-
-        intelligence = process_persisted_observations(session)
+        result = run_collection_pass(
+            session,
+            client,
+            targets,
+            max_videos=args.max_videos,
+        )
         logger.info(
-            "intelligence: videos=%d snapshots=%d errors=%d",
-            intelligence.videos_processed,
-            intelligence.snapshots_built,
-            intelligence.errors,
+            "collection run %d: videos=%d intelligence_videos=%d snapshots=%d errors=%d",
+            result.run_id,
+            result.videos_observed,
+            result.intelligence.videos_processed,
+            result.intelligence.snapshots_built,
+            result.intelligence.errors,
         )
 
 
