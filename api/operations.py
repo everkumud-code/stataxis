@@ -24,7 +24,7 @@ def collection_health(session: Session, *, as_of: datetime | None = None, stale_
     finished_at = _utc(run.finished_at) if run.finished_at else None
     reference_at = finished_at or started_at
     age_minutes = max(0.0, (resolved_as_of - reference_at).total_seconds() / 60)
-    fresh = run.status == "success" and age_minutes <= stale_after_minutes
+    fresh = reference_at <= resolved_as_of and run.status == "success" and age_minutes <= stale_after_minutes
     return {
         "status": run.status,
         "fresh": fresh,
@@ -47,14 +47,16 @@ def intelligence_readiness(session: Session, *, as_of: datetime | None = None, s
     """Assess whether the latest collection has enough persisted STX intelligence for reporting."""
     if not 0.0 <= min_snapshot_coverage <= 1.0:
         raise ValueError("min_snapshot_coverage must be between 0 and 1")
-    health = collection_health(session, as_of=as_of, stale_after_minutes=stale_after_minutes)
+    resolved_as_of = _utc(as_of or datetime.now(UTC))
+    health = collection_health(session, as_of=resolved_as_of, stale_after_minutes=stale_after_minutes)
     run = health["latest_run"]
     if run is None:
-        return {"ready": False, "reason": "no_collection_run", "collection": health, "intelligence": {"videos_observed": 0, "videos_with_intelligence": 0, "coverage": 0.0}}
+        return {"ready": False, "reason": "no_collection_run", "collection": health, "intelligence": {"videos_observed": 0, "videos_with_intelligence": 0, "coverage": 0.0, "min_snapshot_coverage": min_snapshot_coverage}}
     observed = max(0, int(run["videos_observed"]))
     query = select(func.count(distinct(IntelligenceSnapshotRecord.video_id))).select_from(IntelligenceSnapshotRecord)
     if run["finished_at"]:
         query = query.where(IntelligenceSnapshotRecord.generated_at >= datetime.fromisoformat(run["finished_at"]))
+    query = query.where(IntelligenceSnapshotRecord.generated_at <= resolved_as_of)
     with_intelligence = int(session.execute(query).scalar_one() or 0)
     coverage = min(1.0, with_intelligence / observed) if observed else 0.0
     ready = bool(health["fresh"] and observed > 0 and coverage >= min_snapshot_coverage)
