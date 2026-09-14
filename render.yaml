@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: stataxis
+    runtime: python
+    buildCommand: pip install -e .
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120 web:application
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
