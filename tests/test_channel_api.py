@@ -1,35 +1,75 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import json
 
 from sqlalchemy.orm import Session
 
-from api.channel import channel_intelligence_overview
-from collector.storage import Channel, Observation, Video, create_database
+from api.channel import channel_intelligence_comparison
+from api.http import get_channel_comparison
+from collector.storage import Channel, Video, create_database
 from metrics.persistence import IntelligenceSnapshotRecord
 
 
-def test_channel_overview_uses_latest_snapshot_and_ranks_by_score():
+def _record(video_id, when, score, confidence, signals, contributions):
+    return IntelligenceSnapshotRecord(
+        video_id=video_id,
+        generated_at=when,
+        score=score,
+        confidence=confidence,
+        available_signals=signals,
+        view_json="{}",
+        contributions_json=json.dumps(contributions),
+    )
+
+
+def test_channel_comparison_uses_real_historical_snapshots_and_explains_change():
     engine = create_database("sqlite:///:memory:")
     with Session(engine) as session:
-        channel = Channel(youtube_channel_id="UC-test", name="Test")
+        channel = Channel(youtube_channel_id="UC-history", name="History")
         session.add(channel)
         session.flush()
-        first = Video(youtube_video_id="v1", channel_id=channel.id, title="One")
-        second = Video(youtube_video_id="v2", channel_id=channel.id, title="Two")
-        session.add_all([first, second])
+        video = Video(youtube_video_id="history-video", channel_id=channel.id, title="History")
+        session.add(video)
         session.flush()
-        now = datetime(2026, 9, 14, tzinfo=timezone.utc)
+
+        as_of = datetime(2026, 9, 14, tzinfo=timezone.utc)
         session.add_all([
-            IntelligenceSnapshotRecord(video_id=first.id, generated_at=now, score=40, confidence=0.8, available_signals=2, view_json="{}", contributions_json="[]"),
-            IntelligenceSnapshotRecord(video_id=first.id, generated_at=now.replace(minute=1), score=80, confidence=0.7, available_signals=3, view_json="{}", contributions_json="[]"),
-            IntelligenceSnapshotRecord(video_id=second.id, generated_at=now, score=60, confidence=0.9, available_signals=2, view_json="{}", contributions_json="[]"),
+            _record(video.id, as_of - timedelta(days=365), 50, 0.5, 2, [{"name": "momentum", "contribution": 2}]),
+            _record(video.id, as_of - timedelta(days=30), 70, 0.8, 3, [{"name": "momentum", "contribution": 5}]),
+            _record(video.id, as_of, 80, 0.9, 4, [{"name": "momentum", "contribution": 8}, {"name": "acceleration", "contribution": 3}]),
         ])
         session.commit()
-        result = channel_intelligence_overview(session, channel.id)
-        assert [item["score"] for item in result["videos"]] == [80, 60]
-        assert result["videos"][0]["available_signals"] == 3
+
+        result = channel_intelligence_comparison(session, channel.id, as_of=as_of)
+        month = result["comparisons"]["last_1_month"]
+        year = result["comparisons"]["last_1_year"]
+
+        assert month["current"]["score"] == 80.0
+        assert month["baseline"]["score"] == 70.0
+        assert month["change"]["score_delta"] == 10.0
+        assert month["change"]["sufficient_data"] is True
+        assert month["contribution_changes"][0]["name"] == "momentum"
+        assert year["baseline"]["score"] == 50.0
 
 
-def test_channel_overview_returns_none_for_missing_channel():
+def test_channel_comparison_does_not_invent_missing_history():
     engine = create_database("sqlite:///:memory:")
     with Session(engine) as session:
-        assert channel_intelligence_overview(session, 999) is None
+        channel = Channel(youtube_channel_id="UC-new", name="New")
+        session.add(channel)
+        session.flush()
+        video = Video(youtube_video_id="new-video", channel_id=channel.id, title="New")
+        session.add(video)
+        session.flush()
+        session.add(_record(video.id, datetime(2026, 9, 14, tzinfo=timezone.utc), 75, 0.8, 2, []))
+        session.commit()
+
+        result = channel_intelligence_comparison(session, channel.id, as_of=datetime(2026, 9, 14, tzinfo=timezone.utc))
+        assert result["comparisons"]["last_3_weeks"]["baseline"] is None
+        assert result["comparisons"]["last_3_weeks"]["change"]["sufficient_data"] is False
+
+
+def test_channel_comparison_http_adapter_validates_ids_and_missing_channels():
+    engine = create_database("sqlite:///:memory:")
+    with Session(engine) as session:
+        assert get_channel_comparison(session, 0)[0] == 400
+        assert get_channel_comparison(session, 999)[0] == 404

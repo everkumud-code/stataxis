@@ -9,6 +9,7 @@ from typing import Any, Callable
 from sqlalchemy.orm import Session
 
 from api.access import UserRole
+from api.channel import channel_intelligence_comparison
 from api.export import ObservationExportFilters, export_response
 from api.intelligence import latest_video_intelligence
 
@@ -20,6 +21,16 @@ def get_video_intelligence(session: Session, video_id: int) -> tuple[int, dict[s
     payload = latest_video_intelligence(session, video_id)
     if payload is None:
         return 404, {"error": "intelligence not found"}
+    return 200, payload
+
+
+def get_channel_comparison(session: Session, channel_id: int) -> tuple[int, dict[str, Any]]:
+    """Return historical STX comparison for a channel."""
+    if channel_id <= 0:
+        return 400, {"error": "channel_id must be a positive integer"}
+    payload = channel_intelligence_comparison(session, channel_id)
+    if payload is None:
+        return 404, {"error": "channel not found"}
     return 200, payload
 
 
@@ -38,37 +49,47 @@ def wsgi_application(session_factory: Callable[[], Session]):
         if path == "/api/v1/reports/export":
             return _report_response(environ, start_response, session_factory, method)
 
+        channel_prefix = "/api/v1/channels/"
+        channel_suffix = "/comparison"
+        if path.startswith(channel_prefix) and path.endswith(channel_suffix):
+            if method != "GET":
+                return _json_response(start_response, 405, {"error": "method not allowed"})
+            raw_id = path[len(channel_prefix) : -len(channel_suffix)]
+            try:
+                channel_id = int(raw_id)
+            except ValueError:
+                return _json_response(start_response, 400, {"error": "channel_id must be a positive integer"})
+            session = session_factory()
+            try:
+                status, payload = get_channel_comparison(session, channel_id)
+            finally:
+                session.close()
+            return _json_response(start_response, status, payload)
+
         prefix = "/api/v1/videos/"
         suffix = "/intelligence"
         if method != "GET" or not path.startswith(prefix) or not path.endswith(suffix):
-            body = json.dumps({"error": "not found"}).encode()
-            start_response("404 Not Found", [("Content-Type", "application/json")])
-            return [body]
+            return _json_response(start_response, 404, {"error": "not found"})
 
         raw_id = path[len(prefix) : -len(suffix)]
         try:
             video_id = int(raw_id)
         except ValueError:
-            body = json.dumps({"error": "video_id must be a positive integer"}).encode()
-            start_response("400 Bad Request", [("Content-Type", "application/json")])
-            return [body]
+            return _json_response(start_response, 400, {"error": "video_id must be a positive integer"})
 
         session = session_factory()
         try:
             status, payload = get_video_intelligence(session, video_id)
         finally:
             session.close()
-        reason = {200: "OK", 400: "Bad Request", 404: "Not Found"}.get(status, "Error")
-        start_response(f"{status} {reason}", [("Content-Type", "application/json")])
-        return [json.dumps(payload).encode()]
+        return _json_response(start_response, status, payload)
 
     return application
 
 
 def _report_response(environ: dict[str, Any], start_response: Callable[..., Any], session_factory, method: str):
     if method != "GET":
-        start_response("405 Method Not Allowed", [("Content-Type", "application/json")])
-        return [b'{"error":"method not allowed"}']
+        return _json_response(start_response, 405, {"error": "method not allowed"})
 
     def parse_datetime(name: str):
         value = environ.get(name)
@@ -97,6 +118,12 @@ def _report_response(environ: dict[str, Any], start_response: Callable[..., Any]
     reason = {200: "OK", 400: "Bad Request", 403: "Forbidden"}.get(status, "Error")
     start_response(f"{status} {reason}", list(headers.items()))
     return [body]
+
+
+def _json_response(start_response: Callable[..., Any], status: int, payload: dict[str, Any]):
+    reason = {200: "OK", 400: "Bad Request", 404: "Not Found", 405: "Method Not Allowed"}.get(status, "Error")
+    start_response(f"{status} {reason}", [("Content-Type", "application/json")])
+    return [json.dumps(payload).encode()]
 
 
 def _optional_header(environ: dict[str, Any], key: str) -> str | None:
