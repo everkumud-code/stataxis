@@ -9,31 +9,58 @@
 <body>
   <header class="topbar">
     <div class="brand"><span class="mark">SA</span><div><strong>StatAxis</strong><small>Stat The View, Axis The Viewpoint</small></div></div>
-    <div class="top-actions"><span class="status-dot"></span>Data live</div>
+    <div class="top-actions"><span id="api-dot" class="status-dot"></span><span id="api-status">Connecting…</span></div>
   </header>
   <main class="shell">
     <section class="hero">
-      <div><p class="eyebrow">CHANNEL INTELLIGENCE</p><h1>Hindi News — Audience View</h1><p class="muted">Clean measurement, historical movement and evidence-backed viewpoint.</p></div>
-      <div class="filters"><button class="filter active">Today</button><button class="filter">3 Weeks</button><button class="filter">1 Month</button><button class="filter">1 Year</button></div>
+      <div>
+        <p class="eyebrow">CHANNEL INTELLIGENCE</p>
+        <h1 id="channel-name">Hindi News — Audience View</h1>
+        <p id="channel-meta" class="muted">Clean measurement, historical movement and evidence-backed viewpoint.</p>
+      </div>
+      <div class="hero-controls">
+        <label class="select-wrap" for="channel-select"><span>CHANNEL</span><select id="channel-select" aria-label="Select channel"><option>Loading…</option></select></label>
+        <div class="filters" aria-label="Historical period"><button class="filter active">Today</button><button class="filter">3 Weeks</button><button class="filter">1 Month</button><button class="filter">1 Year</button></div>
+      </div>
     </section>
+
     <section class="grid cards">
-      <article class="card index-card"><div class="label">STX INDEX™</div><div class="index-value">78.4</div><div class="delta up">▲ 6.8% vs 1 month</div><div class="meter"><span style="width:78.4%"></span></div><small>Composite intelligence score · provisional</small></article>
-      <article class="card"><div class="label">AUDIENCE</div><div class="big">12.84M</div><div class="delta up">▲ 18.4%</div><p class="muted">vs previous period</p></article>
-      <article class="card"><div class="label">MOMENTUM</div><div class="big">Strong</div><div class="signal">+14.2</div><p class="muted">Acceleration positive</p></article>
-      <article class="card"><div class="label">COMPETITIVE POSITION</div><div class="big">#1</div><div class="delta up">Closing the gap</div><p class="muted">Share 38.6%</p></article>
-    </section>
-    <section class="grid main-grid">
-      <article class="card chart-card"><div class="card-head"><div><h2>Audience Movement</h2><p class="muted">Observed audience signal · last 30 days</p></div><span class="legend"><i></i>Audience</span></div>
-        <div class="chart"><div class="axis y"><span>15M</span><span>10M</span><span>5M</span><span>0</span></div><svg viewBox="0 0 700 240" preserveAspectRatio="none" aria-label="Audience trend"><path class="gridline" d="M0 30H700 M0 90H700 M0 150H700 M0 210H700"/><path class="trend" d="M0 184 C60 190 82 155 130 170 S210 145 255 162 S330 130 375 138 S445 105 490 118 S545 75 590 94 S650 46 700 62"/><path class="area" d="M0 184 C60 190 82 155 130 170 S210 145 255 162 S330 130 375 138 S445 105 490 118 S545 75 590 94 S650 46 700 62 L700 240 L0 240Z"/></svg><div class="xlabels"><span>15 Aug</span><span>22 Aug</span><span>29 Aug</span><span>05 Sep</span><span>14 Sep</span></div></div>
+      <article class="card index-card">
+        <div class="label">STX INDEX™</div>
+        <div id="stx-score" class="index-value">—</div>
+        <div id="stx-confidence" class="delta">Awaiting persisted intelligence</div>
+        <div class="meter"><span id="stx-meter" style="width:0%"></span></div>
+        <small>Composite intelligence score · provisional</small>
       </article>
-      <article class="card"><div class="card-head"><div><h2>StatAxis View</h2><p class="muted">Evidence-backed interpretation</p></div><span class="badge">MIXED → POSITIVE</span></div><div class="view-block"><b>DATA</b><p>Audience is up 18.4% with stronger recent momentum.</p><b>ANALYSIS</b><p>Growth is broadening rather than coming from a single isolated spike.</p><b>STATAXIS VIEW</b><p class="view">The channel is gaining audience strength and improving its competitive position. Current evidence supports a positive trend, while causal displacement is not established.</p></div></article>
+      <article class="card"><div class="label">AUDIENCE</div><div class="big">—</div><div class="delta">Measurement feed</div><p class="muted">Time-series connector pending</p></article>
+      <article class="card"><div class="label">MOMENTUM</div><div class="big">—</div><div class="signal">STX</div><p class="muted">Derived from persisted signals</p></article>
+      <article class="card"><div class="label">COMPETITIVE POSITION</div><div class="big">—</div><div class="delta">Relative comparison</div><p class="muted">Competitive endpoint ready</p></article>
     </section>
+
+    <section class="grid main-grid">
+      <article class="card chart-card">
+        <div class="card-head"><div><h2>Audience Movement</h2><p class="muted">Illustrative view · time-series API module next</p></div><span class="legend"><i></i>Audience</span></div>
+        <div class="chart" aria-label="Illustrative audience trend pending live time-series wiring">
+          <div class="axis y"><span>15M</span><span>10M</span><span>5M</span><span>0</span></div>
+          <svg viewBox="0 0 700 240" preserveAspectRatio="none"><path class="gridline" d="M0 30H700 M0 90H700 M0 150H700 M0 210H700"/><path class="trend" d="M0 184 C60 190 82 155 130 170 S210 145 255 162 S330 130 375 138 S445 105 490 118 S545 75 590 94 S650 46 700 62"/><path class="area" d="M0 184 C60 190 82 155 130 170 S210 145 255 162 S330 130 375 138 S445 105 490 118 S545 75 590 94 S650 46 700 62 L700 240 L0 240Z"/></svg>
+          <div class="xlabels"><span>15 Aug</span><span>22 Aug</span><span>29 Aug</span><span>05 Sep</span><span>14 Sep</span></div>
+        </div>
+      </article>
+      <article class="card">
+        <div class="card-head"><div><h2>StatAxis View</h2><p class="muted">Evidence-backed interpretation</p></div><span class="badge">LIVE EVIDENCE</span></div>
+        <p class="selected-video"><strong>Selected video:</strong> <span id="selected-video">—</span></p>
+        <div class="view-block"><b>DATA</b><p id="view-data">No persisted DATA statement available.</p><b>ANALYSIS</b><p id="view-analysis">No persisted ANALYSIS statement available.</p><b>STATAXIS VIEW</b><p id="view-conclusion" class="view">No persisted StatAxis View available.</p></div>
+      </article>
+    </section>
+
     <section class="grid lower-grid">
-      <article class="card"><div class="card-head"><div><h2>Competitive View</h2><p class="muted">Current relative position</p></div></div><div class="rows"><div><span>Aaj Tak</span><b>38.6%</b><em>▲</em></div><div><span>IndiaTV</span><b>31.2%</b><em>→</em></div><div><span>The Lallantop</span><b>30.2%</b><em>▲</em></div></div></article>
-      <article class="card"><div class="card-head"><div><h2>Historical Comparison</h2><p class="muted">STX Index change</p></div></div><div class="history"><div><span>3 Weeks</span><b>+4.1</b></div><div><span>1 Month</span><b>+6.8</b></div><div><span>1 Year</span><b>+11.7</b></div></div></article>
-      <article class="card"><div class="card-head"><div><h2>Signal Drivers</h2><p class="muted">Contribution to current score</p></div></div><div class="drivers"><div><span>Audience</span><i style="width:86%"></i><b>30%</b></div><div><span>Growth</span><i style="width:67%"></i><b>20%</b></div><div><span>Momentum</span><i style="width:54%"></i><b>15%</b></div><div><span>Competition</span><i style="width:38%"></i><b>10%</b></div></div></article>
+      <article class="card"><div class="card-head"><div><h2>Competitive View</h2><p class="muted">Current relative position</p></div></div><div class="rows"><div><span>Channel comparison</span><b>API</b><em>→</em></div><div><span>Rank movement</span><b>API</b><em>→</em></div><div><span>Share movement</span><b>API</b><em>→</em></div></div></article>
+      <article class="card"><div class="card-head"><div><h2>Historical Comparison</h2><p class="muted">STX Index change</p></div></div><div class="history"><div><span id="hist-3w-meta">3 Weeks</span><b id="hist-3w">—</b></div><div><span id="hist-1m-meta">1 Month</span><b id="hist-1m">—</b></div><div><span id="hist-1y-meta">1 Year</span><b id="hist-1y">—</b></div></div></article>
+      <article class="card"><div class="card-head"><div><h2>Signal Drivers</h2><p class="muted">Contribution to current score</p></div></div><div id="signal-drivers" class="drivers"><div><span>Awaiting data</span><i style="width:22%"></i><b>—</b></div></div></article>
     </section>
+    <p id="api-note" class="api-note">Connecting to StatAxis read APIs…</p>
   </main>
   <footer>StatAxis · Independent digital media intelligence · Data → Analysis → StatAxis View</footer>
+  <script src="app.js" defer></script>
 </body>
 </html>
