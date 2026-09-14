@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import json
 
 from sqlalchemy.orm import Session
 
@@ -29,12 +30,20 @@ def test_collection_pass_persists_traceable_intelligence():
 
         result = process_persisted_observations(session)
         record = session.query(IntelligenceSnapshotRecord).one()
+        view = json.loads(record.view_json)
+        contributions = json.loads(record.contributions_json)
 
         assert result.snapshots_built == 1
         assert record.score is not None
         assert record.available_signals >= 3
-        assert "contribution" in record.contributions_json
-        assert "confidence" in record.view_json
+        assert contributions and "weighted_contribution" not in contributions[0]
+        assert "contribution" in contributions[0]
+        assert "share_of_score" in contributions[0]
+        assert view["data"]
+        assert view["analysis"]
+        assert isinstance(view["view"], str)
+        assert view["signals"]
+        assert view["measurement_provenance"]["observation_count"] == 3
 
 
 def test_missing_time_series_does_not_create_fake_score():

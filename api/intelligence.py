@@ -25,6 +25,8 @@ def latest_video_intelligence(session: Session, video_id: int) -> dict[str, Any]
     if row is None:
         return None
     record, video = row
+    view_payload = _safe_object(record.view_json)
+    contributions = _safe_list(record.contributions_json)
     return {
         "video_id": video.id,
         "youtube_video_id": video.youtube_video_id,
@@ -33,6 +35,32 @@ def latest_video_intelligence(session: Session, video_id: int) -> dict[str, Any]
         "score": record.score,
         "confidence": record.confidence,
         "available_signals": record.available_signals,
-        "view": json.loads(record.view_json),
-        "contributions": json.loads(record.contributions_json),
+        "stx_index": {
+            "score": record.score,
+            "confidence": record.confidence,
+            "available_signals": record.available_signals,
+        },
+        "data": view_payload.get("data", []),
+        "analysis": view_payload.get("analysis", []),
+        "view": view_payload.get("view", "No persisted StatAxis View available."),
+        "stat_axis_view": view_payload,
+        "signal_contributions": contributions,
+        "contributions": contributions,
+        "measurement_provenance": view_payload.get("measurement_provenance", {}),
     }
+
+
+def _safe_object(value: str | None) -> dict[str, Any]:
+    try:
+        payload = json.loads(value or "{}")
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _safe_list(value: str | None) -> list[dict[str, Any]]:
+    try:
+        payload = json.loads(value or "[]")
+    except json.JSONDecodeError:
+        return []
+    return payload if isinstance(payload, list) else []

@@ -27,24 +27,25 @@
   const renderSignals = (items) => {
     const container = $("#signal-drivers");
     if (!container || !Array.isArray(items) || !items.length) return;
-    const max = Math.max(...items.map((item) => Math.abs(Number(item.weighted_contribution) || 0)), 1);
+    const max = Math.max(...items.map((item) => Math.abs(Number(item.weighted_contribution ?? item.contribution) || 0)), 1);
     container.innerHTML = items.slice(0, 5).map((item) => {
-      const value = Number(item.weighted_contribution) || 0;
+      const value = Number(item.weighted_contribution ?? item.contribution) || 0;
       const width = Math.max(4, Math.round((Math.abs(value) / max) * 100));
       return `<div><span>${item.name}</span><i style="width:${width}%"></i><b>${value >= 0 ? "+" : ""}${value.toFixed(1)}</b></div>`;
     }).join("");
   };
 
   const renderIntelligence = (payload) => {
-    const index = payload?.stx_index || {};
+    const index = payload?.stx_index || { score: payload?.score, confidence: payload?.confidence, available_signals: payload?.available_signals };
     setText("#stx-score", index.score == null ? "—" : Number(index.score).toFixed(1));
-    setText("#stx-confidence", index.confidence == null ? "Confidence unavailable" : `Confidence ${Math.round(Number(index.confidence) * 100)}%`);
+    const confidence = Number(index.confidence);
+    setText("#stx-confidence", Number.isFinite(confidence) ? `Confidence ${Math.round(confidence > 1 ? confidence : confidence * 100)}% · ${index.available_signals ?? 0} signals` : "Confidence unavailable");
     const meter = $("#stx-meter");
     if (meter) meter.style.width = `${Math.max(0, Math.min(100, Number(index.score) || 0))}%`;
     setText("#view-data", Array.isArray(payload?.data) ? payload.data.join(" ") : "No persisted DATA statement available.");
     setText("#view-analysis", Array.isArray(payload?.analysis) ? payload.analysis.join(" ") : "No persisted ANALYSIS statement available.");
     setText("#view-conclusion", payload?.view || "No persisted StatAxis View available.");
-    renderSignals(payload?.signal_contributions || []);
+    renderSignals(payload?.signal_contributions || payload?.contributions || []);
   };
 
   const renderSeries = (payload) => {

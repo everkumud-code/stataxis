@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, Text
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from collector.storage import Base, Observation
@@ -61,7 +61,13 @@ def persist_video_intelligence(
             {
                 "score": intelligence.view.score,
                 "confidence": intelligence.view.confidence,
-                "signals": intelligence.view.signals,
+                "signals": [
+                    {"name": signal.name, "direction": signal.direction, "strength": signal.strength}
+                    for signal in intelligence.view.signals
+                ],
+                "data": list(intelligence.view.data),
+                "analysis": list(intelligence.view.analysis),
+                "view": intelligence.view.view,
                 "measurement_provenance": {
                     "observation_count": len(timestamps),
                     "oldest_observation": oldest.isoformat() if oldest else None,
@@ -73,7 +79,7 @@ def persist_video_intelligence(
         ),
         contributions_json=json.dumps(
             [
-                {"name": item.name, "value": item.value, "contribution": item.contribution}
+                {"name": item.name, "value": item.value, "contribution": item.weighted_contribution, "share_of_score": item.share_of_score}
                 for item in snapshot.contributions
             ],
             sort_keys=True,
