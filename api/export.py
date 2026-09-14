@@ -1,4 +1,4 @@
-"""Admin-only filtered Excel export of StatAxis observation data."""
+"""Role-aware filtered Excel export for StatAxis dashboard reports."""
 
 from __future__ import annotations
 
@@ -30,10 +30,7 @@ class ObservationExportFilters:
     classification: str | None = None
 
 
-def filtered_observations(
-    session: Session,
-    filters: ObservationExportFilters,
-) -> list[tuple[Observation, Video, Channel]]:
+def filtered_observations(session: Session, filters: ObservationExportFilters) -> list[tuple[Observation, Video, Channel]]:
     """Return observations matching the dashboard export filters."""
     stmt: Select[tuple[Observation, Video, Channel]] = (
         select(Observation, Video, Channel)
@@ -60,10 +57,7 @@ def filtered_observations(
     return list(session.execute(stmt).all())
 
 
-def export_observations_xlsx(
-    session: Session,
-    filters: ObservationExportFilters,
-) -> bytes:
+def export_observations_xlsx(session: Session, filters: ObservationExportFilters) -> bytes:
     """Build an Excel workbook containing filtered data and latest intelligence."""
     rows = filtered_observations(session, filters)
     workbook = Workbook()
@@ -119,15 +113,26 @@ def export_observations_xlsx(
     return output.getvalue()
 
 
-def export_for_role(
-    session: Session,
-    role: UserRole | str,
-    filters: ObservationExportFilters,
-) -> bytes:
-    """Authorize and export dashboard data; Excel export is Admin-only."""
+def export_for_role(session: Session, role: UserRole | str, filters: ObservationExportFilters) -> bytes:
+    """Authorize and export the dashboard report for an authenticated role."""
     policy = video_access_policy(role)
-    require_capability(policy, "can_add_video")
+    require_capability(policy, "can_download_report")
     return export_observations_xlsx(session, filters)
+
+
+def export_response(session: Session, role: UserRole | str, filters: ObservationExportFilters) -> tuple[int, dict[str, str], bytes]:
+    """Return an HTTP-ready report response with server-side role enforcement."""
+    try:
+        payload = export_for_role(session, role, filters)
+    except PermissionError as exc:
+        return 403, {"Content-Type": "application/json"}, json.dumps({"error": str(exc)}).encode()
+    except ValueError as exc:
+        return 400, {"Content-Type": "application/json"}, json.dumps({"error": str(exc)}).encode()
+
+    return 200, {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": "attachment; filename=stataxis-report.xlsx",
+    }, payload
 
 
 def _format_sheet(sheet) -> None:
