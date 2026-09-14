@@ -5,18 +5,18 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from typing import Any, Callable
+from urllib.parse import parse_qs
 
 from sqlalchemy.orm import Session
 
 from api.access import UserRole
 from api.catalog import list_channels
-from api.channel import channel_intelligence_comparison, channel_intelligence_overview
+from api.channel import channel_intelligence_comparison, channel_intelligence_overview, channel_view_series
 from api.export import ObservationExportFilters, export_response
 from api.intelligence import latest_video_intelligence
 
 
 def get_video_intelligence(session: Session, video_id: int) -> tuple[int, dict[str, Any]]:
-    """Return HTTP status and JSON-serializable payload for a video."""
     if video_id <= 0:
         return 400, {"error": "video_id must be a positive integer"}
     payload = latest_video_intelligence(session, video_id)
@@ -26,7 +26,6 @@ def get_video_intelligence(session: Session, video_id: int) -> tuple[int, dict[s
 
 
 def get_channel_comparison(session: Session, channel_id: int) -> tuple[int, dict[str, Any]]:
-    """Return historical STX comparison for a channel."""
     if channel_id <= 0:
         return 400, {"error": "channel_id must be a positive integer"}
     payload = channel_intelligence_comparison(session, channel_id)
@@ -36,7 +35,6 @@ def get_channel_comparison(session: Session, channel_id: int) -> tuple[int, dict
 
 
 def get_channel_overview(session: Session, channel_id: int) -> tuple[int, dict[str, Any]]:
-    """Return latest scored videos for a channel."""
     if channel_id <= 0:
         return 400, {"error": "channel_id must be a positive integer"}
     payload = channel_intelligence_overview(session, channel_id)
@@ -45,22 +43,33 @@ def get_channel_overview(session: Session, channel_id: int) -> tuple[int, dict[s
     return 200, payload
 
 
+def get_channel_series(session: Session, channel_id: int, days: int = 30) -> tuple[int, dict[str, Any]]:
+    if channel_id <= 0:
+        return 400, {"error": "channel_id must be a positive integer"}
+    try:
+        days = int(days)
+    except (TypeError, ValueError):
+        return 400, {"error": "days must be an integer"}
+    payload = channel_view_series(session, channel_id, days=days)
+    if payload is None:
+        return 404, {"error": "channel not found"}
+    return 200, payload
+
+
 def get_channel_catalog(session: Session) -> tuple[int, dict[str, Any]]:
-    """Return active channel metadata for dashboard selectors."""
     return 200, {"channels": list_channels(session)}
 
 
 def wsgi_application(session_factory: Callable[[], Session]):
-    """Expose health, catalog, intelligence and role-aware report endpoints."""
+    """Expose health, catalog, intelligence, time-series and report endpoints."""
 
     def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         method = environ.get("REQUEST_METHOD", "GET")
         path = environ.get("PATH_INFO", "")
 
         if path == "/health":
-            body = b'{"status":"ok","service":"stataxis"}'
             start_response("200 OK", [("Content-Type", "application/json")])
-            return [body]
+            return [b'{"status":"ok","service":"stataxis"}']
 
         if path == "/api/v1/channels":
             if method != "GET":
@@ -92,6 +101,24 @@ def wsgi_application(session_factory: Callable[[], Session]):
                 session.close()
             return _json_response(start_response, status, payload)
 
+        series_suffix = "/series"
+        if path.startswith(channel_prefix) and path.endswith(series_suffix):
+            if method != "GET":
+                return _json_response(start_response, 405, {"error": "method not allowed"})
+            raw_id = path[len(channel_prefix) : -len(series_suffix)]
+            try:
+                channel_id = int(raw_id)
+            except ValueError:
+                return _json_response(start_response, 400, {"error": "channel_id must be a positive integer"})
+            query = parse_qs(environ.get("QUERY_STRING", ""))
+            raw_days = query.get("days", ["30"])[0]
+            session = session_factory()
+            try:
+                status, payload = get_channel_series(session, channel_id, raw_days)
+            finally:
+                session.close()
+            return _json_response(start_response, status, payload)
+
         if path.startswith(channel_prefix):
             if method != "GET":
                 return _json_response(start_response, 405, {"error": "method not allowed"})
@@ -119,7 +146,6 @@ def wsgi_application(session_factory: Callable[[], Session]):
             video_id = int(raw_id)
         except ValueError:
             return _json_response(start_response, 400, {"error": "video_id must be a positive integer"})
-
         session = session_factory()
         try:
             status, payload = get_video_intelligence(session, video_id)
