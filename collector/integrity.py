@@ -28,8 +28,14 @@ class IntegrityReport:
 
 
 def audit_database(session: Session, *, as_of: datetime | None = None) -> IntegrityReport:
-    """Audit relational and measurement invariants without modifying data."""
+    """Audit relational and measurement invariants without modifying data.
+
+    An explicit ``as_of`` is treated as a historical reporting cutoff: records
+    after that cutoff are not considered timestamp violations, so historical
+    readiness remains reproducible as new measurements arrive.
+    """
     resolved_as_of = _utc(as_of or datetime.now(UTC))
+    check_future_timestamps = as_of is None
     issues: list[IntegrityIssue] = []
 
     channels = session.execute(select(Channel)).scalars().all()
@@ -58,7 +64,7 @@ def audit_database(session: Session, *, as_of: datetime | None = None) -> Integr
             issues.append(IntegrityIssue("negative_comment_count", f"observation {observation.id} has negative comments"))
         if observation.concurrent_viewers is not None and observation.concurrent_viewers < 0:
             issues.append(IntegrityIssue("negative_concurrent_viewers", f"observation {observation.id} has negative concurrent viewers"))
-        if _utc(observation.observed_at) > resolved_as_of:
+        if check_future_timestamps and _utc(observation.observed_at) > resolved_as_of:
             issues.append(IntegrityIssue("future_observation", f"observation {observation.id} is after the audit cutoff"))
 
     valid_run_statuses = {"running", "success", "partial", "failed"}
@@ -69,7 +75,7 @@ def audit_database(session: Session, *, as_of: datetime | None = None) -> Integr
             issues.append(IntegrityIssue("invalid_run_timing", f"collection run {run.id} finishes before it starts"))
         if run.channels_attempted < 0 or run.videos_observed < 0:
             issues.append(IntegrityIssue("negative_run_counts", f"collection run {run.id} has negative counters"))
-        if _utc(run.started_at) > resolved_as_of:
+        if check_future_timestamps and _utc(run.started_at) > resolved_as_of:
             issues.append(IntegrityIssue("future_collection_run", f"collection run {run.id} starts after the audit cutoff"))
 
     return IntegrityReport(
