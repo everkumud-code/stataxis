@@ -32,6 +32,8 @@ def test_api_returns_json_serializable_intelligence():
         assert payload["score"] is not None
         assert payload["video_id"] == video.id
         assert isinstance(payload["signals"], (list, tuple))
+        assert payload["stat_axis_view"]["score"] == payload["score"]
+        assert payload["measurement_provenance"]["observation_count"] == 2
 
 
 def test_api_is_read_only_and_missing_safe():
