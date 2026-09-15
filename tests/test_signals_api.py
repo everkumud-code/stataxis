@@ -12,7 +12,7 @@ def test_channel_signals_calculates_recent_velocity_and_momentum():
         channel = Channel(youtube_channel_id="UC-signals", name="Signals")
         session.add(channel)
         session.flush()
-        base = datetime(2026, 9, 14, 12, tzinfo=timezone.utc)
+        base = datetime.now(timezone.utc) - timedelta(minutes=20)
         session.add_all([
             Observation(video_id=1, channel_id=channel.id, observed_at=base, view_count=1000, concurrent_viewers=100, is_live=True),
             Observation(video_id=1, channel_id=channel.id, observed_at=base + timedelta(minutes=10), view_count=1600, concurrent_viewers=130, is_live=True),
