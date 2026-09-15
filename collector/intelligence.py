@@ -34,3 +34,13 @@ def process_persisted_observations(
             session.rollback()
             errors += 1
     return IntelligenceRunResult(processed, snapshots, errors)
+
+
+def persist_intelligence_snapshot(
+    session: Session,
+    video_id: int,
+    *,
+    limit: int = 25,
+):
+    """Backward-compatible facade for callers using the legacy collector API."""
+    return persist_video_intelligence(session, video_id, limit=limit)
