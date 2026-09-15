@@ -37,11 +37,17 @@ def test_stable_series_is_not_anomaly():
     assert result[-1].robust_z_score == 0.0
 
 
-def test_zero_mad_detects_a_deviation_from_constant_baseline():
-    result = detect_anomalies(_points([100, 100, 100, 100, 100, 101]), minimum_points=5)
+def test_zero_mad_uses_materiality_floor_for_constant_baseline():
+    result = detect_anomalies(_points([100, 100, 100, 100, 100, 106]), minimum_points=5)
     latest = result[-1]
     assert latest.is_anomaly is True
     assert latest.robust_z_score == float("inf")
+
+
+def test_zero_mad_ignores_tiny_deviation():
+    result = detect_anomalies(_points([100, 100, 100, 100, 100, 101]), minimum_points=5)
+    assert result[-1].is_anomaly is False
+    assert result[-1].robust_z_score == 0.0
 
 
 def test_missing_values_are_not_zero():
