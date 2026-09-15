@@ -19,11 +19,7 @@ def channel_report(
     series_days: int = 30,
     signal_hours: int = 24,
 ) -> dict[str, Any] | None:
-    """Compose the dashboard-ready individual channel intelligence report.
-
-    All report sections are sourced from the existing persisted/read-only API
-    accessors. No measurements are synthesized or written back to storage.
-    """
+    """Compose the dashboard-ready individual channel intelligence report."""
     overview = channel_intelligence_overview(session, channel_id)
     if overview is None:
         return None
@@ -36,7 +32,7 @@ def channel_report(
     return {
         "channel": {
             "channel_id": overview["channel_id"],
-            "youtube_channel_id": overview["youtube_channel_id"],
+            "youtube_channel_id": overview.get("youtube_channel_id"),
             "name": overview["name"],
         },
         "as_of": resolved_as_of,
