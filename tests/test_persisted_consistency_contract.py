@@ -1,7 +1,7 @@
-from collector.storage import create_database
-from metrics.persisted import build_persisted_video_snapshot
 from sqlalchemy.orm import Session
 
+from collector.storage import create_database
+from metrics.persisted import build_persisted_video_snapshot
 from tests.test_persisted_pipeline import _seed
 
 
