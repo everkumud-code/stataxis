@@ -14,8 +14,8 @@ def _bounded(value: float) -> float:
     return max(0.0, min(100.0, value))
 
 
-def _change_signal(change: MetricChange) -> float | None:
-    if not change.sufficient_data or change.percent_change is None:
+def _change_signal(change: MetricChange | None) -> float | None:
+    if change is None or not change.sufficient_data or change.percent_change is None:
         return None
     return _bounded(50.0 + change.percent_change)
 
@@ -51,8 +51,8 @@ def _consistency_signal(observations: list[ObservationPoint]) -> float | None:
 
 
 def build_stx_signals(
-    audience_change: MetricChange,
-    growth_change: MetricChange,
+    audience_change: MetricChange | None,
+    growth_change: MetricChange | None,
     velocity: VelocityPoint | None,
     acceleration: AccelerationPoint | None = None,
     standing: CompetitiveStanding | None = None,
