@@ -39,6 +39,7 @@ def build_fused_intelligence(
         "momentum": signals.momentum,
         "acceleration": signals.acceleration,
         "consistency": signals.consistency,
+        "engagement": signals.engagement,
         "competitive_position": signals.competitive_position,
         "anomaly_event": signals.anomaly_event,
     }
