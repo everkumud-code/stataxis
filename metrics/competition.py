@@ -32,7 +32,7 @@ class CompetitiveStanding:
     previous_gap_to_leader: float | None
     gap_change: float | None
     momentum: float | None
-    momentum_rank: int | None
+    momentum_rank: int | None = None
 
 
 @dataclass(frozen=True)
@@ -73,10 +73,7 @@ class CompetitiveSummary:
 
 def _rank_map(points: list[CompetitionPoint]) -> dict[str, int]:
     """Return competition ranks (1, 1, 3) for available values."""
-    ordered = sorted(
-        (point for point in points if point.value is not None),
-        key=lambda point: (-point.value, point.name.lower(), point.channel_id),
-    )
+    ordered = sorted((point for point in points if point.value is not None), key=lambda point: (-point.value, point.name.lower(), point.channel_id))
     ranks: dict[str, int] = {}
     previous_value: float | None = None
     previous_rank = 0
@@ -94,10 +91,7 @@ def _share_map(points: list[CompetitionPoint]) -> dict[str, float | None]:
     total = sum(values)
     if total <= 0:
         return {point.channel_id: None for point in points}
-    return {
-        point.channel_id: (point.value / total * 100 if point.value is not None else None)
-        for point in points
-    }
+    return {point.channel_id: (point.value / total * 100 if point.value is not None else None) for point in points}
 
 
 def _gap_map(points: list[CompetitionPoint]) -> dict[str, float | None]:
@@ -106,18 +100,12 @@ def _gap_map(points: list[CompetitionPoint]) -> dict[str, float | None]:
     if not values:
         return {point.channel_id: None for point in points}
     leader = max(values)
-    return {
-        point.channel_id: (leader - point.value if point.value is not None else None)
-        for point in points
-    }
+    return {point.channel_id: (leader - point.value if point.value is not None else None) for point in points}
 
 
 def _momentum_rank_map(points: list[CompetitionPoint]) -> dict[str, int]:
     """Rank available momentum values, with higher momentum ranked first."""
-    ordered = sorted(
-        (point for point in points if point.momentum is not None),
-        key=lambda point: (-point.momentum, point.name.lower(), point.channel_id),
-    )
+    ordered = sorted((point for point in points if point.momentum is not None), key=lambda point: (-point.momentum, point.name.lower(), point.channel_id))
     ranks: dict[str, int] = {}
     previous_value: float | None = None
     previous_rank = 0
@@ -129,20 +117,15 @@ def _momentum_rank_map(points: list[CompetitionPoint]) -> dict[str, int]:
     return ranks
 
 
-def build_competition(
-    current: list[CompetitionPoint],
-    previous: list[CompetitionPoint] | None = None,
-) -> list[CompetitiveStanding]:
+def build_competition(current: list[CompetitionPoint], previous: list[CompetitionPoint] | None = None) -> list[CompetitiveStanding]:
     """Build a competition snapshot without treating missing data as zero."""
     current_ranks = _rank_map(current)
     current_shares = _share_map(current)
     current_gaps = _gap_map(current)
     momentum_ranks = _momentum_rank_map(current)
-
     previous_ranks = _rank_map(previous or [])
     previous_shares = _share_map(previous or [])
     previous_gaps = _gap_map(previous or [])
-
     standings: list[CompetitiveStanding] = []
     for point in current:
         rank = current_ranks.get(point.channel_id)
@@ -151,48 +134,17 @@ def build_competition(
         previous_share = previous_shares.get(point.channel_id)
         gap = current_gaps.get(point.channel_id)
         previous_gap = previous_gaps.get(point.channel_id)
-
         rank_change = previous_rank - rank if previous_rank is not None and rank is not None else None
         share_change = share - previous_share if share is not None and previous_share is not None else None
         gap_change = gap - previous_gap if gap is not None and previous_gap is not None else None
-
-        standings.append(
-            CompetitiveStanding(
-                channel_id=point.channel_id,
-                name=point.name,
-                value=point.value,
-                rank=rank,
-                share=share,
-                previous_rank=previous_rank,
-                rank_change=rank_change,
-                previous_share=previous_share,
-                share_change=share_change,
-                gap_to_leader=gap,
-                previous_gap_to_leader=previous_gap,
-                gap_change=gap_change,
-                momentum=point.momentum,
-                momentum_rank=momentum_ranks.get(point.channel_id),
-            )
-        )
-
-    return sorted(
-        standings,
-        key=lambda item: (
-            item.rank is None,
-            item.rank if item.rank is not None else float("inf"),
-            item.name.lower(),
-        ),
-    )
+        standings.append(CompetitiveStanding(point.channel_id, point.name, point.value, rank, share, previous_rank, rank_change, previous_share, share_change, gap, previous_gap, gap_change, point.momentum, momentum_ranks.get(point.channel_id)))
+    return sorted(standings, key=lambda item: (item.rank is None, item.rank if item.rank is not None else float("inf"), item.name.lower()))
 
 
 def classify_competitive_position(standing: CompetitiveStanding) -> CompetitivePosition:
-    """Translate measured movements into conservative dashboard labels.
-
-    Labels describe observed relative movement; they do not claim audience causality.
-    """
+    """Translate measured movements into conservative dashboard labels."""
     if standing.value is None or standing.rank is None:
         return CompetitivePosition(standing.channel_id, "insufficient data", ())
-
     signals: list[str] = []
     if standing.rank == 1:
         signals.append("leader")
@@ -210,7 +162,6 @@ def classify_competitive_position(standing: CompetitiveStanding) -> CompetitiveP
         signals.append("closing gap")
     elif standing.gap_change is not None and standing.gap_change > 0:
         signals.append("widening gap")
-
     if standing.rank == 1 and standing.momentum_rank == 1:
         label = "competitive leader"
     elif standing.rank_change is not None and standing.rank_change > 0:
@@ -225,12 +176,10 @@ def classify_competitive_position(standing: CompetitiveStanding) -> CompetitiveP
         label = "falling behind"
     else:
         label = "stable position"
-
     return CompetitivePosition(standing.channel_id, label, tuple(signals))
 
 
 def _unique_extreme_id(standings: list[CompetitiveStanding], attribute: str, maximize: bool) -> str | None:
-    """Return an extreme movement only when it is uniquely supported by data."""
     candidates = [item for item in standings if getattr(item, attribute) is not None]
     if not candidates:
         return None
@@ -243,13 +192,9 @@ def summarize_competition(standings: list[CompetitiveStanding]) -> CompetitiveSu
     """Summarize competitive movement without forcing conclusions on ties."""
     ranked = [item for item in standings if item.rank is not None]
     momentum = [item for item in standings if item.momentum_rank is not None]
-
-    leader_id = ranked[0].channel_id if ranked else None
-    momentum_leader_id = min(momentum, key=lambda item: item.momentum_rank).channel_id if momentum else None
-
     return CompetitiveSummary(
-        leader_id=leader_id,
-        momentum_leader_id=momentum_leader_id,
+        leader_id=ranked[0].channel_id if ranked else None,
+        momentum_leader_id=min(momentum, key=lambda item: item.momentum_rank).channel_id if momentum else None,
         biggest_rank_gainer_id=_unique_extreme_id(standings, "rank_change", True),
         biggest_rank_loser_id=_unique_extreme_id(standings, "rank_change", False),
         biggest_share_gainer_id=_unique_extreme_id(standings, "share_change", True),
@@ -268,7 +213,6 @@ def compare_head_to_head(points: list[CompetitionPoint], channel_a_id: str, chan
         channel_b = by_id[channel_b_id]
     except KeyError as exc:
         raise ValueError(f"unknown channel: {exc.args[0]}") from exc
-
     value_leader = None
     value_gap = None
     if channel_a.value is not None and channel_b.value is not None:
@@ -277,7 +221,6 @@ def compare_head_to_head(points: list[CompetitionPoint], channel_a_id: str, chan
         elif channel_b.value > channel_a.value:
             value_leader = channel_b.channel_id
         value_gap = abs(channel_a.value - channel_b.value)
-
     momentum_leader = None
     momentum_gap = None
     if channel_a.momentum is not None and channel_b.momentum is not None:
@@ -286,12 +229,4 @@ def compare_head_to_head(points: list[CompetitionPoint], channel_a_id: str, chan
         elif channel_b.momentum > channel_a.momentum:
             momentum_leader = channel_b.channel_id
         momentum_gap = abs(channel_a.momentum - channel_b.momentum)
-
-    return HeadToHeadResult(
-        channel_a=channel_a,
-        channel_b=channel_b,
-        value_leader=value_leader,
-        value_gap=value_gap,
-        momentum_leader=momentum_leader,
-        momentum_gap=momentum_gap,
-    )
+    return HeadToHeadResult(channel_a, channel_b, value_leader, value_gap, momentum_leader, momentum_gap)
