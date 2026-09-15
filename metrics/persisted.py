@@ -52,6 +52,8 @@ def build_persisted_video_snapshot(
             observed_at=_utc(row.observed_at),
             view_count=row.view_count,
             concurrent_viewers=row.concurrent_viewers,
+            like_count=row.like_count,
+            comment_count=row.comment_count,
         )
         for row in reversed(rows)
     ]
