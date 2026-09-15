@@ -38,7 +38,8 @@ def detect_anomalies(
 
     The current observation is never included in its own baseline. Missing values
     remain unavailable rather than being interpreted as zero. A zero historical
-    MAD is treated as a constant baseline: any different value is anomalous.
+    MAD uses a 5% materiality floor so tiny changes to a constant baseline are not
+    promoted to anomalies merely because the dispersion is mathematically zero.
     """
     if minimum_points < 1:
         raise ValueError("minimum_points must be at least 1")
@@ -74,11 +75,13 @@ def detect_anomalies(
         difference = value - baseline
 
         if mad == 0:
-            robust_z_score = float("inf") if difference != 0 else 0.0
+            relative_change = abs(difference) / max(abs(baseline), 1.0)
+            robust_z_score = float("inf") if relative_change >= 0.05 else 0.0
+            is_anomaly = relative_change >= 0.05
         else:
             robust_z_score = difference / mad
+            is_anomaly = abs(robust_z_score) >= z_threshold
 
-        is_anomaly = abs(robust_z_score) >= z_threshold
         direction = None
         if is_anomaly:
             direction = "positive" if difference > 0 else "negative"
