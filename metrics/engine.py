@@ -18,6 +18,8 @@ class ObservationPoint:
     observed_at: datetime
     view_count: int | None = None
     concurrent_viewers: int | None = None
+    like_count: int | None = None
+    comment_count: int | None = None
 
 
 def _rate(delta: int | None, elapsed_seconds: float) -> float | None:
@@ -41,6 +43,23 @@ def audience_momentum(previous: ObservationPoint, current: ObservationPoint) -> 
         return None
     return _rate(
         current.concurrent_viewers - previous.concurrent_viewers,
+        elapsed,
+    ) * 60
+
+
+def engagement_rate(previous: ObservationPoint, current: ObservationPoint) -> float | None:
+    """Return likes plus comments gained per minute between observations."""
+    elapsed = (current.observed_at - previous.observed_at).total_seconds()
+    if (
+        previous.like_count is None
+        or current.like_count is None
+        or previous.comment_count is None
+        or current.comment_count is None
+    ):
+        return None
+    return _rate(
+        (current.like_count - previous.like_count)
+        + (current.comment_count - previous.comment_count),
         elapsed,
     ) * 60
 
