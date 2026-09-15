@@ -22,6 +22,7 @@ class StatAxisView:
     analysis: tuple[str, ...]
     view: str
     confidence: float
+    signals: tuple[Signal, ...]
 
 
 def _direction(signal: Signal) -> int:
@@ -66,4 +67,5 @@ def build_stat_axis_view(
         analysis=tuple(analysis),
         view=view,
         confidence=confidence,
+        signals=tuple(usable),
     )
