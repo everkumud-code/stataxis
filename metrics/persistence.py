@@ -59,7 +59,7 @@ def persist_video_intelligence(
         available_signals=intelligence.index.available_signals,
         view_json=json.dumps(
             {
-                "score": intelligence.view.score,
+                "score": intelligence.index.score,
                 "confidence": intelligence.view.confidence,
                 "signals": [
                     {"name": signal.name, "direction": signal.direction, "strength": signal.strength}
