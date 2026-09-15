@@ -44,6 +44,7 @@ def build_intelligence_snapshot(
         velocity=velocity,
         acceleration=acceleration,
         standing=standing,
+        observations=observations,
     )
     intelligence = build_fused_intelligence(data, signals)
     contributions = explain_index(intelligence.index)
