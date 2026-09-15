@@ -11,6 +11,7 @@ class STXSignals:
 
     audience: float | None = None
     growth: float | None = None
+    view_velocity: float | None = None
     momentum: float | None = None
     acceleration: float | None = None
     consistency: float | None = None
@@ -31,8 +32,9 @@ class STXIndexResult:
 # Provisional v0 weights. These are intentionally explicit and can be calibrated
 # later against validated outcomes; they are not presented as empirical truth.
 WEIGHTS: dict[str, float] = {
-    "audience": 0.30,
-    "growth": 0.20,
+    "audience": 0.25,
+    "growth": 0.15,
+    "view_velocity": 0.10,
     "momentum": 0.15,
     "acceleration": 0.10,
     "consistency": 0.10,
@@ -54,6 +56,7 @@ def calculate_stx_index(signals: STXSignals) -> STXIndexResult:
     raw = {
         "audience": signals.audience,
         "growth": signals.growth,
+        "view_velocity": signals.view_velocity,
         "momentum": signals.momentum,
         "acceleration": signals.acceleration,
         "consistency": signals.consistency,

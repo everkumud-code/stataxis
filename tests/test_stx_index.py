@@ -8,6 +8,7 @@ def test_full_signal_set_produces_weighted_index():
         STXSignals(
             audience=80,
             growth=70,
+            view_velocity=60,
             momentum=60,
             acceleration=50,
             consistency=90,
@@ -15,15 +16,15 @@ def test_full_signal_set_produces_weighted_index():
             anomaly_event=40,
         )
     )
-    assert result.score == pytest.approx(70.5)
+    assert result.score == pytest.approx(68.75)
     assert result.confidence == 100
-    assert result.available_signals == 7
+    assert result.available_signals == 8
 
 
 def test_missing_signals_are_not_treated_as_zero():
     result = calculate_stx_index(STXSignals(audience=80, growth=None))
     assert result.score == 80
-    assert result.confidence == 50
+    assert result.confidence == 40
     assert result.available_signals == 1
 
 
@@ -45,3 +46,11 @@ def test_component_scores_sum_to_final_score():
         STXSignals(audience=100, momentum=50, competitive_position=0)
     )
     assert sum(result.component_scores.values()) == pytest.approx(result.score)
+
+
+def test_view_velocity_is_a_first_class_index_component():
+    result = calculate_stx_index(STXSignals(view_velocity=75))
+    assert result.score == 75
+    assert result.confidence == 10
+    assert result.available_signals == 1
+    assert result.component_scores["view_velocity"] == pytest.approx(75)

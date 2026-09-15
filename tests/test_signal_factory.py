@@ -24,10 +24,26 @@ def test_build_stx_signals_maps_measured_inputs():
 
     assert result.audience == 70
     assert result.growth == 80
+    assert result.view_velocity == 50.2
     assert result.momentum == 55
     assert result.acceleration == 48
     assert result.consistency is None
     assert result.competitive_position == 100
+
+
+def test_view_velocity_is_derived_from_real_view_measurements():
+    now = datetime.now(timezone.utc)
+    observations = [
+        ObservationPoint(now, view_count=100),
+        ObservationPoint(now + timedelta(minutes=2), view_count=300),
+    ]
+    result = build_stx_signals(
+        compare_metric(100, 300),
+        compare_metric(100, 300),
+        VelocityPoint(now, 100.0, None),
+        observations=observations,
+    )
+    assert result.view_velocity == 51.0
 
 
 def test_consistency_reflects_latest_velocity_direction():
@@ -71,6 +87,7 @@ def test_missing_measurements_remain_missing():
     )
     assert result.audience is None
     assert result.growth == 50
+    assert result.view_velocity is None
     assert result.momentum is None
     assert result.acceleration is None
     assert result.consistency is None

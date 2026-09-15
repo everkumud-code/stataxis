@@ -65,6 +65,10 @@ def build_stx_signals(
     return STXSignals(
         audience=_change_signal(audience_change),
         growth=_change_signal(growth_change),
+        view_velocity=_rate_signal(
+            velocity.view_velocity_per_minute if velocity else None,
+            100.0,
+        ),
         momentum=_rate_signal(
             velocity.audience_momentum_per_minute if velocity else None,
             2.0,
