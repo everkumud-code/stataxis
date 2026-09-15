@@ -72,7 +72,6 @@ class CompetitiveSummary:
 
 
 def _rank_map(points: list[CompetitionPoint]) -> dict[str, int]:
-    """Return competition ranks (1, 1, 3) for available values."""
     ordered = sorted((point for point in points if point.value is not None), key=lambda point: (-point.value, point.name.lower(), point.channel_id))
     ranks: dict[str, int] = {}
     previous_value: float | None = None
@@ -86,16 +85,14 @@ def _rank_map(points: list[CompetitionPoint]) -> dict[str, int]:
 
 
 def _share_map(points: list[CompetitionPoint]) -> dict[str, float | None]:
-    """Return relative share within the supplied comparison set."""
     values = [point.value for point in points if point.value is not None]
     total = sum(values)
     if total <= 0:
         return {point.channel_id: None for point in points}
-    return {point.channel_id: (point.value / total * 100 if point.value is not None else None) for point in points}
+    return {point.channel_id: (round(point.value / total * 100, 12) if point.value is not None else None) for point in points}
 
 
 def _gap_map(points: list[CompetitionPoint]) -> dict[str, float | None]:
-    """Return each available channel's gap to the current leader."""
     values = [point.value for point in points if point.value is not None]
     if not values:
         return {point.channel_id: None for point in points}
@@ -104,7 +101,6 @@ def _gap_map(points: list[CompetitionPoint]) -> dict[str, float | None]:
 
 
 def _momentum_rank_map(points: list[CompetitionPoint]) -> dict[str, int]:
-    """Rank available momentum values, with higher momentum ranked first."""
     ordered = sorted((point for point in points if point.momentum is not None), key=lambda point: (-point.momentum, point.name.lower(), point.channel_id))
     ranks: dict[str, int] = {}
     previous_value: float | None = None
@@ -118,7 +114,6 @@ def _momentum_rank_map(points: list[CompetitionPoint]) -> dict[str, int]:
 
 
 def build_competition(current: list[CompetitionPoint], previous: list[CompetitionPoint] | None = None) -> list[CompetitiveStanding]:
-    """Build a competition snapshot without treating missing data as zero."""
     current_ranks = _rank_map(current)
     current_shares = _share_map(current)
     current_gaps = _gap_map(current)
@@ -135,14 +130,13 @@ def build_competition(current: list[CompetitionPoint], previous: list[Competitio
         gap = current_gaps.get(point.channel_id)
         previous_gap = previous_gaps.get(point.channel_id)
         rank_change = previous_rank - rank if previous_rank is not None and rank is not None else None
-        share_change = share - previous_share if share is not None and previous_share is not None else None
+        share_change = round(share - previous_share, 12) if share is not None and previous_share is not None else None
         gap_change = gap - previous_gap if gap is not None and previous_gap is not None else None
         standings.append(CompetitiveStanding(point.channel_id, point.name, point.value, rank, share, previous_rank, rank_change, previous_share, share_change, gap, previous_gap, gap_change, point.momentum, momentum_ranks.get(point.channel_id)))
     return sorted(standings, key=lambda item: (item.rank is None, item.rank if item.rank is not None else float("inf"), item.name.lower()))
 
 
 def classify_competitive_position(standing: CompetitiveStanding) -> CompetitivePosition:
-    """Translate measured movements into conservative dashboard labels."""
     if standing.value is None or standing.rank is None:
         return CompetitivePosition(standing.channel_id, "insufficient data", ())
     signals: list[str] = []
@@ -189,7 +183,6 @@ def _unique_extreme_id(standings: list[CompetitiveStanding], attribute: str, max
 
 
 def summarize_competition(standings: list[CompetitiveStanding]) -> CompetitiveSummary:
-    """Summarize competitive movement without forcing conclusions on ties."""
     ranked = [item for item in standings if item.rank is not None]
     momentum = [item for item in standings if item.momentum_rank is not None]
     return CompetitiveSummary(
@@ -206,7 +199,6 @@ def summarize_competition(standings: list[CompetitiveStanding]) -> CompetitiveSu
 
 
 def compare_head_to_head(points: list[CompetitionPoint], channel_a_id: str, channel_b_id: str) -> HeadToHeadResult:
-    """Compare two channels without inventing missing observations."""
     by_id = {point.channel_id: point for point in points}
     try:
         channel_a = by_id[channel_a_id]
