@@ -11,25 +11,21 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: requirements-all.txt
-
       - name: Install dependencies
         run: python -m pip install -r requirements-all.txt
-
       - name: Compile Python sources
         run: python -m compileall -q collector metrics api tests web.py
-
       - name: Run tests
         run: python -m pytest -q
-
       - name: Lint
         run: python -m ruff check .
