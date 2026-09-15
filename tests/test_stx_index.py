@@ -4,16 +4,28 @@ from metrics.stx_index import STXSignals, calculate_stx_index
 
 
 def test_full_signal_set_produces_weighted_index():
-    result = calculate_stx_index(STXSignals(audience=80, growth=70, view_velocity=60, momentum=60, acceleration=50, consistency=90, competitive_position=75, anomaly_event=40))
-    assert result.score == pytest.approx(69.0)
+    result = calculate_stx_index(
+        STXSignals(
+            audience=80,
+            growth=70,
+            view_velocity=60,
+            momentum=60,
+            acceleration=50,
+            consistency=90,
+            engagement=65,
+            competitive_position=75,
+            anomaly_event=40,
+        )
+    )
+    assert result.score == pytest.approx(68.2)
     assert result.confidence == 100
-    assert result.available_signals == 8
+    assert result.available_signals == 9
 
 
 def test_missing_signals_are_not_treated_as_zero():
     result = calculate_stx_index(STXSignals(audience=80, growth=None))
     assert result.score == 80
-    assert result.confidence == 25
+    assert result.confidence == 23
     assert result.available_signals == 1
 
 
@@ -41,3 +53,11 @@ def test_view_velocity_is_a_first_class_index_component():
     assert result.confidence == 10
     assert result.available_signals == 1
     assert result.component_scores["view_velocity"] == pytest.approx(75)
+
+
+def test_engagement_is_a_first_class_index_component():
+    result = calculate_stx_index(STXSignals(engagement=82))
+    assert result.score == 82
+    assert result.confidence == 10
+    assert result.available_signals == 1
+    assert result.component_scores["engagement"] == pytest.approx(82)
