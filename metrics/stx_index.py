@@ -15,7 +15,6 @@ class STXSignals:
     momentum: float | None = None
     acceleration: float | None = None
     consistency: float | None = None
-    engagement: float | None = None
     competitive_position: float | None = None
     anomaly_event: float | None = None
 
@@ -31,14 +30,13 @@ class STXIndexResult:
 
 
 WEIGHTS: dict[str, float] = {
-    "audience": 0.23,
-    "growth": 0.14,
+    "audience": 0.25,
+    "growth": 0.15,
     "view_velocity": 0.10,
-    "momentum": 0.14,
-    "acceleration": 0.09,
+    "momentum": 0.15,
+    "acceleration": 0.10,
     "consistency": 0.10,
-    "engagement": 0.10,
-    "competitive_position": 0.05,
+    "competitive_position": 0.10,
     "anomaly_event": 0.05,
 }
 
@@ -60,7 +58,6 @@ def calculate_stx_index(signals: STXSignals) -> STXIndexResult:
         "momentum": signals.momentum,
         "acceleration": signals.acceleration,
         "consistency": signals.consistency,
-        "engagement": signals.engagement,
         "competitive_position": signals.competitive_position,
         "anomaly_event": signals.anomaly_event,
     }
@@ -78,7 +75,7 @@ def calculate_stx_index(signals: STXSignals) -> STXIndexResult:
         for name, value in available.items()
     }
     score = sum(component_scores.values())
-    confidence = round(available_weight / sum(WEIGHTS.values()) * 100, 10)
+    confidence = round(available_weight / sum(WEIGHTS.values()) * 100, 6)
     return STXIndexResult(
         score=score,
         confidence=confidence,
