@@ -27,6 +27,9 @@ def latest_video_intelligence(session: Session, video_id: int) -> dict[str, Any]
     record, video = row
     view_payload = _safe_object(record.view_json)
     contributions = _safe_list(record.contributions_json)
+    signals = view_payload.get("signals", [])
+    if not isinstance(signals, list):
+        signals = []
     return {
         "video_id": video.id,
         "youtube_video_id": video.youtube_video_id,
@@ -35,11 +38,8 @@ def latest_video_intelligence(session: Session, video_id: int) -> dict[str, Any]
         "score": record.score,
         "confidence": record.confidence,
         "available_signals": record.available_signals,
-        "stx_index": {
-            "score": record.score,
-            "confidence": record.confidence,
-            "available_signals": record.available_signals,
-        },
+        "stx_index": {"score": record.score, "confidence": record.confidence, "available_signals": record.available_signals},
+        "signals": signals,
         "data": view_payload.get("data", []),
         "analysis": view_payload.get("analysis", []),
         "view": view_payload.get("view", "No persisted StatAxis View available."),
