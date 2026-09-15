@@ -30,8 +30,6 @@ class STXIndexResult:
     component_scores: dict[str, float]
 
 
-# Provisional v0 weights. These are intentionally explicit and can be calibrated
-# later against validated outcomes; they are not presented as empirical truth.
 WEIGHTS: dict[str, float] = {
     "audience": 0.23,
     "growth": 0.14,
@@ -80,7 +78,7 @@ def calculate_stx_index(signals: STXSignals) -> STXIndexResult:
         for name, value in available.items()
     }
     score = sum(component_scores.values())
-    confidence = available_weight / sum(WEIGHTS.values()) * 100
+    confidence = round(available_weight / sum(WEIGHTS.values()) * 100, 10)
     return STXIndexResult(
         score=score,
         confidence=confidence,
