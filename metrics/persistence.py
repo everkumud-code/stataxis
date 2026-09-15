@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from collector.storage import Base, Observation
 from metrics.persisted import build_persisted_video_snapshot
+from collector.storage import Video
 
 
 class IntelligenceSnapshotRecord(Base):
@@ -25,13 +26,58 @@ class IntelligenceSnapshotRecord(Base):
     contributions_json: Mapped[str] = mapped_column(Text)
 
 
+def _latest_snapshot_is_current(
+    session: Session,
+    video_id: int,
+    newest_observation: datetime | None,
+) -> IntelligenceSnapshotRecord | None:
+    """Return the latest snapshot when it already covers the newest measurement."""
+    if newest_observation is None:
+        return None
+    record = (
+        session.query(IntelligenceSnapshotRecord)
+        .filter(IntelligenceSnapshotRecord.video_id == video_id)
+        .order_by(IntelligenceSnapshotRecord.generated_at.desc())
+        .first()
+    )
+    if record is None:
+        return None
+    try:
+        payload = json.loads(record.view_json or "{}")
+        recorded_newest = payload.get("measurement_provenance", {}).get("newest_observation")
+    except (json.JSONDecodeError, AttributeError):
+        return None
+    if recorded_newest == newest_observation.isoformat():
+        return record
+    return None
+
+
 def persist_video_intelligence(
     session: Session,
     video_id: int,
     *,
     limit: int = 25,
 ) -> IntelligenceSnapshotRecord:
-    """Build and persist one deterministic, traceable intelligence snapshot."""
+    """Build and persist one deterministic, traceable intelligence snapshot.
+
+    Persistence is idempotent for an unchanged latest observation: repeated
+    production passes do not create duplicate intelligence snapshots when no
+    new measurement has arrived.
+    """
+    if limit < 2:
+        raise ValueError("limit must be at least 2")
+
+    newest_row = (
+        session.query(Observation.observed_at)
+        .filter(Observation.video_id == video_id)
+        .order_by(Observation.observed_at.desc())
+        .first()
+    )
+    newest_observation = newest_row[0] if newest_row else None
+    current = _latest_snapshot_is_current(session, video_id, newest_observation)
+    if current is not None:
+        return current
+
     snapshot = build_persisted_video_snapshot(session, video_id, limit=limit)
     intelligence = snapshot.intelligence
 
