@@ -22,11 +22,14 @@ def process_persisted_observations(
     *,
     limit_per_video: int = 25,
 ) -> IntelligenceRunResult:
-    """Build and durably store STX intelligence for persisted videos."""
+    """Build and durably store STX intelligence for videos with a change window."""
     video_ids = [row[0] for row in session.query(Observation.video_id).distinct().all()]
     processed = snapshots = errors = 0
     for video_id in video_ids:
         processed += 1
+        observation_count = session.query(Observation.id).filter(Observation.video_id == video_id).count()
+        if observation_count < 2:
+            continue
         try:
             persist_video_intelligence(session, video_id, limit=limit_per_video)
             snapshots += 1
