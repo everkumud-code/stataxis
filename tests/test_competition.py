@@ -27,10 +27,10 @@ def test_rank_share_and_gap_changes_are_calculated_from_previous_window():
     alpha = next(item for item in standings if item.channel_id == "a")
     beta = next(item for item in standings if item.channel_id == "b")
     assert (alpha.rank, alpha.previous_rank, alpha.rank_change) == (2, 1, -1)
-    assert alpha.share_change == -18.33333333333333
+    assert alpha.share_change == -18.333333333333
     assert (alpha.gap_to_leader, alpha.previous_gap_to_leader, alpha.gap_change) == (200, 0, 200)
     assert (beta.rank, beta.previous_rank, beta.rank_change) == (1, 2, 1)
-    assert beta.share_change == 18.33333333333333
+    assert beta.share_change == 18.333333333333
 
 
 def test_gap_change_can_show_a_channel_closing_the_gap():
