@@ -28,12 +28,7 @@ class IntegrityReport:
 
 
 def audit_database(session: Session, *, as_of: datetime | None = None) -> IntegrityReport:
-    """Audit relational and measurement invariants without modifying data.
-
-    An explicit ``as_of`` is treated as a historical reporting cutoff: records
-    after that cutoff are not considered timestamp violations, so historical
-    readiness remains reproducible as new measurements arrive.
-    """
+    """Audit relational and measurement invariants without modifying data."""
     resolved_as_of = _utc(as_of or datetime.now(UTC))
     check_future_timestamps = as_of is None
     issues: list[IntegrityIssue] = []
@@ -66,6 +61,21 @@ def audit_database(session: Session, *, as_of: datetime | None = None) -> Integr
             issues.append(IntegrityIssue("negative_concurrent_viewers", f"observation {observation.id} has negative concurrent viewers"))
         if check_future_timestamps and _utc(observation.observed_at) > resolved_as_of:
             issues.append(IntegrityIssue("future_observation", f"observation {observation.id} is after the audit cutoff"))
+
+    observations_by_video: dict[int, list[Observation]] = {}
+    for observation in observations:
+        observations_by_video.setdefault(observation.video_id, []).append(observation)
+    for video_id, points in observations_by_video.items():
+        ordered = sorted(points, key=lambda point: _utc(point.observed_at))
+        previous = None
+        for point in ordered:
+            if previous is not None and previous.view_count is not None and point.view_count is not None:
+                if point.view_count < previous.view_count:
+                    issues.append(IntegrityIssue(
+                        "view_count_regression",
+                        f"video {video_id} view count fell from {previous.view_count} to {point.view_count}",
+                    ))
+            previous = point
 
     valid_run_statuses = {"running", "success", "partial", "failed"}
     for run in runs:
