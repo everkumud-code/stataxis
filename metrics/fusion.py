@@ -35,6 +35,7 @@ def build_fused_intelligence(
     signal_map = {
         "audience": signals.audience,
         "growth": signals.growth,
+        "view_velocity": signals.view_velocity,
         "momentum": signals.momentum,
         "acceleration": signals.acceleration,
         "consistency": signals.consistency,
