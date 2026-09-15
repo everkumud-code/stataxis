@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -8,14 +8,15 @@ from collector.storage import Base, save_observations
 from collector.youtube.collector import VideoObservation
 
 
-def test_observations_are_append_only() -> None:
+def test_observations_are_append_only_and_duplicate_safe() -> None:
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
 
+    observed_at = datetime.now(UTC)
     observation = VideoObservation(
         video_id="video1",
         channel_id="channel1",
-        observed_at=datetime.now(UTC),
+        observed_at=observed_at,
         title="Test",
         published_at=None,
         view_count=100,
@@ -37,13 +38,24 @@ def test_observations_are_append_only() -> None:
             language="Hindi",
             observations=[observation],
         )
-
         assert saved == 1
 
+        # Replaying the exact same measurement must not create a second row.
+        saved = save_observations(
+            session=session,
+            channel_name="Test Channel",
+            channel_youtube_id="channel1",
+            network="Test Network",
+            language="Hindi",
+            observations=[observation],
+        )
+        assert saved == 0
+
+        # A genuinely new timestamp remains append-only.
         observation_2 = VideoObservation(
             video_id="video1",
             channel_id="channel1",
-            observed_at=datetime.now(UTC),
+            observed_at=observed_at + timedelta(minutes=2),
             title="Test",
             published_at=None,
             view_count=150,
@@ -64,7 +76,6 @@ def test_observations_are_append_only() -> None:
             language="Hindi",
             observations=[observation_2],
         )
-
         assert saved == 1
 
         rows = session.execute(
