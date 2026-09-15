@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, create_engine
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from collector.youtube.collector import VideoObservation
@@ -38,6 +38,9 @@ class Video(Base):
 
 class Observation(Base):
     __tablename__ = "stx_observations"
+    __table_args__ = (
+        UniqueConstraint("video_id", "observed_at", name="uq_stx_observation_video_timestamp"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     video_id: Mapped[int] = mapped_column(ForeignKey("stx_videos.id"), index=True)
@@ -81,7 +84,7 @@ def save_observations(
     observations: list[VideoObservation],
     region: str = "unknown",
 ) -> int:
-    """Persist channel/video metadata and append-only observations."""
+    """Persist channel/video metadata and append only new timestamped observations."""
     channel = (
         session.query(Channel)
         .filter_by(youtube_channel_id=channel_youtube_id)
@@ -103,7 +106,13 @@ def save_observations(
         channel.region = region
 
     saved = 0
+    seen: set[tuple[str, datetime]] = set()
     for item in observations:
+        key = (item.video_id, item.observed_at)
+        if key in seen:
+            continue
+        seen.add(key)
+
         video = session.query(Video).filter_by(youtube_video_id=item.video_id).one_or_none()
         if video is None:
             video = Video(
@@ -117,6 +126,14 @@ def save_observations(
         else:
             video.title = item.title
             video.published_at = item.published_at
+
+        existing = (
+            session.query(Observation.id)
+            .filter_by(video_id=video.id, observed_at=item.observed_at)
+            .first()
+        )
+        if existing is not None:
+            continue
 
         session.add(
             Observation(
