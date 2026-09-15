@@ -88,3 +88,13 @@ def persist_video_intelligence(
     session.add(record)
     session.commit()
     return record
+
+
+def persist_intelligence_snapshot(
+    session: Session,
+    video_id: int,
+    *,
+    limit: int = 25,
+) -> IntelligenceSnapshotRecord:
+    """Backward-compatible name for the canonical persistence operation."""
+    return persist_video_intelligence(session, video_id, limit=limit)
