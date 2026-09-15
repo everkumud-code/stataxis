@@ -25,15 +25,55 @@ class IntelligenceSnapshotRecord(Base):
     contributions_json: Mapped[str] = mapped_column(Text)
 
 
+def _measurement_provenance(
+    timestamps: list[datetime],
+    signal_names: list[str],
+) -> dict[str, object]:
+    """Describe exactly which persisted observations support derived signals."""
+    newest = max(timestamps) if timestamps else None
+    oldest = min(timestamps) if timestamps else None
+    window_seconds = (
+        (newest - oldest).total_seconds()
+        if newest is not None and oldest is not None
+        else None
+    )
+    observation_signals = {
+        "audience",
+        "growth",
+        "view_velocity",
+        "momentum",
+        "acceleration",
+        "consistency",
+    }
+    signals = {
+        name: {
+            "source": "persisted_observations",
+            "observation_count": len(timestamps),
+            "derived": True,
+        }
+        for name in signal_names
+        if name in observation_signals
+    }
+    return {
+        "schema_version": 1,
+        "observation_count": len(timestamps),
+        "oldest_observation": oldest.isoformat() if oldest else None,
+        "newest_observation": newest.isoformat() if newest else None,
+        "window_seconds": window_seconds,
+        "signals": signals,
+    }
+
+
 def persist_video_intelligence(session: Session, video_id: int, *, limit: int = 25) -> IntelligenceSnapshotRecord:
     """Build and persist one deterministic, traceable intelligence snapshot."""
     snapshot = build_persisted_video_snapshot(session, video_id, limit=limit)
     intelligence = snapshot.intelligence
     rows = session.query(Observation.observed_at).filter(Observation.video_id == video_id).order_by(Observation.observed_at.desc()).limit(limit).all()
     timestamps = [_utc(row[0]) for row in rows]
-    newest = max(timestamps) if timestamps else None
-    oldest = min(timestamps) if timestamps else None
-    window_seconds = (newest - oldest).total_seconds() if newest is not None and oldest is not None else None
+    provenance = _measurement_provenance(
+        timestamps,
+        [signal.name for signal in intelligence.view.signals],
+    )
     record = IntelligenceSnapshotRecord(
         video_id=video_id,
         generated_at=datetime.now(UTC),
@@ -47,7 +87,7 @@ def persist_video_intelligence(session: Session, video_id: int, *, limit: int = 
             "data": list(intelligence.view.data),
             "analysis": list(intelligence.view.analysis),
             "view": intelligence.view.view,
-            "measurement_provenance": {"observation_count": len(timestamps), "oldest_observation": oldest.isoformat() if oldest else None, "newest_observation": newest.isoformat() if newest else None, "window_seconds": window_seconds},
+            "measurement_provenance": provenance,
         }, sort_keys=True),
         contributions_json=json.dumps([{"name": item.name, "value": item.value, "contribution": item.weighted_contribution, "share_of_score": item.share_of_score} for item in snapshot.contributions], sort_keys=True),
     )

@@ -33,7 +33,15 @@ def test_api_returns_json_serializable_intelligence():
         assert payload["video_id"] == video.id
         assert isinstance(payload["signals"], (list, tuple))
         assert payload["stat_axis_view"]["score"] == payload["score"]
-        assert payload["measurement_provenance"]["observation_count"] == 2
+        provenance = payload["measurement_provenance"]
+        assert provenance["observation_count"] == 2
+        assert provenance["schema_version"] == 1
+        assert provenance["oldest_observation"] == "2026-09-14T00:00:00+00:00"
+        assert provenance["newest_observation"] == "2026-09-14T00:02:00+00:00"
+        assert provenance["window_seconds"] == 120.0
+        assert provenance["signals"]["growth"]["source"] == "persisted_observations"
+        assert provenance["signals"]["growth"]["observation_count"] == 2
+        assert provenance["signals"]["growth"]["derived"] is True
 
 
 def test_api_is_read_only_and_missing_safe():
