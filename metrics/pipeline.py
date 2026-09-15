@@ -9,7 +9,6 @@ from metrics.competition import CompetitiveStanding
 from metrics.explain import SignalContribution, explain_index
 from metrics.fusion import FusedIntelligence, build_fused_intelligence
 from metrics.signal_factory import build_stx_signals
-from metrics.stx_index import STXSignals
 from metrics.timeseries import MetricChange
 from metrics.velocity import latest_velocity
 from metrics.engine import ObservationPoint
@@ -38,7 +37,7 @@ def build_intelligence_snapshot(
     """
     velocity = latest_velocity(observations)
     acceleration = latest_acceleration(observations)
-    signals: STXSignals = build_stx_signals(
+    signals = build_stx_signals(
         audience_change=audience_change,
         growth_change=growth_change,
         velocity=velocity,
