@@ -15,6 +15,7 @@ class STXSignals:
     momentum: float | None = None
     acceleration: float | None = None
     consistency: float | None = None
+    engagement: float | None = None
     competitive_position: float | None = None
     anomaly_event: float | None = None
 
@@ -29,14 +30,17 @@ class STXIndexResult:
     component_scores: dict[str, float]
 
 
+# Provisional v0 weights. These are explicit calibration starting points,
+# not claims of empirical truth.
 WEIGHTS: dict[str, float] = {
-    "audience": 0.25,
-    "growth": 0.15,
+    "audience": 0.23,
+    "growth": 0.14,
     "view_velocity": 0.10,
-    "momentum": 0.15,
-    "acceleration": 0.10,
-    "consistency": 0.10,
-    "competitive_position": 0.10,
+    "momentum": 0.14,
+    "acceleration": 0.09,
+    "consistency": 0.09,
+    "engagement": 0.10,
+    "competitive_position": 0.06,
     "anomaly_event": 0.05,
 }
 
@@ -58,6 +62,7 @@ def calculate_stx_index(signals: STXSignals) -> STXIndexResult:
         "momentum": signals.momentum,
         "acceleration": signals.acceleration,
         "consistency": signals.consistency,
+        "engagement": signals.engagement,
         "competitive_position": signals.competitive_position,
         "anomaly_event": signals.anomaly_event,
     }
