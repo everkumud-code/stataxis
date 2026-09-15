@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from sqlalchemy.orm import Session
 
 from collector.storage import Observation, Video
 from metrics.engine import ObservationPoint
 from metrics.pipeline import IntelligenceSnapshot, build_intelligence_snapshot
 from metrics.timeseries import compare_metric
+
+
+def _utc(value: datetime | None) -> datetime | None:
+    """Normalize database timestamps to explicit UTC for deterministic provenance."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def build_persisted_video_snapshot(
@@ -19,9 +30,8 @@ def build_persisted_video_snapshot(
 ) -> IntelligenceSnapshot:
     """Build an explainable STX snapshot from observations already in storage.
 
-    The adapter is read-only: it never mutates the database. Observations are
-    ordered chronologically before being passed to the deterministic metric
-    layer, so velocity and acceleration use the actual collection timestamps.
+    The adapter is read-only and never invents change signals from a single
+    observation. Observations are ordered chronologically before measurement.
     """
     if limit < 2:
         raise ValueError("limit must be at least 2")
@@ -39,7 +49,7 @@ def build_persisted_video_snapshot(
     )
     observations = [
         ObservationPoint(
-            observed_at=row.observed_at,
+            observed_at=_utc(row.observed_at),
             view_count=row.view_count,
             concurrent_viewers=row.concurrent_viewers,
         )
@@ -48,13 +58,14 @@ def build_persisted_video_snapshot(
 
     first = observations[0] if observations else None
     last = observations[-1] if observations else None
+    has_change_window = len(observations) >= 2
     audience_change = compare_metric(
-        first.concurrent_viewers if first else None,
-        last.concurrent_viewers if last else None,
+        first.concurrent_viewers if has_change_window and first else None,
+        last.concurrent_viewers if has_change_window and last else None,
     )
     growth_change = compare_metric(
-        first.view_count if first else None,
-        last.view_count if last else None,
+        first.view_count if has_change_window and first else None,
+        last.view_count if has_change_window and last else None,
     )
 
     snapshot_data = list(data or [])
