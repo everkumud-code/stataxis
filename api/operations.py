@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
+from collector.integrity import audit_database
 from collector.storage import CollectionRun, Observation
 from metrics.persistence import IntelligenceSnapshotRecord
 
@@ -44,14 +45,33 @@ def collection_health(session: Session, *, as_of: datetime | None = None, stale_
 
 
 def intelligence_readiness(session: Session, *, as_of: datetime | None = None, stale_after_minutes: int = 360, min_snapshot_coverage: float = 1.0) -> dict[str, Any]:
-    """Assess whether the latest collection has enough persisted STX intelligence for reporting."""
+    """Assess collection freshness, persisted-data integrity, and STX coverage."""
     if not 0.0 <= min_snapshot_coverage <= 1.0:
         raise ValueError("min_snapshot_coverage must be between 0 and 1")
     resolved_as_of = _utc(as_of or datetime.now(UTC))
     health = collection_health(session, as_of=resolved_as_of, stale_after_minutes=stale_after_minutes)
+    integrity = audit_database(session, as_of=as_of)
+    integrity_payload = {
+        "ok": integrity.ok,
+        "checked_channels": integrity.checked_channels,
+        "checked_videos": integrity.checked_videos,
+        "checked_observations": integrity.checked_observations,
+        "checked_collection_runs": integrity.checked_collection_runs,
+        "issue_count": len(integrity.issues),
+        "issues": [{"code": issue.code, "message": issue.message} for issue in integrity.issues],
+    }
     run = health["latest_run"]
+    if not integrity.ok:
+        observed = 0 if run is None else max(0, int(run["videos_observed"]))
+        return {
+            "ready": False,
+            "reason": "data_integrity_failed",
+            "collection": health,
+            "integrity": integrity_payload,
+            "intelligence": {"videos_observed": observed, "videos_with_intelligence": 0, "coverage": 0.0, "min_snapshot_coverage": min_snapshot_coverage},
+        }
     if run is None:
-        return {"ready": False, "reason": "no_collection_run", "collection": health, "intelligence": {"videos_observed": 0, "videos_with_intelligence": 0, "coverage": 0.0, "min_snapshot_coverage": min_snapshot_coverage}}
+        return {"ready": False, "reason": "no_collection_run", "collection": health, "integrity": integrity_payload, "intelligence": {"videos_observed": 0, "videos_with_intelligence": 0, "coverage": 0.0, "min_snapshot_coverage": min_snapshot_coverage}}
     observed = max(0, int(run["videos_observed"]))
     run_started_at = datetime.fromisoformat(run["started_at"])
     observed_video_ids = (
@@ -81,6 +101,7 @@ def intelligence_readiness(session: Session, *, as_of: datetime | None = None, s
         "ready": ready,
         "reason": reason,
         "collection": health,
+        "integrity": integrity_payload,
         "intelligence": {
             "videos_observed": observed,
             "videos_with_intelligence": with_intelligence,
