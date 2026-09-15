@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from metrics.acceleration import AccelerationPoint
 from metrics.competition import CompetitiveStanding
-from metrics.engine import ObservationPoint, engagement_rate
+from metrics.engine import ObservationPoint
 from metrics.stx_index import STXSignals
 from metrics.timeseries import MetricChange
 from metrics.velocity import VelocityPoint, calculate_velocity
@@ -32,12 +32,6 @@ def _standing_signal(standing: CompetitiveStanding | None) -> float | None:
     return _bounded(100.0 / standing.rank)
 
 
-def _engagement_signal(observations: list[ObservationPoint]) -> float | None:
-    if len(observations) < 2:
-        return None
-    return _rate_signal(engagement_rate(observations[-2], observations[-1]), 10.0)
-
-
 def _consistency_signal(observations: list[ObservationPoint]) -> float | None:
     """Score how consistently view velocity has kept its latest direction."""
     velocities = [point.view_velocity_per_minute for point in calculate_velocity(observations)]
@@ -57,9 +51,10 @@ def build_stx_signals(
     standing: CompetitiveStanding | None = None,
     observations: list[ObservationPoint] | None = None,
 ) -> STXSignals:
-    """Build a real signal snapshot from measured metrics.
+    """Build a real v0 signal snapshot from measured metrics.
 
     Missing source metrics remain missing rather than being converted to zero.
+    Cross-platform engagement is intentionally excluded from STX Index v0.
     """
     observations = observations or []
     return STXSignals(
@@ -72,6 +67,5 @@ def build_stx_signals(
             1.0,
         ),
         consistency=_consistency_signal(observations),
-        engagement=_engagement_signal(observations),
         competitive_position=_standing_signal(standing),
     )
