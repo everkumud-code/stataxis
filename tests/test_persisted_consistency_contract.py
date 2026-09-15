@@ -1,8 +1,8 @@
+from collector.storage import create_database
 from metrics.persisted import build_persisted_video_snapshot
+from sqlalchemy.orm import Session
 
 from tests.test_persisted_pipeline import _seed
-from collector.storage import Observation, create_database
-from sqlalchemy.orm import Session
 
 
 def test_persisted_snapshot_exposes_consistency_signal_and_explanation():
@@ -14,7 +14,4 @@ def test_persisted_snapshot_exposes_consistency_signal_and_explanation():
         assert result.intelligence.index.available_signals == 4
         assert result.intelligence.index.component_scores["consistency"] > 0
         assert any(item.name == "consistency" for item in result.contributions)
-        assert any(
-            item.name == "consistency"
-            for item in result.intelligence.view.signals
-        )
+        assert result.intelligence.view.confidence == result.intelligence.index.confidence
