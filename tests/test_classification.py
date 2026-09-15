@@ -25,7 +25,7 @@ def test_classify_active_live_video_without_broadcast_content():
         },
     }
 
-    assert classify_video(video) == VideoClassification.UNKNOWN.value
+    assert classify_video(video) == VideoClassification.LIVE.value
 
 
 def test_classify_upcoming_video():
