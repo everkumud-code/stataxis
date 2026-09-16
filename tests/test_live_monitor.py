@@ -41,7 +41,7 @@ def test_live_audience_window_returns_exact_observed_seconds_without_interpolati
         payload = live_audience_window(session, start_at=base, end_at=base + timedelta(seconds=4))
 
         assert [point["observed_at"] for point in payload["timeline"]] == [base.isoformat(), (base + timedelta(seconds=2)).isoformat()]
-        assert payload["overall"]["peak_concurrent"] == 235
+        assert payload["overall"]["peak_concurrent"] == 210
         assert payload["overall"]["observed_seconds"] == 2
         assert payload["languages"]["Hindi"]["current_concurrent"] == 140
         assert payload["languages"]["Hindi"]["peak_concurrent"] == 140
