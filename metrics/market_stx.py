@@ -43,7 +43,6 @@ def build_market_stx(
             continue
         observations = _observations(rows)
         previous_obs = _observations(previous.get(channel_id, []))
-        first = observations[0] if observations else None
         last = observations[-1] if observations else None
         previous_last = previous_obs[-1] if previous_obs else None
         audience_change = compare_metric(
