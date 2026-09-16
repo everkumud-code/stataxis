@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from api.access import VideoAccessPolicy, require_capability
+from api.access import require_capability
 from api.auth import AuthIdentity
-from collector.storage import Channel, Video
-from collector.storage import save_observations
+from api.auth_service import policy_for_identity
+from collector.storage import Channel, Observation, Video, save_observations
 from collector.youtube.client import YouTubeClient
 from collector.youtube.manual_live import ManualLiveTarget, fetch_manual_live
 from metrics.persistence import persist_video_intelligence
@@ -61,32 +61,28 @@ def evaluate_youtube_url(
     client: YouTubeClient | None = None,
 ) -> EvaluationResult:
     """Fetch, persist, and measure one manually supplied YouTube URL."""
-    from api.auth_service import policy_for_identity
-
-    policy: VideoAccessPolicy = policy_for_identity(identity)
-    require_capability(policy, "can_evaluate")
+    require_capability(policy_for_identity(identity), "can_evaluate")
     target = ManualLiveTarget.from_url(url, display_name)
     owns_client = client is None
     youtube = client or YouTubeClient()
     try:
-        channel_meta = youtube.get_channel(fetch_manual_live(youtube, target).channel_id)
         observation = fetch_manual_live(youtube, target)
-        channel_snippet = channel_meta.get("snippet", {})
-        channel_name = str(channel_snippet.get("title") or observation.channel_id)
-        channel_network = str(channel_snippet.get("customUrl") or "unknown")
-        language = str(channel_snippet.get("defaultLanguage") or "unknown")
+        channel_meta = youtube.get_channel(observation.channel_id)
+        snippet = channel_meta.get("snippet", {})
+        channel_name = str(snippet.get("title") or observation.channel_id)
+        network = str(snippet.get("customUrl") or "unknown")
+        language = str(snippet.get("defaultLanguage") or "unknown")
         saved = save_observations(
             session,
             channel_name=channel_name,
             channel_youtube_id=observation.channel_id,
-            network=channel_network,
+            network=network,
             language=language,
             observations=[observation],
         )
         video = session.query(Video).filter_by(youtube_video_id=observation.video_id).one()
         channel = session.query(Channel).filter_by(id=video.channel_id).one()
-        count = session.query(Video).join(Channel).filter(Video.id == video.id).count()
-        observation_count = session.query(__import__("collector.storage", fromlist=["Observation"]).Observation).filter_by(video_id=video.id).count()
+        observation_count = session.query(Observation).filter_by(video_id=video.id).count()
         if observation_count < 2:
             return EvaluationResult(
                 video_id=video.id,
@@ -104,7 +100,7 @@ def evaluate_youtube_url(
                 view="Signal captured. STX Index is withheld until a valid comparison window exists.",
             )
         record = persist_video_intelligence(session, video.id)
-        payload = __import__("json").loads(record.view_json)
+        payload = json.loads(record.view_json)
         return EvaluationResult(
             video_id=video.id,
             youtube_video_id=video.youtube_video_id,
