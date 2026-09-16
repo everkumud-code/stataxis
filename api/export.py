@@ -1,4 +1,4 @@
-"""Role-aware filtered Excel export for StatAxis dashboard reports."""
+"""Role-aware Excel exports for StatAxis dashboard reports and live audience windows."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
 from api.access import UserRole, require_capability, video_access_policy
+from api.live_monitor import live_audience_window
 from collector.storage import Channel, Observation, Video
 from metrics.persistence import IntelligenceSnapshotRecord
 
@@ -107,6 +108,63 @@ def export_observations_xlsx(session: Session, filters: ObservationExportFilters
                 view.get("view", view.get("summary", "")), json.dumps(contributions, sort_keys=True),
             ])
     _format_sheet(intelligence)
+
+    output = BytesIO()
+    workbook.save(output)
+    return output.getvalue()
+
+
+def export_live_audience_xlsx(
+    session: Session,
+    *,
+    start_at: datetime,
+    end_at: datetime,
+    language: str | None = None,
+) -> bytes:
+    """Export the exact observed live audience window, including language and channel detail."""
+    payload = live_audience_window(session, start_at=start_at, end_at=end_at, language=language)
+    workbook = Workbook()
+
+    timeline = workbook.active
+    timeline.title = "Second-by-Second"
+    timeline.append(["Observed At", "Hindi", "English", "Regional", "Unknown", "Total Concurrent"])
+    for point in payload["timeline"]:
+        timeline.append([
+            point["observed_at"], point.get("Hindi", 0), point.get("English", 0),
+            point.get("Regional", 0), point.get("Unknown", 0), point.get("total_concurrent", 0),
+        ])
+    _format_sheet(timeline)
+
+    markets = workbook.create_sheet("Language Markets")
+    markets.append(["Language Group", "Channel Count", "Observations", "Current Concurrent", "Peak Concurrent", "Average Concurrent", "Metric Note"])
+    for group, item in payload["languages"].items():
+        markets.append([
+            group, item["channel_count"], item["observations"], item["current_concurrent"],
+            item["peak_concurrent"], item["average_concurrent"], item["metric_note"],
+        ])
+    _format_sheet(markets)
+
+    channels = workbook.create_sheet("Channels")
+    channels.append(["Channel ID", "Channel", "Language Group", "Language", "Current Concurrent", "Peak Concurrent", "Latest Observed At"])
+    for item in payload["channels"]:
+        channels.append([
+            item["channel_id"], item["name"], item["language_group"], item["language"],
+            item["current_concurrent"], item["peak_concurrent"], item["observed_at"],
+        ])
+    _format_sheet(channels)
+
+    summary = workbook.create_sheet("Summary")
+    summary.append(["Metric", "Value"])
+    summary.append(["Window Start", payload["start_at"]])
+    summary.append(["Window End", payload["end_at"]])
+    summary.append(["Peak Concurrent", payload["overall"]["peak_concurrent"]])
+    summary.append(["Current Concurrent", payload["overall"]["current_concurrent"]])
+    summary.append(["Observed Seconds", payload["overall"]["observed_seconds"]])
+    summary.append(["Live Channels", payload["overall"]["channel_count"]])
+    summary.append(["Interpolation", "OFF — observed data only"])
+    summary.append(["Language Filter", language or "All"])
+    summary.append(["Sampling Definition", payload["sample_resolution"]])
+    _format_sheet(summary)
 
     output = BytesIO()
     workbook.save(output)

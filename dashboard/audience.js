@@ -66,6 +66,29 @@
       if (status) status.textContent = "Window loaded · observed data only";
     } catch (error) { if (status) status.textContent = error.message; }
   };
+  const exportWindow = async () => {
+    const start = $("#aud-start")?.value;
+    const end = $("#aud-end")?.value;
+    const status = $("#aud-status");
+    if (!start || !end) { if (status) status.textContent = "Select a start and end time first."; return; }
+    if (!token()) { if (status) status.textContent = "Sign in to export Excel data."; return; }
+    if (status) status.textContent = "Preparing Excel export…";
+    try {
+      const params = new URLSearchParams({ start: new Date(start).toISOString(), end: new Date(end).toISOString() });
+      const response = await fetch(`/api/v1/audience/live/export?${params}`, { headers: { Authorization: `Bearer ${token()}` } });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || `${response.status} ${response.statusText}`);
+      }
+      const blob = await response.blob();
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = href;
+      link.download = "stataxis-live-audience.xlsx";
+      document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(href);
+      if (status) status.textContent = "Excel exported · observed data only";
+    } catch (error) { if (status) status.textContent = error.message; }
+  };
   let timer = null;
   const stop = () => {
     if (timer) clearInterval(timer);
@@ -94,6 +117,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     setDefaults();
     $("#aud-load-window")?.addEventListener("click", loadWindow);
+    $("#aud-export-excel")?.addEventListener("click", exportWindow);
     $("#aud-start-monitor")?.addEventListener("click", start);
     $("#aud-stop-monitor")?.addEventListener("click", stop);
     loadWindow();

@@ -1,4 +1,4 @@
-"""HTTP endpoints for authenticated precision live sampling and public window reads."""
+"""HTTP endpoints for authenticated precision live sampling, windows and Excel export."""
 
 from __future__ import annotations
 
@@ -6,30 +6,67 @@ import json
 from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 
-from api.auth_service import authenticate
+from api.auth_service import authenticate, policy_for_identity
+from api.export import export_live_audience_xlsx
 from api.live_monitor import live_audience_window, sample_live_url
+from api.access import require_capability
 
 
 def live_application(session_factory: Callable[[], Any]):
-    """Expose precision live sampling and language-group audience windows."""
+    """Expose authenticated precision live sampling, audience windows and Excel export."""
     def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         path = environ.get("PATH_INFO", "")
         method = environ.get("REQUEST_METHOD", "GET")
 
+        if path == "/api/v1/audience/live/export":
+            if method != "GET":
+                return _json(start_response, 405, {"error": "method not allowed"})
+            try:
+                identity = authenticate(environ.get("HTTP_AUTHORIZATION"))
+                require_capability(policy_for_identity(identity), "can_download_report")
+                query = _query(environ.get("QUERY_STRING", ""))
+                end_at = _parse_datetime(query.get("end")) or datetime.now(UTC)
+                start_at = _parse_datetime(query.get("start")) or end_at - timedelta(hours=1)
+                session = session_factory()
+                try:
+                    body = export_live_audience_xlsx(
+                        session,
+                        start_at=start_at,
+                        end_at=end_at,
+                        language=query.get("language"),
+                    )
+                finally:
+                    session.close()
+                start_response("200 OK", [
+                    ("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                    ("Content-Disposition", "attachment; filename=stataxis-live-audience.xlsx"),
+                    ("Content-Length", str(len(body))),
+                ])
+                return [body]
+            except PermissionError as exc:
+                message = str(exc)
+                return _json(start_response, 403 if "premium" in message or "access" in message else 401, {"error": message})
+            except ValueError as exc:
+                return _json(start_response, 400, {"error": str(exc)})
+
         if path == "/api/v1/audience/live":
             if method != "GET":
                 return _json(start_response, 405, {"error": "method not allowed"})
-            query = _query(environ.get("QUERY_STRING", ""))
             try:
+                identity = authenticate(environ.get("HTTP_AUTHORIZATION"))
+                require_capability(policy_for_identity(identity), "can_evaluate_url")
+                query = _query(environ.get("QUERY_STRING", ""))
                 end_at = _parse_datetime(query.get("end")) or datetime.now(UTC)
                 start_at = _parse_datetime(query.get("start")) or end_at - timedelta(hours=1)
-                payload = None
                 session = session_factory()
                 try:
                     payload = live_audience_window(session, start_at=start_at, end_at=end_at, language=query.get("language"))
                 finally:
                     session.close()
                 return _json(start_response, 200, payload)
+            except PermissionError as exc:
+                message = str(exc)
+                return _json(start_response, 403 if "premium" in message or "access" in message else 401, {"error": message})
             except ValueError as exc:
                 return _json(start_response, 400, {"error": str(exc)})
 
