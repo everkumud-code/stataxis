@@ -49,7 +49,10 @@ def market_report(
     channel_ids = [channel.id for channel in channels]
 
     current_rows = _observation_rows(session, channel_ids, start_at, as_of)
-    previous_rows = _observation_rows(session, channel_ids, previous_start, previous_end)
+    # Windows are half-open at their shared boundary: an observation exactly at
+    # current start belongs to the current period, never to both periods.
+    previous_query_end = previous_end - timedelta(microseconds=1)
+    previous_rows = _observation_rows(session, channel_ids, previous_start, previous_query_end)
     current = _aggregate_by_channel(session, channels, current_rows, stream_scope)
     previous = _aggregate_by_channel(session, channels, previous_rows, stream_scope)
 
