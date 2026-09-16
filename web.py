@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from sqlalchemy.orm import Session
 
+from api.auth_guard import protect_application
 from api.auth_http import auth_application
 from api.http import wsgi_application
 from collector.storage import create_database
@@ -24,7 +25,7 @@ def _session() -> Session:
     return Session(_engine)
 
 
-_api = wsgi_application(_session)
+_api = protect_application(wsgi_application(_session))
 _auth_api = auth_application(_session)
 
 
