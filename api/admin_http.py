@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, Callable
 
-from api.admin import add_video, remove_video
+from api.admin import add_video, remove_video, set_channel_language
 from api.auth_service import authenticate
 
 
@@ -34,6 +34,12 @@ def admin_application(session_factory: Callable[[], Any]):
                     if not isinstance(name, str) or not name.strip():
                         raise ValueError("display_name is required")
                     return _json(start_response, 200, add_video(session, identity, url, name))
+                if path == "/api/v1/admin/channels/language":
+                    channel_id = int(body.get("channel_id"))
+                    language = body.get("language")
+                    if not isinstance(language, str):
+                        raise ValueError("language is required")
+                    return _json(start_response, 200, set_channel_language(session, identity, channel_id, language))
                 return _json(start_response, 404, {"error": "not found"})
             finally:
                 session.close()
