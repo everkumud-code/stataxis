@@ -16,6 +16,28 @@
     const total = m.rows.reduce((a,r)=>a+Number(r[5]),0), avg = m.rows.reduce((a,r)=>a+Number(r[2]),0)/m.rows.length, peak = Math.max(...m.rows.map(r=>r[4]));
     $('#market-total').textContent = `${total.toFixed(1)}M`; $('#market-average').textContent = fmt(Math.round(avg)); $('#market-peak').textContent = fmt(peak); $('#market-leader').textContent = `${m.rows[0][0]} · ${m.rows[0][6]}`;
   };
+  const enhanceHero = () => {
+    const hero = $('.stax9-hero'), copy = $('.hero-copy');
+    if (!hero || !copy || hero.dataset.enhanced) return;
+    hero.dataset.enhanced = '1';
+    hero.innerHTML = `<div class="stax9-visual"><div class="stax9-glow"></div><img src="stax9-explorer.svg" alt="STAX9 futuristic explorer" loading="eager"><span class="stax9-tag">STAX9 · EXPLORER</span></div><div class="stax9-copy"><strong>MEET STAX9</strong><p>A curious, precise intelligence companion built to look beyond the obvious.</p><span>Same data. A wider view.</span></div>`;
+    const trust = document.createElement('blockquote');
+    trust.className = 'hero-trust';
+    trust.innerHTML = '<span>“</span><strong>Trust cannot be demanded.<br>It must be engineered.</strong><span>”</span>';
+    copy.insertBefore(trust, copy.querySelector('.hero-actions'));
+    const stx = document.createElement('div');
+    stx.className = 'hero-stx';
+    stx.innerHTML = '<span>STATAXIS INTELLIGENCE</span><b>STX Index™</b><p>A composite signal that brings audience, growth, momentum, consistency, competition and event evidence into one qualified view.</p><a href="#stx">Explore STX Index →</a>';
+    copy.appendChild(stx);
+    if (!document.getElementById('stax9-hero-enhancements')) {
+      const style = document.createElement('style');
+      style.id = 'stax9-hero-enhancements';
+      style.textContent = `
+        .hero-trust{margin:8px 0 2px;max-width:620px;padding:16px 22px;border-left:3px solid #12c8ff;background:linear-gradient(90deg,#071a2d,#071a2d00);color:#eaf6ff;font-size:18px;line-height:1.35;display:flex;gap:10px;align-items:flex-start}.hero-trust span{color:#12c8ff;font-size:28px;line-height:.8}.hero-trust strong{font-weight:850;letter-spacing:-.01em}.hero-stx{margin-top:16px;max-width:620px;padding:13px 16px;border:1px solid #1b5578;border-radius:11px;background:#071a2de6}.hero-stx>span{display:block;color:#12c8ff;font-size:8px;font-weight:900;letter-spacing:.16em}.hero-stx b{display:block;color:#fff;font-size:18px;margin-top:3px}.hero-stx p{margin:4px 0 7px;color:#8fa8c1;font-size:10px;line-height:1.45}.hero-stx a{color:#12c8ff;text-decoration:none;font-size:9px;font-weight:900;letter-spacing:.08em}.stax9-hero{min-height:430px!important;position:relative;overflow:hidden}.stax9-visual{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}.stax9-visual img{position:relative;z-index:2;width:min(100%,520px);height:100%;object-fit:contain;filter:drop-shadow(0 18px 40px #008cff2b)}.stax9-glow{position:absolute;width:330px;height:330px;border-radius:50%;background:radial-gradient(circle,#0dafff3b,transparent 68%);filter:blur(2px)}.stax9-tag{position:absolute;right:10px;top:12px;z-index:4;color:#12c8ff;font-size:8px;font-weight:900;letter-spacing:.16em}.stax9-copy{z-index:5}.hero-card{grid-template-columns:1.05fr .95fr}.hero-copy h1{max-width:720px}@media(max-width:900px){.hero-card{grid-template-columns:1fr}.stax9-hero{min-height:420px!important}.hero-stx{max-width:100%}}@media(max-width:620px){.hero-trust{font-size:15px}.stax9-hero{min-height:350px!important}.stax9-visual img{width:95%}.hero-stx p{font-size:9px}}
+      `;
+      document.head.appendChild(style);
+    }
+  };
   const tryLive = async () => {
     const access = token(); if (!access) return;
     try {
@@ -31,6 +53,7 @@
     } catch (_) {}
   };
   document.addEventListener('DOMContentLoaded',()=>{
+    enhanceHero();
     document.querySelectorAll('.market-tab').forEach(btn=>btn.addEventListener('click',()=>render(btn.dataset.market)));
     $('#market-period')?.addEventListener('change',tryLive); $('#market-scope')?.addEventListener('change',tryLive);
     render('hindi'); setTimeout(tryLive,250);
