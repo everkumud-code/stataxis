@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from sqlalchemy.orm import Session
 
+from api.admin_http import admin_application
 from api.auth_guard import protect_application
 from api.auth_http import auth_application
 from api.evaluate_http import evaluate_application
@@ -29,6 +30,7 @@ def _session() -> Session:
 _api = protect_application(wsgi_application(_session))
 _auth_api = auth_application(_session)
 _evaluate_api = evaluate_application(_session)
+_admin_api = admin_application(_session)
 
 
 def application(environ: dict[str, Any], start_response: Callable[..., Any]):
@@ -37,6 +39,8 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         return _auth_api(environ, start_response)
     if path.startswith("/api/v1/evaluate/youtube"):
         return _evaluate_api(environ, start_response)
+    if path.startswith("/api/v1/admin/"):
+        return _admin_api(environ, start_response)
     if path.startswith("/api/") or path == "/health":
         return _api(environ, start_response)
 
