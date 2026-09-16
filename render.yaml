@@ -12,3 +12,21 @@ services:
         sync: false
       - key: STAXIS_AUTH_SECRET
         sync: false
+  - type: worker
+    name: stataxis-collector
+    runtime: python
+    buildCommand: pip install -e .
+    startCommand: python -m collector.worker
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: STAXIS_COLLECTION_INTERVAL_SECONDS
+        value: "300"
+      - key: STAXIS_COLLECTION_MAX_VIDEOS
+        value: "25"
+      - key: STAXIS_YOUTUBE_REQUESTS_PER_MINUTE
+        value: "60"
+      - key: STAXIS_YOUTUBE_REQUESTS_PER_DAY
+        value: "9000"
