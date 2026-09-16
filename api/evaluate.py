@@ -61,7 +61,7 @@ def evaluate_youtube_url(
     client: YouTubeClient | None = None,
 ) -> EvaluationResult:
     """Fetch, persist, and measure one manually supplied YouTube URL."""
-    require_capability(policy_for_identity(identity), "can_evaluate")
+    require_capability(policy_for_identity(identity), "can_evaluate_url")
     target = ManualLiveTarget.from_url(url, display_name)
     owns_client = client is None
     youtube = client or YouTubeClient()
