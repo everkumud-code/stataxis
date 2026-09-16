@@ -1,4 +1,4 @@
-"""Account registration and login HTTP endpoints for StatAxis."""
+"""Account application and login HTTP endpoints for StatAxis."""
 
 from __future__ import annotations
 
@@ -8,16 +8,13 @@ from typing import Any, Callable
 
 from sqlalchemy.orm import Session
 
-from api.auth import AuthIdentity, hash_password, issue_token, verify_password
-from api.plans import SXPlan, get_plan
+from api.auth_service import login, register
 from collector.storage import User
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def auth_application(session_factory: Callable[[], Session]):
-    """Expose register/login endpoints with server-side SX plan assignment."""
-
     def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         method = environ.get("REQUEST_METHOD", "GET")
         path = environ.get("PATH_INFO", "")
@@ -34,48 +31,24 @@ def auth_application(session_factory: Callable[[], Session]):
             session = session_factory()
             try:
                 if path.endswith("/register"):
-                    result = _register(session, email, password)
+                    result = register(session, email, password, payload.get("name", ""), payload.get("mobile", ""),
+                                      payload.get("organization", ""), payload.get("purpose_of_use", ""),
+                                      payload.get("requested_plan", ""))
+                    # No token is issued: an applicant cannot use the workspace before approval.
+                    result = {"account": result, "message": "Profile submitted for admin approval."}
                     status = 201
                 else:
-                    result = _login(session, email, password)
+                    result = login(session, email, password)
                     status = 200
             finally:
                 session.close()
             return _json(start_response, status, result)
+        except PermissionError as exc:
+            return _json(start_response, 403, {"error": str(exc)})
         except ValueError as exc:
             return _json(start_response, 400, {"error": str(exc)})
 
     return application
-
-
-def _register(session: Session, email: str, password: str) -> dict[str, Any]:
-    existing = session.query(User).filter_by(email=email).one_or_none()
-    if existing is not None:
-        raise ValueError("account already exists")
-    user = User(email=email, password_hash=hash_password(password), plan=SXPlan.FREE.value)
-    session.add(user)
-    session.commit()
-    identity = AuthIdentity(user.id, user.email, user.plan, user.is_admin)
-    return {"user": _user_payload(user), "access_token": issue_token(identity), "token_type": "Bearer"}
-
-
-def _login(session: Session, email: str, password: str) -> dict[str, Any]:
-    user = session.query(User).filter_by(email=email, active=True).one_or_none()
-    if user is None or not verify_password(password, user.password_hash):
-        raise ValueError("invalid email or password")
-    identity = AuthIdentity(user.id, user.email, user.plan, user.is_admin)
-    return {"user": _user_payload(user), "access_token": issue_token(identity), "token_type": "Bearer"}
-
-
-def _user_payload(user: User) -> dict[str, Any]:
-    definition = get_plan(user.plan)
-    return {
-        "id": user.id,
-        "email": user.email,
-        "plan": definition.code.value,
-        "plan_name": definition.name,
-        "is_admin": user.is_admin,
-    }
 
 
 def _read_json(environ: dict[str, Any]) -> dict[str, Any]:
@@ -105,7 +78,7 @@ def _email(value: Any) -> str:
 
 
 def _json(start_response: Callable[..., Any], status: int, payload: dict[str, Any]):
-    reasons = {200: "OK", 201: "Created", 400: "Bad Request", 404: "Not Found", 405: "Method Not Allowed"}
+    reasons = {200: "OK", 201: "Created", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed"}
     body = json.dumps(payload).encode("utf-8")
     start_response(f"{status} {reasons[status]}", [("Content-Type", "application/json"), ("Content-Length", str(len(body)))])
     return [body]
