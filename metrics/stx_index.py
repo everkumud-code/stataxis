@@ -29,13 +29,14 @@ class STXIndexResult:
     component_scores: dict[str, float]
 
 
-# Provisional v0 weights. These are explicit calibration starting points,
-# not claims of empirical truth. Cross-platform engagement remains Phase 2
-# groundwork and is deliberately excluded from the v0 score.
+# Product-defined v0 weights from the STX Index methodology.
+# View velocity remains available as a supporting StatAxis signal, but is not a
+# separate weighted component so the index stays aligned to the seven published
+# dimensions: audience, growth, momentum, acceleration, consistency,
+# competition, and anomaly/event.
 WEIGHTS: dict[str, float] = {
-    "audience": 0.25,
-    "growth": 0.15,
-    "view_velocity": 0.10,
+    "audience": 0.30,
+    "growth": 0.20,
     "momentum": 0.15,
     "acceleration": 0.10,
     "consistency": 0.10,
@@ -53,11 +54,10 @@ def _validate_signal(value: float | None) -> float | None:
 
 
 def calculate_stx_index(signals: STXSignals) -> STXIndexResult:
-    """Fuse available normalized signals without treating missing data as zero."""
+    """Fuse available weighted signals without treating missing data as zero."""
     raw = {
         "audience": signals.audience,
         "growth": signals.growth,
-        "view_velocity": signals.view_velocity,
         "momentum": signals.momentum,
         "acceleration": signals.acceleration,
         "consistency": signals.consistency,
