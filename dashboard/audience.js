@@ -21,6 +21,16 @@
     if ($("#aud-start") && !$("#aud-start").value) $("#aud-start").value = localInput(start);
     if ($("#aud-end") && !$("#aud-end").value) $("#aud-end").value = localInput(end);
   };
+  const ensureExportButton = () => {
+    const load = $("#aud-load-window");
+    if (!load || $("#aud-export-excel")) return;
+    const button = document.createElement("button");
+    button.id = "aud-export-excel";
+    button.type = "button";
+    button.textContent = "Export Excel";
+    button.className = load.className;
+    load.parentElement?.appendChild(button);
+  };
   const renderGroups = (payload) => {
     const root = $("#aud-language-groups");
     if (!root) return;
@@ -116,6 +126,7 @@
   };
   document.addEventListener("DOMContentLoaded", () => {
     setDefaults();
+    ensureExportButton();
     $("#aud-load-window")?.addEventListener("click", loadWindow);
     $("#aud-export-excel")?.addEventListener("click", exportWindow);
     $("#aud-start-monitor")?.addEventListener("click", start);
