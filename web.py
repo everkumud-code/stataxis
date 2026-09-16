@@ -61,7 +61,10 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
             body = file_path.read_bytes()
             if path == "/index.html":
                 marker = b'<a href="#method">Methodology</a>'
-                deep_dive = b'<a href="#method">Methodology</a><a href="/stax9.html">STAX9 + STX</a>'
+                deep_dive = (b'<a href="#method">Methodology</a>'
+                             b'<a href="/stax9.html">STAX9 + STX</a>'
+                             b'<a href="/stx-index.html">STX Index</a>'
+                             b'<a href="/plans.html">SX Packages</a>')
                 if marker in body and b'href="/stax9.html"' not in body:
                     body = body.replace(marker, deep_dive, 1)
             content_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
