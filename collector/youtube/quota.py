@@ -16,8 +16,16 @@ class RequestBudget:
     """Bound API request rate and daily request budget for one worker."""
 
     def __init__(self, *, per_minute: int | None = None, daily: int | None = None) -> None:
-        self.per_minute = per_minute or int(os.getenv("STAXIS_YOUTUBE_REQUESTS_PER_MINUTE", "60"))
-        self.daily = daily or int(os.getenv("STAXIS_YOUTUBE_REQUESTS_PER_DAY", "9000"))
+        self.per_minute = (
+            int(os.getenv("STAXIS_YOUTUBE_REQUESTS_PER_MINUTE", "60"))
+            if per_minute is None
+            else per_minute
+        )
+        self.daily = (
+            int(os.getenv("STAXIS_YOUTUBE_REQUESTS_PER_DAY", "9000"))
+            if daily is None
+            else daily
+        )
         if self.per_minute <= 0 or self.daily <= 0:
             raise ValueError("request budgets must be positive")
         self._lock = threading.Lock()
