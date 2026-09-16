@@ -1,4 +1,4 @@
-"""Small, quota-aware client for the public YouTube Data API v3."""
+"""YouTube data client used by the StatAxis collector."""
 
 from __future__ import annotations
 
@@ -9,10 +9,9 @@ from typing import Any, Self
 import httpx
 from dotenv import load_dotenv
 
-BASE_URL = "https://www.googleapis.com/youtube/v3"
+from collector.youtube.quota import DEFAULT_BUDGET, QuotaGuardError
 
-# Load the project's local .env without requiring the user to configure
-# Windows environment variables. The .env file is ignored by Git.
+BASE_URL = "https://www.googleapis.com/youtube/v3"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_ROOT / ".env")
 
@@ -22,12 +21,7 @@ class YouTubeAPIError(RuntimeError):
 
 
 class YouTubeClient:
-    """Minimal client using an API key and explicit API methods.
-
-    The client deliberately does not expose generic search functionality.
-    STAXIS should prefer registered channel IDs and their uploads playlists
-    to keep collection deterministic and quota-efficient.
-    """
+    """HTTP client with bounded request rate and request budget."""
 
     def __init__(self, api_key: str | None = None, timeout: float = 20.0) -> None:
         self.api_key = api_key or os.getenv("YOUTUBE_API_KEY")
@@ -45,19 +39,22 @@ class YouTubeClient:
         self.close()
 
     def _get(self, resource: str, params: dict[str, Any]) -> dict[str, Any]:
+        try:
+            DEFAULT_BUDGET.acquire()
+        except QuotaGuardError:
+            raise
         response = self.client.get(
             f"{BASE_URL}/{resource}",
             params={**params, "key": self.api_key},
         )
+        if response.status_code == 429:
+            raise YouTubeAPIError("YouTube request temporarily rate limited")
         if response.is_error:
             detail = response.text[:1000]
-            raise YouTubeAPIError(
-                f"YouTube API {response.status_code} for {resource}: {detail}"
-            )
+            raise YouTubeAPIError(f"YouTube API {response.status_code} for {resource}: {detail}")
         return response.json()
 
     def get_channel(self, channel_id: str) -> dict[str, Any]:
-        """Return channel metadata including the uploads playlist ID."""
         data = self._get(
             "channels",
             {"part": "snippet,contentDetails,statistics", "id": channel_id},
@@ -67,10 +64,7 @@ class YouTubeClient:
             raise YouTubeAPIError(f"Channel not found: {channel_id}")
         return items[0]
 
-    def list_uploads(
-        self, uploads_playlist_id: str, max_results: int = 25
-    ) -> dict[str, Any]:
-        """List recent videos from a channel's system uploads playlist."""
+    def list_uploads(self, uploads_playlist_id: str, max_results: int = 25) -> dict[str, Any]:
         return self._get(
             "playlistItems",
             {
@@ -81,7 +75,6 @@ class YouTubeClient:
         )
 
     def get_videos(self, video_ids: list[str]) -> list[dict[str, Any]]:
-        """Fetch metadata/statistics for up to 50 video IDs in one request."""
         if not video_ids:
             return []
         if len(video_ids) > 50:
