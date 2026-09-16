@@ -7,8 +7,6 @@ from enum import StrEnum
 
 
 class SXPlan(StrEnum):
-    """Public StatAxis package names used by the product and billing layers."""
-
     FREE = "sx_free"
     IDEA = "sx_idea"
     INTELLIGENCE = "sx_intelligence"
@@ -20,8 +18,6 @@ class SXPlan(StrEnum):
 
 @dataclass(frozen=True)
 class SXPlanDefinition:
-    """Stable metadata for one customer-facing SX package."""
-
     code: SXPlan
     name: str
     promise: str
@@ -30,67 +26,29 @@ class SXPlanDefinition:
 
 
 SX_PLANS: dict[SXPlan, SXPlanDefinition] = {
-    SXPlan.FREE: SXPlanDefinition(
-        code=SXPlan.FREE,
-        name="SX Free",
-        promise="Explore the Data",
-        premium=False,
-        max_seats=1,
-    ),
-    SXPlan.IDEA: SXPlanDefinition(
-        code=SXPlan.IDEA,
-        name="SX Idea",
-        promise="Discover the Signal",
-        premium=True,
-        max_seats=1,
-    ),
-    SXPlan.INTELLIGENCE: SXPlanDefinition(
-        code=SXPlan.INTELLIGENCE,
-        name="SX Intelligence",
-        promise="Understand the Signal",
-        premium=True,
-        max_seats=1,
-    ),
-    SXPlan.ANALYST: SXPlanDefinition(
-        code=SXPlan.ANALYST,
-        name="SX Analyst",
-        promise="Analyse the Signal",
-        premium=True,
-        max_seats=1,
-    ),
-    SXPlan.PRO: SXPlanDefinition(
-        code=SXPlan.PRO,
-        name="SX Pro",
-        promise="Act on the Signal",
-        premium=True,
-        max_seats=1,
-    ),
-    SXPlan.CORPORATE: SXPlanDefinition(
-        code=SXPlan.CORPORATE,
-        name="SX Corporate",
-        promise="Team Intelligence",
-        premium=True,
-        max_seats=5,
-    ),
-    SXPlan.ENTERPRISE: SXPlanDefinition(
-        code=SXPlan.ENTERPRISE,
-        name="SX Enterprise",
-        promise="Institutional Intelligence",
-        premium=True,
-        max_seats=None,
-    ),
+    SXPlan.FREE: SXPlanDefinition(SXPlan.FREE, "SX Free", "Explore the Data", False, 1),
+    SXPlan.IDEA: SXPlanDefinition(SXPlan.IDEA, "SX Idea", "Discover the Signal", True, 1),
+    SXPlan.INTELLIGENCE: SXPlanDefinition(SXPlan.INTELLIGENCE, "SX Intelligence", "Understand the Signal", True, 1),
+    SXPlan.ANALYST: SXPlanDefinition(SXPlan.ANALYST, "SX Analyst", "Analyse the Signal", True, 1),
+    SXPlan.PRO: SXPlanDefinition(SXPlan.PRO, "SX Pro", "Act on the Signal", True, 1),
+    SXPlan.CORPORATE: SXPlanDefinition(SXPlan.CORPORATE, "SX Corporate", "Team Intelligence", True, 5),
+    SXPlan.ENTERPRISE: SXPlanDefinition(SXPlan.ENTERPRISE, "SX Enterprise", "Institutional Intelligence", True, None),
 }
 
 
 def get_plan(plan: SXPlan | str) -> SXPlanDefinition:
-    """Resolve a package code/name to its stable definition."""
+    """Resolve either a stable package code or its public package name."""
+    if isinstance(plan, SXPlan):
+        return SX_PLANS[plan]
+    value = str(plan).strip()
     try:
-        resolved = SXPlan(plan)
-    except ValueError as exc:
-        raise ValueError(f"unknown SX plan: {plan}") from exc
-    return SX_PLANS[resolved]
+        return SX_PLANS[SXPlan(value.lower())]
+    except ValueError:
+        for definition in SX_PLANS.values():
+            if definition.name.casefold() == value.casefold():
+                return definition
+        raise ValueError(f"unknown SX plan: {plan}") from None
 
 
 def all_plans() -> tuple[SXPlanDefinition, ...]:
-    """Return packages in their public catalogue order."""
     return tuple(SX_PLANS[plan] for plan in SXPlan)

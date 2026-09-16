@@ -22,54 +22,34 @@ class CollectionPassResult:
     intelligence: IntelligenceRunResult
 
 
-def run_collection_pass(
-    session: Session,
-    client: YouTubeClient,
-    targets: list[ChannelTarget],
-    *,
-    max_videos: int = 25,
-) -> CollectionPassResult:
-    """Collect, persist, score, and durably record one production pass."""
+def run_collection_pass(session: Session, client: YouTubeClient, targets: list[ChannelTarget], *, max_videos: int = 25) -> CollectionPassResult:
+    """Collect every reachable channel, persist successful observations, then score them."""
     if max_videos <= 0:
         raise ValueError("max_videos must be positive")
-
-    run = CollectionRun(
-        started_at=datetime.now(UTC),
-        status="running",
-        channels_attempted=len(targets),
-        videos_observed=0,
-    )
+    run = CollectionRun(started_at=datetime.now(UTC), status="running", channels_attempted=len(targets), videos_observed=0)
     session.add(run)
     session.commit()
-
     videos_observed = 0
+    channel_errors: list[str] = []
     try:
         for target in targets:
-            observations = collect_channel(client, target, max_videos)
-            saved = save_observations(
-                session=session,
-                channel_name=target.name,
-                channel_youtube_id=target.channel_id,
-                network=target.network,
-                language=target.language,
-                observations=observations,
-            )
-            videos_observed += len({item.video_id for item in observations})
-            if saved < 0:  # pragma: no cover - defensive invariant guard
-                raise RuntimeError("collector returned a negative save count")
-
+            try:
+                observations = collect_channel(client, target, max_videos)
+                save_observations(session, target.name, target.channel_id, target.network, target.language, observations)
+                videos_observed += len({item.video_id for item in observations})
+            except Exception as exc:
+                session.rollback()
+                channel_errors.append(f"{target.name}: {str(exc)[:400]}")
+                continue
         intelligence = process_persisted_observations(session)
         run = session.get(CollectionRun, run.id)
-        if run is None:  # pragma: no cover - impossible while session is active
+        if run is None:
             raise RuntimeError("collection run disappeared during processing")
         run.finished_at = datetime.now(UTC)
         run.videos_observed = videos_observed
-        run.status = "partial" if intelligence.errors else "success"
-        run.error_message = (
-            f"intelligence errors: {intelligence.errors}"
-            if intelligence.errors
-            else None
-        )
+        errors = channel_errors + ([f"intelligence errors: {intelligence.errors}"] if intelligence.errors else [])
+        run.status = "partial" if errors else "success"
+        run.error_message = " | ".join(errors)[:2000] if errors else None
         session.commit()
         return CollectionPassResult(run.id, videos_observed, intelligence)
     except Exception as exc:
