@@ -9,9 +9,19 @@
 <body>
   <header class="topbar">
     <div class="brand"><span class="mark">SA</span><div><strong>StatAxis</strong><small>Stat The View, Axis The Viewpoint</small></div></div>
-    <div class="top-actions"><span id="api-dot" class="status-dot"></span><span id="api-status">Connecting…</span></div>
+    <div class="top-actions"><div id="auth-state" class="auth-state"><span id="auth-plan">SX FREE</span><span id="auth-email">Not signed in</span></div><button id="auth-open" class="auth-button">Sign in</button><span id="api-dot" class="status-dot"></span><span id="api-status">Connecting…</span></div>
   </header>
   <main class="shell">
+    <section id="auth-panel" class="auth-panel card" hidden>
+      <div class="card-head"><div><p class="eyebrow">STATAXIS ACCOUNT</p><h2 id="auth-title">Sign in to StatAxis</h2><p class="muted">Create a free account or sign in to unlock authenticated intelligence evaluation.</p></div><button id="auth-close" class="ghost-button" type="button">Close</button></div>
+      <form id="auth-form" class="auth-form">
+        <label><span>Email</span><input id="auth-email-input" name="email" type="email" required autocomplete="email" placeholder="you@company.com"></label>
+        <label><span>Password</span><input name="password" type="password" required minlength="12" autocomplete="current-password" placeholder="Minimum 12 characters"></label>
+        <button id="auth-submit" type="submit">Sign in</button>
+      </form>
+      <div class="auth-switch"><span id="auth-message" class="error" role="alert"></span><button id="auth-mode" type="button">Create a free account</button></div>
+    </section>
+
     <section class="evaluate-card card">
       <div class="card-head"><div><p class="eyebrow">MANUAL INTELLIGENCE</p><h2>Evaluate a YouTube URL</h2><p class="muted">Measure a video without adding it to the global StatAxis catalogue.</p></div><span class="badge">SX ACCESS</span></div>
       <form id="evaluate-form" class="evaluate-form">
@@ -20,7 +30,7 @@
         <button id="evaluate-submit" type="submit">Evaluate Signal</button>
       </form>
       <p id="evaluate-error" class="error" role="alert"></p>
-      <p id="evaluate-status" class="muted" aria-live="polite">Ready for an authenticated evaluation.</p>
+      <p id="evaluate-status" class="muted" aria-live="polite">Sign in to run an authenticated evaluation.</p>
       <div id="evaluate-result" class="evaluate-result" hidden>
         <div class="result-grid"><div><span>NAME</span><b id="result-name">—</b></div><div><span>CHANNEL</span><b id="result-channel">—</b></div><div><span>STX INDEX™</span><b id="result-score">—</b></div><div><span>CONFIDENCE</span><b id="result-confidence">—</b></div><div><span>OBSERVATIONS</span><b id="result-count">—</b></div></div>
         <div class="view-block"><b>DATA</b><p id="result-data">—</p><b>ANALYSIS</b><p id="result-analysis">—</p><b>STATAXIS VIEW</b><p id="result-view" class="view">—</p></div>
@@ -38,6 +48,6 @@
     <p id="api-note" class="api-note">Connecting to StatAxis read APIs…</p>
   </main>
   <footer>StatAxis · Independent digital media intelligence · Data → Analysis → StatAxis View</footer>
-  <script src="app.js" defer></script><script src="evaluate.js" defer></script>
+  <script src="app.js" defer></script><script src="auth.js" defer></script><script src="evaluate.js" defer></script>
 </body>
 </html>
