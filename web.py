@@ -59,6 +59,11 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         file_path = DASHBOARD / path.lstrip("/")
         if file_path.is_file():
             body = file_path.read_bytes()
+            if path == "/index.html":
+                marker = b'<a href="#method">Methodology</a>'
+                deep_dive = b'<a href="#method">Methodology</a><a href="/stax9.html">STAX9 + STX</a>'
+                if marker in body and b'href="/stax9.html"' not in body:
+                    body = body.replace(marker, deep_dive, 1)
             content_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
             start_response("200 OK", [("Content-Type", content_type), ("Content-Length", str(len(body)))])
             return [body]
