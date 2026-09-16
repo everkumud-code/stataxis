@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
 import re
 
 from sqlalchemy.orm import Session
@@ -51,7 +50,6 @@ def authenticate(authorization: str | None) -> AuthIdentity:
 def policy_for_identity(identity: AuthIdentity) -> VideoAccessPolicy:
     """Resolve capabilities from server-signed identity, never client role headers."""
     if identity.is_admin:
-        from api.access import VideoAccessPolicy
         return VideoAccessPolicy(True, True, True, True, "admin access")
     return plan_video_access_policy(identity.plan)
 
