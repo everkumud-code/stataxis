@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from metrics.acceleration import AccelerationPoint
+from metrics.anomaly import latest_anomaly
 from metrics.competition import CompetitiveStanding
 from metrics.engine import ObservationPoint
 from metrics.stx_index import STXSignals
@@ -43,6 +44,17 @@ def _consistency_signal(observations: list[ObservationPoint]) -> float | None:
     return _bounded(100.0 * matching / len(usable))
 
 
+def _anomaly_signal(observations: list[ObservationPoint]) -> float | None:
+    """Convert a robust historical view anomaly into a bounded event signal."""
+    if not observations:
+        return None
+    points = [(point.observed_at, point.view_count) for point in observations]
+    anomaly = latest_anomaly(points, minimum_points=5, z_threshold=3.5)
+    if anomaly is None or not anomaly.sufficient_data or anomaly.robust_z_score is None:
+        return None
+    return _bounded(50.0 + anomaly.robust_z_score * 10.0)
+
+
 def build_stx_signals(
     audience_change: MetricChange | None,
     growth_change: MetricChange | None,
@@ -55,6 +67,7 @@ def build_stx_signals(
 
     Missing source metrics remain missing rather than being converted to zero.
     Cross-platform engagement is intentionally excluded from STX Index v0.
+    Anomaly/event is derived only when a sufficient persisted history exists.
     """
     observations = observations or []
     return STXSignals(
@@ -68,4 +81,5 @@ def build_stx_signals(
         ),
         consistency=_consistency_signal(observations),
         competitive_position=_standing_signal(standing),
+        anomaly_event=_anomaly_signal(observations),
     )

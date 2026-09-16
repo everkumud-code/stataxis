@@ -29,6 +29,7 @@ def test_build_stx_signals_maps_measured_inputs():
     assert result.acceleration == 48
     assert result.consistency is None
     assert result.competitive_position == 100
+    assert result.anomaly_event is None
 
 
 def test_view_velocity_is_derived_from_real_view_measurements():
@@ -78,6 +79,37 @@ def test_consistency_missing_with_insufficient_velocity_history():
     assert result.consistency is None
 
 
+def test_anomaly_event_requires_history_and_uses_robust_evidence():
+    now = datetime.now(timezone.utc)
+    observations = [
+        ObservationPoint(now + timedelta(minutes=i), view_count=value)
+        for i, value in enumerate([100, 101, 99, 100, 102, 130])
+    ]
+    result = build_stx_signals(
+        compare_metric(100, 130),
+        compare_metric(100, 130),
+        VelocityPoint(now, 28.0, None),
+        observations=observations,
+    )
+    assert result.anomaly_event is not None
+    assert result.anomaly_event > 50
+
+
+def test_anomaly_event_is_missing_without_sufficient_history():
+    now = datetime.now(timezone.utc)
+    observations = [
+        ObservationPoint(now + timedelta(minutes=i), view_count=100 + i)
+        for i in range(4)
+    ]
+    result = build_stx_signals(
+        compare_metric(100, 104),
+        compare_metric(100, 104),
+        VelocityPoint(now, 1.0, None),
+        observations=observations,
+    )
+    assert result.anomaly_event is None
+
+
 def test_missing_measurements_remain_missing():
     now = datetime.now(timezone.utc)
     result = build_stx_signals(
@@ -92,3 +124,4 @@ def test_missing_measurements_remain_missing():
     assert result.acceleration is None
     assert result.consistency is None
     assert result.competitive_position is None
+    assert result.anomaly_event is None
