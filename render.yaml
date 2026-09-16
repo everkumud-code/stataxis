@@ -10,3 +10,5 @@ services:
         sync: false
       - key: YOUTUBE_API_KEY
         sync: false
+      - key: STAXIS_AUTH_SECRET
+        sync: false
