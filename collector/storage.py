@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from collector.youtube.collector import VideoObservation
@@ -16,7 +16,6 @@ class Base(DeclarativeBase):
 
 class Channel(Base):
     __tablename__ = "stx_channels"
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     youtube_channel_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(255))
@@ -29,7 +28,6 @@ class Channel(Base):
 class ChannelLanguageOverride(Base):
     __tablename__ = "stx_channel_language_overrides"
     __table_args__ = (UniqueConstraint("channel_id", name="uq_stx_channel_language_override"),)
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
     language: Mapped[str] = mapped_column(String(100))
@@ -38,7 +36,6 @@ class ChannelLanguageOverride(Base):
 
 class Video(Base):
     __tablename__ = "stx_videos"
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     youtube_video_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
@@ -49,7 +46,6 @@ class Video(Base):
 class Observation(Base):
     __tablename__ = "stx_observations"
     __table_args__ = (UniqueConstraint("video_id", "observed_at", name="uq_stx_observation_video_timestamp"),)
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     video_id: Mapped[int] = mapped_column(ForeignKey("stx_videos.id"), index=True)
     channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
@@ -66,7 +62,6 @@ class Observation(Base):
 
 class CollectionRun(Base):
     __tablename__ = "stx_collection_runs"
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -78,19 +73,40 @@ class CollectionRun(Base):
 
 class User(Base):
     __tablename__ = "stx_users"
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(512))
     plan: Mapped[str] = mapped_column(String(32), default="sx_free", index=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    approval_status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mobile: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    organization: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    purpose_of_use: Mapped[str | None] = mapped_column(Text, nullable=True)
+    requested_plan: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
 def create_database(url: str):
     engine = create_engine(url, future=True)
     Base.metadata.create_all(engine)
+    # Lightweight forward migration for the existing production database.
+    with engine.begin() as connection:
+        columns = {item["name"] for item in inspect(connection).get_columns("stx_users")}
+        additions = {
+            "approval_status": "VARCHAR(20) DEFAULT 'pending'",
+            "full_name": "VARCHAR(255)",
+            "mobile": "VARCHAR(32)",
+            "organization": "VARCHAR(255)",
+            "purpose_of_use": "TEXT",
+            "requested_plan": "VARCHAR(32)",
+        }
+        for name, definition in additions.items():
+            if name not in columns:
+                connection.execute(text(f"ALTER TABLE stx_users ADD COLUMN {name} {definition}"))
+        # Existing active accounts created before approval workflow remain usable.
+        connection.execute(text("UPDATE stx_users SET approval_status='approved' WHERE approval_status IS NULL"))
     return engine
 
 
@@ -101,15 +117,7 @@ def effective_channel_language(session: Session, channel: Channel, fallback: str
     return channel.language or fallback
 
 
-def save_observations(
-    session: Session,
-    channel_name: str,
-    channel_youtube_id: str,
-    network: str,
-    language: str,
-    observations: list[VideoObservation],
-    region: str = "unknown",
-) -> int:
+def save_observations(session: Session, channel_name: str, channel_youtube_id: str, network: str, language: str, observations: list[VideoObservation], region: str = "unknown") -> int:
     channel = session.query(Channel).filter_by(youtube_channel_id=channel_youtube_id).one_or_none()
     if channel is None:
         channel = Channel(youtube_channel_id=channel_youtube_id, name=channel_name, network=network, language=language, region=region)
@@ -119,7 +127,6 @@ def save_observations(
         override = session.query(ChannelLanguageOverride).filter_by(channel_id=channel.id).one_or_none()
         channel.language = override.language if override is not None else language
         channel.region = region
-
     saved = 0
     seen: set[tuple[str, datetime]] = set()
     for item in observations:
@@ -135,8 +142,7 @@ def save_observations(
         else:
             video.title = item.title
             video.published_at = item.published_at
-        existing = session.query(Observation.id).filter_by(video_id=video.id, observed_at=item.observed_at).first()
-        if existing is not None:
+        if session.query(Observation.id).filter_by(video_id=video.id, observed_at=item.observed_at).first() is not None:
             continue
         session.add(Observation(video_id=video.id, channel_id=channel.id, observed_at=item.observed_at, view_count=item.view_count, like_count=item.like_count, comment_count=item.comment_count, concurrent_viewers=item.concurrent_viewers, is_live=item.is_live, classification=item.classification))
         saved += 1
