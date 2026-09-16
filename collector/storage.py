@@ -26,6 +26,16 @@ class Channel(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class ChannelLanguageOverride(Base):
+    __tablename__ = "stx_channel_language_overrides"
+    __table_args__ = (UniqueConstraint("channel_id", name="uq_stx_channel_language_override"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
+    language: Mapped[str] = mapped_column(String(100))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
 class Video(Base):
     __tablename__ = "stx_videos"
 
@@ -67,8 +77,6 @@ class CollectionRun(Base):
 
 
 class User(Base):
-    """Customer identity and server-resolved SX entitlement."""
-
     __tablename__ = "stx_users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -81,10 +89,16 @@ class User(Base):
 
 
 def create_database(url: str):
-    """Create an SQLAlchemy engine and all STAXIS tables if absent."""
     engine = create_engine(url, future=True)
     Base.metadata.create_all(engine)
     return engine
+
+
+def effective_channel_language(session: Session, channel: Channel, fallback: str = "unknown") -> str:
+    override = session.query(ChannelLanguageOverride).filter_by(channel_id=channel.id).one_or_none()
+    if override is not None:
+        return override.language
+    return channel.language or fallback
 
 
 def save_observations(
@@ -96,14 +110,14 @@ def save_observations(
     observations: list[VideoObservation],
     region: str = "unknown",
 ) -> int:
-    """Persist channel/video metadata and append only new timestamped observations."""
     channel = session.query(Channel).filter_by(youtube_channel_id=channel_youtube_id).one_or_none()
     if channel is None:
         channel = Channel(youtube_channel_id=channel_youtube_id, name=channel_name, network=network, language=language, region=region)
         session.add(channel)
         session.flush()
     else:
-        channel.language = language
+        override = session.query(ChannelLanguageOverride).filter_by(channel_id=channel.id).one_or_none()
+        channel.language = override.language if override is not None else language
         channel.region = region
 
     saved = 0
