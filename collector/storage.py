@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
@@ -38,9 +38,7 @@ class Video(Base):
 
 class Observation(Base):
     __tablename__ = "stx_observations"
-    __table_args__ = (
-        UniqueConstraint("video_id", "observed_at", name="uq_stx_observation_video_timestamp"),
-    )
+    __table_args__ = (UniqueConstraint("video_id", "observed_at", name="uq_stx_observation_video_timestamp"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     video_id: Mapped[int] = mapped_column(ForeignKey("stx_videos.id"), index=True)
@@ -79,7 +77,7 @@ class User(Base):
     plan: Mapped[str] = mapped_column(String(32), default="sx_free", index=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
 def create_database(url: str):
@@ -100,15 +98,8 @@ def save_observations(
 ) -> int:
     """Persist channel/video metadata and append only new timestamped observations."""
     channel = session.query(Channel).filter_by(youtube_channel_id=channel_youtube_id).one_or_none()
-
     if channel is None:
-        channel = Channel(
-            youtube_channel_id=channel_youtube_id,
-            name=channel_name,
-            network=network,
-            language=language,
-            region=region,
-        )
+        channel = Channel(youtube_channel_id=channel_youtube_id, name=channel_name, network=network, language=language, region=region)
         session.add(channel)
         session.flush()
     else:
@@ -122,39 +113,18 @@ def save_observations(
         if key in seen:
             continue
         seen.add(key)
-
         video = session.query(Video).filter_by(youtube_video_id=item.video_id).one_or_none()
         if video is None:
-            video = Video(
-                youtube_video_id=item.video_id,
-                channel_id=channel.id,
-                title=item.title,
-                published_at=item.published_at,
-            )
+            video = Video(youtube_video_id=item.video_id, channel_id=channel.id, title=item.title, published_at=item.published_at)
             session.add(video)
             session.flush()
         else:
             video.title = item.title
             video.published_at = item.published_at
-
         existing = session.query(Observation.id).filter_by(video_id=video.id, observed_at=item.observed_at).first()
         if existing is not None:
             continue
-
-        session.add(
-            Observation(
-                video_id=video.id,
-                channel_id=channel.id,
-                observed_at=item.observed_at,
-                view_count=item.view_count,
-                like_count=item.like_count,
-                comment_count=item.comment_count,
-                concurrent_viewers=item.concurrent_viewers,
-                is_live=item.is_live,
-                classification=item.classification,
-            )
-        )
+        session.add(Observation(video_id=video.id, channel_id=channel.id, observed_at=item.observed_at, view_count=item.view_count, like_count=item.like_count, comment_count=item.comment_count, concurrent_viewers=item.concurrent_viewers, is_live=item.is_live, classification=item.classification))
         saved += 1
-
     session.commit()
     return saved
