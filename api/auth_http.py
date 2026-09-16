@@ -9,7 +9,6 @@ from typing import Any, Callable
 from sqlalchemy.orm import Session
 
 from api.auth_service import login, register
-from collector.storage import User
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -34,7 +33,6 @@ def auth_application(session_factory: Callable[[], Session]):
                     result = register(session, email, password, payload.get("name", ""), payload.get("mobile", ""),
                                       payload.get("organization", ""), payload.get("purpose_of_use", ""),
                                       payload.get("requested_plan", ""))
-                    # No token is issued: an applicant cannot use the workspace before approval.
                     result = {"account": result, "message": "Profile submitted for admin approval."}
                     status = 201
                 else:
