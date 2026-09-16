@@ -33,7 +33,9 @@ def evaluate_application(session_factory: Callable[[], Session]):
                 session.close()
             return _json(start_response, 200, result.as_dict())
         except PermissionError as exc:
-            return _json(start_response, 401, {"error": str(exc)})
+            message = str(exc)
+            status = 403 if "can_evaluate" in message else 401
+            return _json(start_response, status, {"error": message})
         except ValueError as exc:
             return _json(start_response, 400, {"error": str(exc)})
 
@@ -60,7 +62,7 @@ def _read_json(environ: dict[str, Any]) -> dict[str, Any]:
 
 
 def _json(start_response: Callable[..., Any], status: int, payload: dict[str, Any]):
-    reasons = {200: "OK", 400: "Bad Request", 401: "Unauthorized", 405: "Method Not Allowed"}
+    reasons = {200: "OK", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 405: "Method Not Allowed"}
     body = json.dumps(payload).encode("utf-8")
     start_response(
         f"{status} {reasons[status]}",
