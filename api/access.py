@@ -81,9 +81,7 @@ def extract_youtube_video_id(url: str) -> str:
     if host in {"youtube.com", "www.youtube.com", "m.youtube.com"}:
         if parsed.path == "/watch":
             video_id = parse_qs(parsed.query).get("v", [""])[0]
-        elif parsed.path.startswith("/shorts/"):
-            video_id = parsed.path.split("/", 2)[2]
-        elif parsed.path.startswith("/live/"):
+        elif parsed.path.startswith("/shorts/") or parsed.path.startswith("/live/"):
             video_id = parsed.path.split("/", 2)[2]
         else:
             video_id = ""
