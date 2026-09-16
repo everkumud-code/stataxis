@@ -12,65 +12,32 @@
     <div class="top-actions"><span id="api-dot" class="status-dot"></span><span id="api-status">Connecting…</span></div>
   </header>
   <main class="shell">
+    <section class="evaluate-card card">
+      <div class="card-head"><div><p class="eyebrow">MANUAL INTELLIGENCE</p><h2>Evaluate a YouTube URL</h2><p class="muted">Measure a video without adding it to the global StatAxis catalogue.</p></div><span class="badge">SX ACCESS</span></div>
+      <form id="evaluate-form" class="evaluate-form">
+        <label><span>YouTube URL</span><input name="url" type="url" required placeholder="https://www.youtube.com/watch?v=…" autocomplete="off"></label>
+        <label><span>Custom display name</span><input name="display_name" type="text" required maxlength="255" placeholder="Give this evaluation a name"></label>
+        <button id="evaluate-submit" type="submit">Evaluate Signal</button>
+      </form>
+      <p id="evaluate-error" class="error" role="alert"></p>
+      <p id="evaluate-status" class="muted" aria-live="polite">Ready for an authenticated evaluation.</p>
+      <div id="evaluate-result" class="evaluate-result" hidden>
+        <div class="result-grid"><div><span>NAME</span><b id="result-name">—</b></div><div><span>CHANNEL</span><b id="result-channel">—</b></div><div><span>STX INDEX™</span><b id="result-score">—</b></div><div><span>CONFIDENCE</span><b id="result-confidence">—</b></div><div><span>OBSERVATIONS</span><b id="result-count">—</b></div></div>
+        <div class="view-block"><b>DATA</b><p id="result-data">—</p><b>ANALYSIS</b><p id="result-analysis">—</p><b>STATAXIS VIEW</b><p id="result-view" class="view">—</p></div>
+      </div>
+    </section>
+
     <section class="hero">
-      <div>
-        <p class="eyebrow">CHANNEL INTELLIGENCE</p>
-        <h1 id="channel-name">Hindi News — Audience View</h1>
-        <p id="channel-meta" class="muted">Clean measurement, historical movement and evidence-backed viewpoint.</p>
-      </div>
-      <div class="hero-controls">
-        <label class="select-wrap" for="channel-select"><span>CHANNEL</span><select id="channel-select" aria-label="Select channel"><option>Loading…</option></select></label>
-        <div class="filters" aria-label="Historical period"><button class="filter">Today</button><button class="filter">3 Weeks</button><button class="filter active">1 Month</button><button class="filter">1 Year</button></div>
-      </div>
+      <div><p class="eyebrow">CHANNEL INTELLIGENCE</p><h1 id="channel-name">Hindi News — Audience View</h1><p id="channel-meta" class="muted">Clean measurement, historical movement and evidence-backed viewpoint.</p></div>
+      <div class="hero-controls"><label class="select-wrap" for="channel-select"><span>CHANNEL</span><select id="channel-select" aria-label="Select channel"><option>Loading…</option></select></label><div class="filters" aria-label="Historical period"><button class="filter">Today</button><button class="filter">3 Weeks</button><button class="filter active">1 Month</button><button class="filter">1 Year</button></div></div>
     </section>
-
-    <section class="card comparison-card">
-      <div class="card-head"><div><h2>Hindi News Channel Comparison</h2><p class="muted" id="comparison-report-note">Ranked from persisted STX intelligence · no demo scores</p></div><span class="badge">REAL STX</span></div>
-      <div class="comparison-table-wrap">
-        <table class="comparison-table" aria-label="STX channel comparison">
-          <thead><tr><th>Rank</th><th>Channel</th><th>STX</th><th>Confidence</th><th>3 Weeks</th><th>1 Month</th><th>1 Year</th></tr></thead>
-          <tbody id="comparison-table-body"><tr><td colspan="7" class="muted">Loading persisted channel comparison…</td></tr></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="grid cards">
-      <article class="card index-card">
-        <div class="label">STX INDEX™</div>
-        <div id="stx-score" class="index-value">—</div>
-        <div id="stx-confidence" class="delta">Awaiting persisted intelligence</div>
-        <div class="meter"><span id="stx-meter" style="width:0%"></span></div>
-        <small>Composite intelligence score · provisional</small>
-      </article>
-      <article class="card"><div class="label">AUDIENCE</div><div class="big" id="audience-value">—</div><div class="delta" id="audience-delta">Observed view count</div><p class="muted">Latest persisted observation</p></article>
-      <article class="card"><div class="label">MOMENTUM</div><div class="big" id="momentum-value">—</div><div class="signal" id="momentum-direction">STX</div><p class="muted" id="momentum-meta">Derived from persisted signals</p></article>
-      <article class="card"><div class="label">COMPETITIVE POSITION</div><div class="big" id="competitive-rank">—</div><div class="delta" id="competitive-share">Relative comparison</div><p class="muted" id="competitive-meta">Current multi-channel position</p></article>
-    </section>
-
-    <section class="grid main-grid">
-      <article class="card chart-card">
-        <div class="card-head"><div><h2>Observed View Count</h2><p class="muted" id="series-note">Loading persisted observation series…</p></div><span class="legend"><i></i>View count</span></div>
-        <div class="chart" aria-label="Persisted channel view-count trend">
-          <div class="axis y" id="series-axis"><span>—</span><span>—</span><span>—</span></div>
-          <svg id="series-chart" viewBox="0 0 700 240" preserveAspectRatio="none"></svg>
-          <div class="xlabels" id="series-labels"><span>—</span><span>—</span></div>
-        </div>
-      </article>
-      <article class="card">
-        <div class="card-head"><div><h2>StatAxis View</h2><p class="muted">Evidence-backed interpretation</p></div><span class="badge">LIVE EVIDENCE</span></div>
-        <p class="selected-video"><strong>Selected video:</strong> <span id="selected-video">—</span></p>
-        <div class="view-block"><b>DATA</b><p id="view-data">No persisted DATA statement available.</p><b>ANALYSIS</b><p id="view-analysis">No persisted ANALYSIS statement available.</p><b>STATAXIS VIEW</b><p id="view-conclusion" class="view">No persisted StatAxis View available.</p></div>
-      </article>
-    </section>
-
-    <section class="grid lower-grid">
-      <article class="card"><div class="card-head"><div><h2>Competitive View</h2><p class="muted" id="competition-note">Current relative position</p></div></div><div class="rows" id="competition-rows"><div><span>Channel comparison</span><b>—</b><em>→</em></div><div><span>Rank movement</span><b>—</b><em>→</em></div><div><span>Share movement</span><b>—</b><em>→</em></div></div></article>
-      <article class="card"><div class="card-head"><div><h2>Historical Comparison</h2><p class="muted">STX Index change</p></div></div><div class="history"><div><span id="hist-3w-meta">3 Weeks</span><b id="hist-3w">—</b></div><div><span id="hist-1m-meta">1 Month</span><b id="hist-1m">—</b></div><div><span id="hist-1y-meta">1 Year</span><b id="hist-1y">—</b></div></div></article>
-      <article class="card"><div class="card-head"><div><h2>Signal Drivers</h2><p class="muted">Contribution to current score</p></div></div><div id="signal-drivers" class="drivers"><div><span>Awaiting data</span><i style="width:22%"></i><b>—</b></div></div></article>
-    </section>
+    <section class="card comparison-card"><div class="card-head"><div><h2>Hindi News Channel Comparison</h2><p class="muted" id="comparison-report-note">Ranked from persisted STX intelligence · no demo scores</p></div><span class="badge">REAL STX</span></div><div class="comparison-table-wrap"><table class="comparison-table" aria-label="STX channel comparison"><thead><tr><th>Rank</th><th>Channel</th><th>STX</th><th>Confidence</th><th>3 Weeks</th><th>1 Month</th><th>1 Year</th></tr></thead><tbody id="comparison-table-body"><tr><td colspan="7" class="muted">Loading persisted channel comparison…</td></tr></tbody></table></div></section>
+    <section class="grid cards"><article class="card index-card"><div class="label">STX INDEX™</div><div id="stx-score" class="index-value">—</div><div id="stx-confidence" class="delta">Awaiting persisted intelligence</div><div class="meter"><span id="stx-meter" style="width:0%"></span></div><small>Composite intelligence score · provisional</small></article><article class="card"><div class="label">AUDIENCE</div><div class="big" id="audience-value">—</div><div class="delta" id="audience-delta">Observed view count</div><p class="muted">Latest persisted observation</p></article><article class="card"><div class="label">MOMENTUM</div><div class="big" id="momentum-value">—</div><div class="signal" id="momentum-direction">STX</div><p class="muted" id="momentum-meta">Derived from persisted signals</p></article><article class="card"><div class="label">COMPETITIVE POSITION</div><div class="big" id="competitive-rank">—</div><div class="delta" id="competitive-share">Relative comparison</div><p class="muted" id="competitive-meta">Current multi-channel position</p></article></section>
+    <section class="grid main-grid"><article class="card chart-card"><div class="card-head"><div><h2>Observed View Count</h2><p class="muted" id="series-note">Loading persisted observation series…</p></div><span class="legend"><i></i>View count</span></div><div class="chart" aria-label="Persisted channel view-count trend"><div class="axis y" id="series-axis"><span>—</span><span>—</span><span>—</span></div><svg id="series-chart" viewBox="0 0 700 240" preserveAspectRatio="none"></svg><div class="xlabels" id="series-labels"><span>—</span><span>—</span></div></div></article><article class="card"><div class="card-head"><div><h2>StatAxis View</h2><p class="muted">Evidence-backed interpretation</p></div><span class="badge">LIVE EVIDENCE</span></div><p class="selected-video"><strong>Selected video:</strong> <span id="selected-video">—</span></p><div class="view-block"><b>DATA</b><p id="view-data">No persisted DATA statement available.</p><b>ANALYSIS</b><p id="view-analysis">No persisted ANALYSIS statement available.</p><b>STATAXIS VIEW</b><p id="view-conclusion" class="view">No persisted StatAxis View available.</p></div></article></section>
+    <section class="grid lower-grid"><article class="card"><div class="card-head"><div><h2>Competitive View</h2><p class="muted" id="competition-note">Current relative position</p></div></div><div class="rows" id="competition-rows"><div><span>Channel comparison</span><b>—</b><em>→</em></div><div><span>Rank movement</span><b>—</b><em>→</em></div><div><span>Share movement</span><b>—</b><em>→</em></div></div></article><article class="card"><div class="card-head"><div><h2>Historical Comparison</h2><p class="muted">STX Index change</p></div></div><div class="history"><div><span id="hist-3w-meta">3 Weeks</span><b id="hist-3w">—</b></div><div><span id="hist-1m-meta">1 Month</span><b id="hist-1m">—</b></div><div><span id="hist-1y-meta">1 Year</span><b id="hist-1y">—</b></div></div></article><article class="card"><div class="card-head"><div><h2>Signal Drivers</h2><p class="muted">Contribution to current score</p></div></div><div id="signal-drivers" class="drivers"><div><span>Awaiting data</span><i style="width:22%"></i><b>—</b></div></div></article></section>
     <p id="api-note" class="api-note">Connecting to StatAxis read APIs…</p>
   </main>
   <footer>StatAxis · Independent digital media intelligence · Data → Analysis → StatAxis View</footer>
-  <script src="app.js" defer></script>
+  <script src="app.js" defer></script><script src="evaluate.js" defer></script>
 </body>
 </html>
