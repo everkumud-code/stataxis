@@ -9,7 +9,6 @@ from typing import Any, Callable
 from sqlalchemy.orm import Session
 
 from api.auth_service import login, register
-from collector.storage import User
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -31,18 +30,16 @@ def auth_application(session_factory: Callable[[], Session]):
             session = session_factory()
             try:
                 if path.endswith("/register"):
-                    result = register(session, email, password, payload.get("name", ""), payload.get("mobile", ""),
-                                      payload.get("organization", ""), payload.get("purpose_of_use", ""),
-                                      payload.get("requested_plan", ""))
-                    # No token is issued: an applicant cannot use the workspace before approval.
-                    result = {"account": result, "message": "Profile submitted for admin approval."}
-                    status = 201
-                else:
-                    result = login(session, email, password)
-                    status = 200
+                    result = register(
+                        session, email, password,
+                        payload.get("name", ""), payload.get("mobile", ""),
+                        payload.get("organization", ""), payload.get("purpose_of_use", ""),
+                        payload.get("requested_plan") or payload.get("package", ""),
+                    )
+                    return _json(start_response, 201, {"account": result, "message": "Profile submitted for admin approval."})
+                return _json(start_response, 200, login(session, email, password))
             finally:
                 session.close()
-            return _json(start_response, status, result)
         except PermissionError as exc:
             return _json(start_response, 403, {"error": str(exc)})
         except ValueError as exc:
