@@ -1,4 +1,4 @@
-"""Production authentication boundary for protected StatAxis HTTP routes."""
+"""Production authentication boundary for StatAxis API routes."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from api.auth_service import authenticate
 
 
 def protect_application(downstream: Callable[..., Any]):
-    """Require a signed bearer token for commercial/admin API endpoints."""
+    """Require a signed bearer token for every non-authentication API route."""
     def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         path = environ.get("PATH_INFO", "")
-        protected = path == "/api/v1/reports/export" or path.startswith("/api/v1/evaluate") or path.startswith("/api/v1/admin")
+        protected = path.startswith("/api/v1/")
         if not protected:
             return downstream(environ, start_response)
         try:
