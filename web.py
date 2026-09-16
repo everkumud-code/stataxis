@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from api.auth_guard import protect_application
 from api.auth_http import auth_application
+from api.evaluate_http import evaluate_application
 from api.http import wsgi_application
 from collector.storage import create_database
 
@@ -27,12 +28,15 @@ def _session() -> Session:
 
 _api = protect_application(wsgi_application(_session))
 _auth_api = auth_application(_session)
+_evaluate_api = evaluate_application(_session)
 
 
 def application(environ: dict[str, Any], start_response: Callable[..., Any]):
     path = environ.get("PATH_INFO", "/")
     if path.startswith("/api/v1/auth/"):
         return _auth_api(environ, start_response)
+    if path.startswith("/api/v1/evaluate/youtube"):
+        return _evaluate_api(environ, start_response)
     if path.startswith("/api/") or path == "/health":
         return _api(environ, start_response)
 
