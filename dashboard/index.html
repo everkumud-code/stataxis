@@ -11,6 +11,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <title>StatAxis — Stat The View, Axis The Viewpoint</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="audience.css">
 </head>
 <body>
   <header class="topbar">
@@ -43,6 +44,37 @@
       </div>
     </section>
 
+    <section class="audience-monitor card">
+      <div class="card-head"><div><p class="eyebrow">LIVE AUDIENCE INTELLIGENCE</p><h2>Second-by-Second Viewers Monitor</h2><p class="muted">Observed concurrent viewers, exact timestamps, peak and language-market aggregation. No interpolation.</p></div><span class="badge">PRECISION LIVE</span></div>
+      <div class="audience-controls">
+        <label><span>YouTube Live URL</span><input id="aud-url" type="url" placeholder="https://www.youtube.com/live/…"></label>
+        <label><span>Display name</span><input id="aud-name" type="text" placeholder="Aaj Tak Live"></label>
+        <label><span>Sampling interval</span><select id="aud-interval"><option value="1">1 second</option><option value="5" selected>5 seconds</option><option value="10">10 seconds</option><option value="30">30 seconds</option></select></label>
+        <div class="audience-actions"><button id="aud-start-monitor" type="button">Start Precision Monitor</button><button id="aud-stop-monitor" type="button" disabled>Stop</button></div>
+      </div>
+      <div class="audience-warning">1-second mode means one YouTube Data API request per second for the selected stream. YouTube's <code>videos.list</code> method costs 1 quota unit per call; use 5–30 seconds for multi-channel monitoring. citeturn0search1turn0search2</div>
+      <div class="audience-controls" style="margin-top:16px">
+        <label><span>Window start</span><input id="aud-start" type="datetime-local"></label>
+        <label><span>Window end</span><input id="aud-end" type="datetime-local"></label>
+        <div class="audience-actions"><button id="aud-load-window" type="button">Load Window</button></div>
+      </div>
+      <div class="audience-summary">
+        <div class="mini-stat"><span>Peak Concurrent</span><strong id="aud-peak">0</strong></div>
+        <div class="mini-stat"><span>Current Concurrent</span><strong id="aud-current">0</strong></div>
+        <div class="mini-stat"><span>Observed Seconds</span><strong id="aud-seconds">0</strong></div>
+        <div class="mini-stat"><span>Live Channels</span><strong id="aud-channels">0</strong></div>
+      </div>
+      <div class="audience-grid">
+        <article class="audience-card"><div class="card-head"><div><h3>Language Market</h3><p class="muted">Hindi · English · Regional · Unknown</p></div></div><div id="aud-language-groups"></div></article>
+        <article class="audience-card"><div class="card-head"><div><h3>Audience Timeline</h3><p class="muted" id="aud-resolution">Observed 1-second timestamp buckets</p></div></div><div id="aud-timeline-chart" class="aud-chart"></div></article>
+      </div>
+      <div class="card-head" style="margin-top:18px"><div><h3>Channel-Level Audience</h3><p class="muted">Current and peak concurrent viewers in the selected interval.</p></div></div>
+      <div class="comparison-table-wrap"><table class="aud-table"><thead><tr><th>Channel</th><th>Group</th><th>Language</th><th>Current</th><th>Peak</th><th>Observed</th></tr></thead><tbody id="aud-channel-body"><tr><td colspan="6" class="muted">No observations loaded.</td></tr></tbody></table></div>
+      <div class="card-head" style="margin-top:18px"><div><h3>Second-by-Second Evidence</h3><p class="muted">The timeline shows only timestamps actually observed by StatAxis.</p></div></div>
+      <div class="comparison-table-wrap"><table class="aud-table"><thead><tr><th>Time</th><th>Hindi</th><th>English</th><th>Regional</th><th>Total Concurrent</th></tr></thead><tbody id="aud-timeline-body"><tr><td colspan="5" class="muted">No observations loaded.</td></tr></tbody></table></div>
+      <p id="aud-status" class="aud-note">Ready.</p>
+    </section>
+
     <section class="hero">
       <div><p class="eyebrow">CHANNEL INTELLIGENCE</p><h1 id="channel-name">Hindi News — Audience View</h1><p id="channel-meta" class="muted">Clean measurement, historical movement and evidence-backed viewpoint.</p></div>
       <div class="hero-controls"><label class="select-wrap" for="channel-select"><span>CHANNEL</span><select id="channel-select" aria-label="Select channel"><option>Loading…</option></select></label><div class="filters" aria-label="Historical period"><button class="filter">Today</button><button class="filter">3 Weeks</button><button class="filter active">1 Month</button><button class="filter">1 Year</button></div></div>
@@ -54,6 +86,6 @@
     <p id="api-note" class="api-note">Connecting to StatAxis read APIs…</p>
   </main>
   <footer>StatAxis · Independent digital media intelligence · Data → Analysis → StatAxis View</footer>
-  <script src="app.js" defer></script><script src="auth.js" defer></script><script src="evaluate.js" defer></script>
+  <script src="app.js" defer></script><script src="auth.js" defer></script><script src="evaluate.js" defer></script><script src="audience.js" defer></script>
 </body>
 </html>
