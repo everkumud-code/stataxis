@@ -49,6 +49,38 @@
       box.innerHTML = labels.map(([key,label]) => { const value = Number(components[key] ?? 0); return `<div><span>${label}</span><i style="width:${Math.max(0,Math.min(100,value))}%"></i><b>${Math.round(value)}%</b></div>`; }).join('');
     }
   };
+  const renderCompetition = (channels) => {
+    const box = $('#competition-rows'); if (!box || !Array.isArray(channels) || !channels.length) return;
+    const leader = channels[0], leaderViews = Number(leader.view_delta || 0);
+    const top = channels.slice(0,4);
+    box.innerHTML = top.map((r,i) => {
+      const movement = r.rank_change == null ? '—' : `${r.rank_change >= 0 ? '+' : ''}${r.rank_change}`;
+      const share = leaderViews > 0 && r.view_delta != null ? `${(Number(r.view_delta)/leaderViews*100).toFixed(1)}% of leader` : '—';
+      return `<div><span>${r.channel || r.name || 'Channel'}</span><b>#${r.rank ?? i+1}</b><em>${movement} · ${share}</em></div>`;
+    }).join('');
+    $('#competitive-rank') && ($('#competitive-rank').textContent = `#${leader.rank || 1}`);
+    $('#competitive-share') && ($('#competitive-share').textContent = leader.view_delta == null ? 'Measured position' : 'Current leader by observed view movement');
+    $('#competition-note') && ($('#competition-note').textContent = 'LIVE DATA · Rank movement and relative share are calculated from the persisted observation window.');
+  };
+  const renderContent = (payload) => {
+    const items = payload?.content?.top_videos;
+    const box = $('.content-grid'); if (!box || !Array.isArray(items) || !items.length) return;
+    box.innerHTML = items.slice(0,4).map((v,i) => {
+      const delta = v.view_delta == null ? '—' : `+${fmt(v.view_delta)} views`;
+      const velocity = v.view_velocity_per_minute == null ? 'velocity unavailable' : `${fmt(Math.round(v.view_velocity_per_minute))}/min`;
+      const classification = String(v.classification || 'OBSERVED').toUpperCase();
+      return `<div class="content-item"><span>#${String(i+1).padStart(2,'0')}</span><b>${v.title || 'Untitled video'}</b><small>${classification} · ${velocity}</small><strong>${delta}</strong></div>`;
+    }).join('');
+    $('.content-intel .badge') && ($('.content-intel .badge').textContent = 'LIVE DATA');
+  };
+  const loadChannelContent = async (channelId, period, scope) => {
+    if (!channelId) return;
+    try {
+      const res = await fetch(`/api/v1/channels/${encodeURIComponent(channelId)}/media-intelligence?period=${encodeURIComponent(period)}&stream_scope=${encodeURIComponent(scope)}&top_videos=4`,{headers:{Accept:'application/json',Authorization:`Bearer ${token()}`} });
+      if (!res.ok) return;
+      renderContent(await res.json());
+    } catch (_) {}
+  };
   const tryLive = async () => {
     const access = token(); if (!access) return;
     try {
@@ -61,6 +93,8 @@
       $('#market-title').textContent = data.filters?.market || data.filters?.language || 'Live Market';
       body.innerHTML=data.channels.map((r,i)=>{ const stx=r.stx || {}; const badge=stx.score==null?'':`<span class="live-stx">STX ${Number(stx.score).toFixed(1)} <em>${Math.round(Number(stx.confidence||0)*100)}%</em></span>`; return `<tr><td>#${r.rank ?? i+1}</td><td><strong>${r.channel || r.name || 'Channel'}</strong></td><td>${r.current_concurrent==null?'—':fmt(r.current_concurrent)}</td><td>${r.average_concurrent==null?'—':fmt(Math.round(r.average_concurrent))}</td><td>${r.peak_concurrent==null?'—':fmt(r.peak_concurrent)}</td><td>${r.view_delta==null?'—':fmt(r.view_delta)}</td><td>${data.market?.view_delta_total?((Number(r.view_delta||0)/Number(data.market.view_delta_total))*100).toFixed(1)+'%':'—'}</td><td><span class="${r.rank_change>=0?'trend-up':'trend-down'}">${r.rank_change==null?'—':`${r.rank_change>=0?'+':''}${r.rank_change}`}</span>${badge}</td></tr>`; }).join('');
       renderStx(data.channels[0].stx);
+      renderCompetition(data.channels);
+      await loadChannelContent(data.channels[0].channel_id, p, scope);
       $('#api-status').textContent='Live'; $('#api-dot').classList.add('connected'); $('#api-note').textContent='LIVE DATA · Rendered from persisted StatAxis observations.';
     } catch (_) {}
   };
