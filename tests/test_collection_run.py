@@ -1,9 +1,7 @@
-from datetime import UTC, datetime
-
 from sqlalchemy.orm import Session
 
 from collector.run import run_collection_pass
-from collector.storage import Base, Channel, CollectionRun, Observation, create_database
+from collector.storage import CollectionRun, Observation, create_database
 from collector.youtube.collector import ChannelTarget
 
 
@@ -51,24 +49,21 @@ def test_collection_pass_records_success_and_intelligence():
         assert session.query(Observation).count() == 1
 
 
-def test_collection_pass_records_failure_without_erasing_run():
+def test_collection_pass_records_partial_failure_without_stopping_cycle():
     engine = create_database("sqlite:///:memory:")
     with Session(engine) as session:
-        try:
-            run_collection_pass(
-                session,
-                FakeClient(fail_channel_id="UC-bad"),
-                [ChannelTarget("UC-bad", "Broken")],
-                max_videos=1,
-            )
-        except RuntimeError as exc:
-            assert str(exc) == "upstream unavailable"
-        else:
-            raise AssertionError("expected collection failure")
+        result = run_collection_pass(
+            session,
+            FakeClient(fail_channel_id="UC-bad"),
+            [ChannelTarget("UC-bad", "Broken"), ChannelTarget("UC-good", "Healthy")],
+            max_videos=1,
+        )
 
-        run = session.query(CollectionRun).one()
-        assert run.status == "failed"
+        run = session.get(CollectionRun, result.run_id)
+        assert run is not None
+        assert run.status == "partial"
         assert run.finished_at is not None
-        assert run.error_message == "upstream unavailable"
-        assert run.channels_attempted == 1
-        assert run.videos_observed == 0
+        assert run.error_message == "Broken: upstream unavailable"
+        assert run.channels_attempted == 2
+        assert run.videos_observed == 1
+        assert session.query(Observation).count() == 1
