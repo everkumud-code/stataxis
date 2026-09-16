@@ -95,6 +95,9 @@ def live_audience_window(session: Session, *, start_at: datetime, end_at: dateti
 
     timeline_rows = [{"observed_at": timestamp.isoformat(), **values, "total_concurrent": sum(values.values())} for timestamp, values in sorted(timeline.items())]
     overall_values = [row["total_concurrent"] for row in timeline_rows]
+    latest_by_channel_total = sum(int(observation.concurrent_viewers or 0) for observation, _ in channel_latest.values())
+    latest_observed_at = max((_utc(observation.observed_at) for observation, _ in channel_latest.values()), default=None)
+    earliest_observed_at = min((_utc(observation.observed_at) for observation, _ in channel_latest.values()), default=None)
     return {
         "start_at": start_at.isoformat(),
         "end_at": end_at.isoformat(),
@@ -105,9 +108,12 @@ def live_audience_window(session: Session, *, start_at: datetime, end_at: dateti
         "languages": summaries,
         "overall": {
             "peak_concurrent": max(overall_values) if overall_values else 0,
-            "current_concurrent": overall_values[-1] if overall_values else 0,
+            "current_concurrent": latest_by_channel_total,
             "observed_seconds": len(timeline_rows),
             "channel_count": len(channel_latest),
+            "latest_observed_at": latest_observed_at.isoformat() if latest_observed_at else None,
+            "earliest_observed_at": earliest_observed_at.isoformat() if earliest_observed_at else None,
+            "current_definition": "sum of each active channel's latest observed concurrent viewers",
         },
         "channels": [
             {
