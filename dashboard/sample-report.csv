@@ -1,0 +1,16 @@
+StatAxis Sample Report — DEMO DATA
+
+Category,Channel,Language,Region,Current Audience,Peak Concurrent,Average Concurrent,Observed Interval,STX Index,Confidence
+Hindi,Aaj Tak,Hindi,India,92000,118000,104000,09:00:00-10:00:00,82.4,94%
+Hindi,IndiaTV,Hindi,India,61000,79000,69000,09:00:00-10:00:00,78.7,91%
+Hindi,The Lallantop,Hindi,India,31000,42000,36000,09:00:00-10:00:00,74.2,88%
+English India,NDTV,English,India,72000,91000,81000,09:00:00-10:00:00,69.5,86%
+English India,Times Now,English,India,54000,70000,61000,09:00:00-10:00:00,67.9,85%
+English World,BBC News,English,World,128000,164000,145000,09:00:00-10:00:00,76.1,90%
+English World,CNN,English,World,113000,149000,127000,09:00:00-10:00:00,73.8,89%
+Regional India,Thanthi TV,Tamil,India,54000,68000,61000,09:00:00-10:00:00,65.8,84%
+Regional India,ABP Ananda,Bengali,India,39000,51000,45000,09:00:00-10:00:00,63.4,82%
+Regional World,TRT World,English,World,47000,62000,54000,09:00:00-10:00:00,61.7,80%
+Regional World,CGTN,English,World,43000,57000,49000,09:00:00-10:00:00,60.9,79%
+
+Note: All values in this sample report are illustrative DEMO DATA and are not live measurements.
