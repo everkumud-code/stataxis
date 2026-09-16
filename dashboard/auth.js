@@ -1,0 +1,69 @@
+(() => {
+  const panel = document.querySelector('#auth-panel');
+  const form = document.querySelector('#auth-form');
+  const open = document.querySelector('#auth-open');
+  const close = document.querySelector('#auth-close');
+  const mode = document.querySelector('#auth-mode');
+  const title = document.querySelector('#auth-title');
+  const submit = document.querySelector('#auth-submit');
+  const message = document.querySelector('#auth-message');
+  const plan = document.querySelector('#auth-plan');
+  const email = document.querySelector('#auth-email');
+  const tokenKey = 'stataxis_access_token';
+  const accountKey = 'stataxis_account';
+  let registerMode = false;
+
+  const readAccount = () => {
+    try { return JSON.parse(localStorage.getItem(accountKey) || 'null'); } catch (_) { return null; }
+  };
+  const setText = (selector, value) => { const node = document.querySelector(selector); if (node) node.textContent = value; };
+  const refresh = () => {
+    const token = localStorage.getItem(tokenKey);
+    const account = readAccount();
+    if (token && account) {
+      plan.textContent = account.plan_name || account.plan || 'SX';
+      email.textContent = account.email || 'Signed in';
+      open.textContent = 'Sign out';
+      open.dataset.action = 'logout';
+      setText('#evaluate-status', 'Authenticated. Ready to evaluate a YouTube URL.');
+    } else {
+      plan.textContent = 'SX FREE'; email.textContent = 'Not signed in';
+      open.textContent = 'Sign in'; open.dataset.action = 'signin';
+      setText('#evaluate-status', 'Sign in to run an authenticated evaluation.');
+    }
+  };
+  const showPanel = () => { panel.hidden = false; document.querySelector('#auth-email-input')?.focus(); };
+  const setMode = (register) => {
+    registerMode = register;
+    title.textContent = register ? 'Create your StatAxis account' : 'Sign in to StatAxis';
+    submit.textContent = register ? 'Create account' : 'Sign in';
+    mode.textContent = register ? 'Already have an account? Sign in' : 'Create a free account';
+    document.querySelector('[name=password]').autocomplete = register ? 'new-password' : 'current-password';
+    message.textContent = '';
+  };
+  open?.addEventListener('click', () => {
+    if (open.dataset.action === 'logout') {
+      localStorage.removeItem(tokenKey); localStorage.removeItem(accountKey); refresh();
+      setText('#evaluate-error', ''); return;
+    }
+    setMode(false); showPanel();
+  });
+  close?.addEventListener('click', () => { panel.hidden = true; });
+  mode?.addEventListener('click', () => setMode(!registerMode));
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault(); submit.disabled = true; message.textContent = '';
+    const payload = { email: form.elements.email.value.trim(), password: form.elements.password.value };
+    try {
+      const response = await fetch(registerMode ? '/api/v1/auth/register' : '/api/v1/auth/login', {
+        method: 'POST', headers: {'Content-Type': 'application/json', Accept: 'application/json'}, body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || `Authentication failed (${response.status})`);
+      localStorage.setItem(tokenKey, data.access_token);
+      localStorage.setItem(accountKey, JSON.stringify(data.user));
+      form.reset(); panel.hidden = true; refresh(); setText('#evaluate-error', '');
+    } catch (error) { message.textContent = error.message || 'Authentication failed'; }
+    finally { submit.disabled = false; }
+  });
+  refresh();
+})();
