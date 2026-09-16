@@ -68,6 +68,20 @@ class CollectionRun(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class User(Base):
+    """Customer identity and server-resolved SX entitlement."""
+
+    __tablename__ = "stx_users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(512))
+    plan: Mapped[str] = mapped_column(String(32), default="sx_free", index=True)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
 def create_database(url: str):
     """Create an SQLAlchemy engine and all STAXIS tables if absent."""
     engine = create_engine(url, future=True)
@@ -85,11 +99,7 @@ def save_observations(
     region: str = "unknown",
 ) -> int:
     """Persist channel/video metadata and append only new timestamped observations."""
-    channel = (
-        session.query(Channel)
-        .filter_by(youtube_channel_id=channel_youtube_id)
-        .one_or_none()
-    )
+    channel = session.query(Channel).filter_by(youtube_channel_id=channel_youtube_id).one_or_none()
 
     if channel is None:
         channel = Channel(
@@ -127,11 +137,7 @@ def save_observations(
             video.title = item.title
             video.published_at = item.published_at
 
-        existing = (
-            session.query(Observation.id)
-            .filter_by(video_id=video.id, observed_at=item.observed_at)
-            .first()
-        )
+        existing = session.query(Observation.id).filter_by(video_id=video.id, observed_at=item.observed_at).first()
         if existing is not None:
             continue
 
