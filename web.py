@@ -15,6 +15,7 @@ from api.auth_guard import protect_application
 from api.auth_http import auth_application
 from api.evaluate_http import evaluate_application
 from api.http import wsgi_application
+from api.live_http import live_application
 from collector.storage import create_database
 
 ROOT = Path(__file__).resolve().parent
@@ -35,6 +36,7 @@ with _session() as _bootstrap_session:
 _api = protect_application(wsgi_application(_session))
 _auth_api = auth_application(_session)
 _evaluate_api = evaluate_application(_session)
+_live_api = live_application(_session)
 _admin_api = admin_application(_session)
 
 
@@ -42,6 +44,8 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
     path = environ.get("PATH_INFO", "/")
     if path.startswith("/api/v1/auth/"):
         return _auth_api(environ, start_response)
+    if path == "/api/v1/evaluate/youtube/live-sample" or path == "/api/v1/audience/live":
+        return _live_api(environ, start_response)
     if path.startswith("/api/v1/evaluate/youtube"):
         return _evaluate_api(environ, start_response)
     if path.startswith("/api/v1/admin/"):
