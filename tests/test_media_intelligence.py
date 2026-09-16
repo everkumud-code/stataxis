@@ -66,13 +66,14 @@ def test_channel_media_intelligence_exposes_content_and_provenance():
 def test_stream_scope_can_isolate_live_observations():
     session = _session()
     as_of, alpha_id, _ = _seed(session)
+    video_id = session.query(Video).filter_by(youtube_video_id="va").one().id
     session.add(Observation(
-        video_id=session.query(Video).filter_by(youtube_video_id="va").one().id,
+        video_id=video_id,
         channel_id=alpha_id,
-        observed_at=as_of,
-        view_count=1700,
-        like_count=17,
-        comment_count=5,
+        observed_at=as_of - timedelta(minutes=30),
+        view_count=1300,
+        like_count=13,
+        comment_count=4,
         concurrent_viewers=None,
         is_live=False,
         classification="REGULAR_VIDEO",

@@ -14,6 +14,7 @@ from api.catalog import list_channels
 from api.channel import channel_intelligence_comparison, channel_intelligence_overview, channel_view_series, compare_channels
 from api.export import ObservationExportFilters, export_response
 from api.intelligence import latest_video_intelligence
+from api.media_intelligence import channel_media_intelligence, market_report
 from api.operations import collection_health, intelligence_readiness
 from api.report import channel_report
 from api.signals import channel_signals
@@ -81,6 +82,26 @@ def get_channel_report(session: Session, channel_id: int, *, as_of: datetime | N
     return 200, payload
 
 
+def get_channel_media_intelligence(session: Session, channel_id: int, *, as_of: datetime | None = None, period: str = "7d", stream_scope: str = "all") -> tuple[int, dict[str, Any]]:
+    if channel_id <= 0:
+        return 400, {"error": "channel_id must be a positive integer"}
+    try:
+        payload = channel_media_intelligence(session, channel_id, as_of=as_of, period=period, stream_scope=stream_scope)
+    except ValueError as exc:
+        return 400, {"error": str(exc)}
+    if payload is None:
+        return 404, {"error": "channel not found"}
+    return 200, payload
+
+
+def get_market_report(session: Session, *, as_of: datetime | None = None, period: str = "7d", language: str | None = None, region: str | None = None, market: str | None = None, stream_scope: str = "all", limit: int = 50) -> tuple[int, dict[str, Any]]:
+    try:
+        payload = market_report(session, as_of=as_of, period=period, language=language, region=region, market=market, stream_scope=stream_scope, limit=limit)
+    except ValueError as exc:
+        return 400, {"error": str(exc)}
+    return 200, payload
+
+
 def get_channel_overview(session: Session, channel_id: int) -> tuple[int, dict[str, Any]]:
     if channel_id <= 0:
         return 400, {"error": "channel_id must be a positive integer"}
@@ -121,7 +142,7 @@ def get_channel_catalog(session: Session) -> tuple[int, dict[str, Any]]:
 
 
 def wsgi_application(session_factory: Callable[[], Session]):
-    """Expose health, catalog, intelligence, signal, comparison, series, report and readiness endpoints."""
+    """Expose health, catalog, intelligence, market, comparison, series, report and readiness endpoints."""
     def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         method = environ.get("REQUEST_METHOD", "GET")
         path = environ.get("PATH_INFO", "")
@@ -132,6 +153,16 @@ def wsgi_application(session_factory: Callable[[], Session]):
             if method != "GET": return _json_response(start_response, 405, {"error": "method not allowed"})
             session = session_factory()
             try: status, payload = get_channel_catalog(session)
+            finally: session.close()
+            return _json_response(start_response, status, payload)
+        if path == "/api/v1/markets/report":
+            if method != "GET": return _json_response(start_response, 405, {"error": "method not allowed"})
+            query = parse_qs(environ.get("QUERY_STRING", ""))
+            try: as_of = _query_datetime(query, "as_of")
+            except ValueError as exc: return _json_response(start_response, 400, {"error": str(exc)})
+            session = session_factory()
+            try:
+                status, payload = get_market_report(session, as_of=as_of, period=query.get("period", ["7d"])[0], language=_optional_query(query, "language"), region=_optional_query(query, "region"), market=_optional_query(query, "market"), stream_scope=query.get("stream_scope", ["all"])[0], limit=query.get("limit", ["50"])[0])
             finally: session.close()
             return _json_response(start_response, status, payload)
         if path == "/api/v1/channels/compare":
@@ -180,6 +211,18 @@ def wsgi_application(session_factory: Callable[[], Session]):
             except ValueError as exc: return _json_response(start_response, 400, {"error": str(exc)})
             session = session_factory()
             try: status, payload = get_channel_report(session, channel_id, as_of=as_of, series_days=query.get("series_days", ["30"])[0], signal_hours=query.get("signal_hours", ["24"])[0])
+            finally: session.close()
+            return _json_response(start_response, status, payload)
+        media_suffix = "/media-intelligence"
+        if path.startswith(channel_prefix) and path.endswith(media_suffix):
+            if method != "GET": return _json_response(start_response, 405, {"error": "method not allowed"})
+            try: channel_id = int(path[len(channel_prefix) : -len(media_suffix)])
+            except ValueError: return _json_response(start_response, 400, {"error": "channel_id must be a positive integer"})
+            query = parse_qs(environ.get("QUERY_STRING", ""))
+            try: as_of = _query_datetime(query, "as_of")
+            except ValueError as exc: return _json_response(start_response, 400, {"error": str(exc)})
+            session = session_factory()
+            try: status, payload = get_channel_media_intelligence(session, channel_id, as_of=as_of, period=query.get("period", ["7d"])[0], stream_scope=query.get("stream_scope", ["all"])[0])
             finally: session.close()
             return _json_response(start_response, status, payload)
         channel_suffix = "/comparison"
@@ -239,10 +282,15 @@ def _query_datetime(query: dict[str, list[str]], key: str) -> datetime | None:
     values = query.get(key)
     if not values or not values[0].strip(): return None
     raw = values[0].strip()
-    # RFC 3986 query decoding turns an unescaped '+' in an ISO timezone into a space.
     if " " in raw and "T" in raw: raw = raw.replace(" ", "+")
     try: return datetime.fromisoformat(raw)
     except ValueError as exc: raise ValueError(f"{key} must be an ISO datetime") from exc
+
+
+def _optional_query(query: dict[str, list[str]], key: str) -> str | None:
+    values = query.get(key)
+    value = values[0].strip() if values else ""
+    return value or None
 
 
 def _report_response(environ: dict[str, Any], start_response: Callable[..., Any], session_factory, method: str):
