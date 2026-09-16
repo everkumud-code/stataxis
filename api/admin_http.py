@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 from api.admin import add_video, remove_video, set_channel_language
 from api.auth_service import authenticate
+from collector.storage import User
 
 
 def admin_application(session_factory: Callable[[], Any]):
@@ -14,6 +15,8 @@ def admin_application(session_factory: Callable[[], Any]):
             return _json(start_response, 405, {"error": "method not allowed"})
         try:
             identity = authenticate(environ.get("HTTP_AUTHORIZATION"))
+            if not identity.is_admin:
+                raise PermissionError("admin access required")
             length = int(environ.get("CONTENT_LENGTH") or "0")
             if length <= 0 or length > 16384:
                 raise ValueError("request body must be between 1 and 16384 bytes")
@@ -22,13 +25,35 @@ def admin_application(session_factory: Callable[[], Any]):
                 raise ValueError("JSON body must be an object")
             session = session_factory()
             try:
+                if path == "/api/v1/admin/users/approve":
+                    user_id = int(body.get("user_id"))
+                    user = session.query(User).filter_by(id=user_id).one_or_none()
+                    if user is None:
+                        raise LookupError("user not found")
+                    user.approval_status = "approved"
+                    user.active = True
+                    if user.requested_plan:
+                        user.plan = user.requested_plan
+                    session.commit()
+                    return _json(start_response, 200, {"approved": True, "user": _user_payload(user)})
+                if path == "/api/v1/admin/users/reject":
+                    user_id = int(body.get("user_id"))
+                    user = session.query(User).filter_by(id=user_id).one_or_none()
+                    if user is None:
+                        raise LookupError("user not found")
+                    user.approval_status = "rejected"
+                    user.active = False
+                    session.commit()
+                    return _json(start_response, 200, {"rejected": True, "user_id": user_id})
+                if path == "/api/v1/admin/users/pending":
+                    users = session.query(User).filter_by(approval_status="pending").order_by(User.created_at.asc()).all()
+                    return _json(start_response, 200, {"users": [_user_payload(user) for user in users]})
                 if path == "/api/v1/admin/videos/remove":
                     video_id = int(body.get("video_id"))
                     remove_video(session, identity, video_id)
                     return _json(start_response, 200, {"removed": True, "video_id": video_id})
                 if path == "/api/v1/admin/videos":
-                    url = body.get("url")
-                    name = body.get("display_name")
+                    url, name = body.get("url"), body.get("display_name")
                     if not isinstance(url, str) or not url.strip():
                         raise ValueError("url is required")
                     if not isinstance(name, str) or not name.strip():
@@ -50,6 +75,13 @@ def admin_application(session_factory: Callable[[], Any]):
         except LookupError as exc:
             return _json(start_response, 404, {"error": str(exc)})
     return application
+
+
+def _user_payload(user: User) -> dict[str, Any]:
+    return {"id": user.id, "name": user.full_name, "email": user.email, "mobile": user.mobile,
+            "organization": user.organization, "purpose_of_use": user.purpose_of_use,
+            "requested_plan": user.requested_plan, "approval_status": user.approval_status,
+            "created_at": user.created_at.isoformat() if user.created_at else None}
 
 
 def _json(start_response: Callable[..., Any], status: int, payload: dict[str, Any]):
