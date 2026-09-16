@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from sqlalchemy.orm import Session
 
+from api.admin_bootstrap import bootstrap_admin
 from api.admin_http import admin_application
 from api.auth_guard import protect_application
 from api.auth_http import auth_application
@@ -25,6 +26,10 @@ _engine = create_database(DATABASE_URL)
 
 def _session() -> Session:
     return Session(_engine)
+
+
+with _session() as _bootstrap_session:
+    bootstrap_admin(_bootstrap_session)
 
 
 _api = protect_application(wsgi_application(_session))
