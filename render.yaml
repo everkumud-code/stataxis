@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: stataxis
+    name: stataxis-production
     runtime: python
     buildCommand: pip install -e .
     startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120 web:application
@@ -11,6 +11,10 @@ services:
       - key: YOUTUBE_API_KEY
         sync: false
       - key: STAXIS_AUTH_SECRET
+        sync: false
+      - key: STAXIS_ADMIN_EMAIL
+        sync: false
+      - key: STAXIS_ADMIN_PASSWORD
         sync: false
   - type: worker
     name: stataxis-collector
