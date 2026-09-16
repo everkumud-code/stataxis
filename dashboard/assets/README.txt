@@ -1,0 +1,1 @@
+Approved StatAxis logo asset is supplied by the product owner. Binary upload is handled separately.
