@@ -87,7 +87,11 @@ def live_audience_window(
     rows = list(session.execute(stmt).all())
     if language:
         target = language.strip().lower()
-        rows = [row for row in rows if language_group(row[1].language).lower() == target or row[1].language.lower() == target]
+        rows = [
+            row
+            for row in rows
+            if language_group(row[1].language).lower() == target or row[1].language.lower() == target
+        ]
 
     groups = {"Hindi": [], "English": [], "Regional": [], "Unknown": []}
     timeline: dict[datetime, dict[str, int]] = {}
@@ -108,7 +112,11 @@ def live_audience_window(
     summaries: dict[str, dict[str, Any]] = {}
     for group, items in groups.items():
         values = [int(observation.concurrent_viewers or 0) for observation, _ in items]
-        latest_values = [int(observation.concurrent_viewers or 0) for observation, _ in channel_latest.values() if language_group(_[1].language) == group]
+        latest_values = [
+            int(observation.concurrent_viewers or 0)
+            for observation, channel in channel_latest.values()
+            if language_group(channel.language) == group
+        ]
         summaries[group] = {
             "channel_count": len({channel.id for _, channel in items}),
             "observations": len(items),
