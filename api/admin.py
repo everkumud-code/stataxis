@@ -16,6 +16,81 @@ def require_admin(identity: AuthIdentity) -> None:
         raise PermissionError("admin access required")
 
 
+def add_channel(session: Session, identity: AuthIdentity, url: str, display_name: str, language: str, region: str, market: str, *, client: YouTubeClient | None = None) -> dict[str, object]:
+    require_admin(identity)
+    normalized_url = url.strip()
+    normalized_name = display_name.strip()
+    normalized_language = language.strip()
+    normalized_region = region.strip() or "unknown"
+    normalized_market = market.strip() or "unknown"
+    if not normalized_url:
+        raise ValueError("channel URL is required")
+    if not normalized_name:
+        raise ValueError("display_name is required")
+    if not normalized_language:
+        raise ValueError("language is required")
+    if len(normalized_name) > 255 or len(normalized_language) > 100 or len(normalized_region) > 100 or len(normalized_market) > 255:
+        raise ValueError("channel metadata is too long")
+    owns_client = client is None
+    youtube = client or YouTubeClient()
+    try:
+        meta = youtube.resolve_channel_url(normalized_url)
+        channel_id = str(meta.get("id") or "").strip()
+        if not channel_id:
+            raise ValueError("YouTube did not return a channel ID")
+        snippet = meta.get("snippet", {})
+        channel = session.query(Channel).filter_by(youtube_channel_id=channel_id).one_or_none()
+        if channel is None:
+            channel = Channel(
+                youtube_channel_id=channel_id,
+                name=normalized_name,
+                network=normalized_market,
+                language=normalized_language,
+                region=normalized_region,
+                active=True,
+            )
+            session.add(channel)
+            session.flush()
+            existing = False
+        else:
+            channel.name = normalized_name
+            channel.network = normalized_market
+            channel.language = normalized_language
+            channel.region = normalized_region
+            channel.active = True
+            existing = True
+        session.commit()
+        return {
+            "channel_id": channel.id,
+            "youtube_channel_id": channel.youtube_channel_id,
+            "name": channel.name,
+            "youtube_name": str(snippet.get("title") or channel.name),
+            "language": channel.language,
+            "region": channel.region,
+            "market": channel.network,
+            "active": channel.active,
+            "existing": existing,
+        }
+    finally:
+        if owns_client:
+            youtube.close()
+
+
+def rename_channel(session: Session, identity: AuthIdentity, channel_id: int, display_name: str) -> dict[str, object]:
+    require_admin(identity)
+    if channel_id <= 0:
+        raise ValueError("channel_id must be positive")
+    normalized = display_name.strip()
+    if not normalized or len(normalized) > 255:
+        raise ValueError("display_name is required and must be <= 255 characters")
+    channel = session.get(Channel, channel_id)
+    if channel is None:
+        raise LookupError("channel not found")
+    channel.name = normalized
+    session.commit()
+    return {"channel_id": channel.id, "name": channel.name}
+
+
 def add_video(session: Session, identity: AuthIdentity, url: str, display_name: str, *, client: YouTubeClient | None = None) -> dict[str, object]:
     require_admin(identity)
     youtube_id = extract_youtube_video_id(url)
