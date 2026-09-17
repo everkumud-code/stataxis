@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine, inspect, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from collector.youtube.collector import VideoObservation
@@ -88,10 +89,22 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
+class PackageConfig(Base):
+    """Reserved commercial package slot; intentionally empty until configured."""
+    __tablename__ = "stx_package_configs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slot: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    criteria_json: Mapped[str] = mapped_column(Text, default="[]")
+    amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    currency: Mapped[str] = mapped_column(String(3), default="INR")
+    active: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+
+
 def create_database(url: str):
     engine = create_engine(url, future=True)
     Base.metadata.create_all(engine)
-    # Lightweight forward migration for the existing production database.
     with engine.begin() as connection:
         columns = {item["name"] for item in inspect(connection).get_columns("stx_users")}
         additions = {
@@ -105,7 +118,6 @@ def create_database(url: str):
         for name, definition in additions.items():
             if name not in columns:
                 connection.execute(text(f"ALTER TABLE stx_users ADD COLUMN {name} {definition}"))
-        # Existing active accounts created before approval workflow remain usable.
         connection.execute(text("UPDATE stx_users SET approval_status='approved' WHERE approval_status IS NULL"))
     return engine
 
