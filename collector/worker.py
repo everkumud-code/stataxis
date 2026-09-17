@@ -27,7 +27,7 @@ def _stop(*_: object) -> None:
 
 
 def load_targets(session: Session) -> list[ChannelTarget]:
-    """Build the active monitoring universe from persisted channels, seeded by config."""
+    """Build the active monitoring universe from persisted channels plus config."""
     path = ROOT / "config" / "channels.json"
     configured = json.loads(path.read_text(encoding="utf-8")).get("channels", [])
     existing = {
@@ -52,6 +52,12 @@ def load_targets(session: Session) -> list[ChannelTarget]:
                 language=row.language,
                 network=row.network,
             ))
+    logger.info(
+        "monitoring universe: configured=%d persisted_active=%d total=%d",
+        len(configured),
+        len(existing),
+        len(targets),
+    )
     return targets
 
 
