@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Any, Self
+from urllib.parse import unquote, urlparse
 
 import httpx
 from dotenv import load_dotenv
@@ -63,6 +64,41 @@ class YouTubeClient:
         if not items:
             raise YouTubeAPIError(f"Channel not found: {channel_id}")
         return items[0]
+
+    def resolve_channel_url(self, url: str) -> dict[str, Any]:
+        """Resolve a public channel URL to YouTube channel metadata."""
+        candidate = url.strip()
+        parsed = urlparse(candidate)
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError("YouTube channel URL must use http or https")
+        host = parsed.netloc.lower().split(":", 1)[0]
+        if host not in {"youtube.com", "www.youtube.com", "m.youtube.com"}:
+            raise ValueError("URL must be a YouTube channel URL")
+        parts = [unquote(part) for part in parsed.path.split("/") if part]
+        if not parts:
+            raise ValueError("YouTube channel URL is required")
+        if parts[0] == "channel" and len(parts) >= 2:
+            return self.get_channel(parts[1])
+        if parts[0].startswith("@"):
+            handle = parts[0][1:]
+            if not handle:
+                raise ValueError("invalid YouTube channel handle")
+            data = self._get("channels", {"part": "snippet,contentDetails,statistics", "forHandle": handle})
+            items = data.get("items", [])
+            if not items:
+                raise YouTubeAPIError(f"Channel not found for handle: @{handle}")
+            return items[0]
+        if parts[0] in {"c", "user"} and len(parts) >= 2:
+            handle = parts[1]
+            data = self._get("search", {"part": "snippet", "q": handle, "type": "channel", "maxResults": 5})
+            items = data.get("items", [])
+            if not items:
+                raise YouTubeAPIError(f"Channel not found: {handle}")
+            channel_id = str(items[0].get("snippet", {}).get("channelId") or items[0].get("id", {}).get("channelId") or "")
+            if not channel_id:
+                raise YouTubeAPIError(f"Channel ID not found: {handle}")
+            return self.get_channel(channel_id)
+        raise ValueError("Use a YouTube /channel/ID or /@handle URL")
 
     def list_uploads(self, uploads_playlist_id: str, max_results: int = 25) -> dict[str, Any]:
         return self._get(
