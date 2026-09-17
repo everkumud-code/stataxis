@@ -15,6 +15,7 @@ from api.auth_guard import protect_application
 from api.auth_http import auth_application
 from api.evaluate_http import evaluate_application
 from api.http import wsgi_application
+from api.insight_extensions import insight_application
 from api.live_http import live_application
 from collector.storage import create_database
 
@@ -38,6 +39,7 @@ _auth_api = auth_application(_session)
 _evaluate_api = evaluate_application(_session)
 _live_api = live_application(_session)
 _admin_api = admin_application(_session)
+_insight_api = protect_application(insight_application(_session))
 
 
 def application(environ: dict[str, Any], start_response: Callable[..., Any]):
@@ -50,6 +52,8 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         return _evaluate_api(environ, start_response)
     if path.startswith("/api/v1/admin/"):
         return _admin_api(environ, start_response)
+    if path.startswith("/api/v1/insights/"):
+        return _insight_api(environ, start_response)
     if path.startswith("/api/") or path == "/health":
         return _api(environ, start_response)
 
