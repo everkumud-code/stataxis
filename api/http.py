@@ -118,6 +118,8 @@ def get_channel_series(session: Session, channel_id: int, days: int = 30) -> tup
         days = int(days)
     except (TypeError, ValueError):
         return 400, {"error": "days must be an integer"}
+    if not 1 <= days <= 365:
+        return 400, {"error": "days must be between 1 and 365"}
     payload = channel_view_series(session, channel_id, days=days)
     if payload is None:
         return 404, {"error": "channel not found"}
@@ -258,67 +260,52 @@ def wsgi_application(session_factory: Callable[[], Session]):
             finally: session.close()
             return _json_response(start_response, status, payload)
         if path.startswith(channel_prefix):
-            if method != "GET": return _json_response(start_response, 404, {"error": "not found"})
-            raw_id = path[len(channel_prefix):].strip("/")
-            if not raw_id or "/" in raw_id: return _json_response(start_response, 400, {"error": "channel_id must be a positive integer"})
-            try: channel_id = int(raw_id)
+            if method != "GET": return _json_response(start_response, 405, {"error": "method not allowed"})
+            try: channel_id = int(path[len(channel_prefix):])
             except ValueError: return _json_response(start_response, 400, {"error": "channel_id must be a positive integer"})
             session = session_factory()
             try: status, payload = get_channel_overview(session, channel_id)
             finally: session.close()
             return _json_response(start_response, status, payload)
-        prefix = "/api/v1/videos/"; suffix = "/intelligence"
-        if method != "GET" or not path.startswith(prefix) or not path.endswith(suffix): return _json_response(start_response, 404, {"error": "not found"})
-        try: video_id = int(path[len(prefix):-len(suffix)])
-        except ValueError: return _json_response(start_response, 400, {"error": "video_id must be a positive integer"})
-        session = session_factory()
-        try: status, payload = get_video_intelligence(session, video_id)
-        finally: session.close()
-        return _json_response(start_response, status, payload)
+        return _json_response(start_response, 404, {"error": "not found"})
     return application
 
 
-def _query_datetime(query: dict[str, list[str]], key: str) -> datetime | None:
-    values = query.get(key)
-    if not values or not values[0].strip(): return None
-    raw = values[0].strip()
-    if " " in raw and "T" in raw: raw = raw.replace(" ", "+")
-    try: return datetime.fromisoformat(raw)
-    except ValueError as exc: raise ValueError(f"{key} must be an ISO datetime") from exc
-
-
 def _optional_query(query: dict[str, list[str]], key: str) -> str | None:
-    values = query.get(key)
-    value = values[0].strip() if values else ""
+    value = query.get(key, [""])[0].strip()
     return value or None
 
 
-def _report_response(environ: dict[str, Any], start_response: Callable[..., Any], session_factory, method: str):
-    if method != "GET": return _json_response(start_response, 405, {"error": "method not allowed"})
-    def parse_datetime(name: str):
-        value = environ.get(name)
-        if not value: return None
-        try: return datetime.fromisoformat(value)
-        except ValueError: raise ValueError(f"invalid ISO datetime: {value}")
-    role = environ.get("HTTP_X_STATAXIS_ROLE", UserRole.FREE.value)
-    session = session_factory()
+def _query_datetime(query: dict[str, list[str]], key: str) -> datetime | None:
+    value = query.get(key, [""])[0].strip()
+    if not value:
+        return None
     try:
-        filters = ObservationExportFilters(start_at=parse_datetime("HTTP_X_STATAXIS_START_AT"), end_at=parse_datetime("HTTP_X_STATAXIS_END_AT"), language=_optional_header(environ, "HTTP_X_STATAXIS_LANGUAGE"), region=_optional_header(environ, "HTTP_X_STATAXIS_REGION"))
-        status, headers, body = export_response(session, role, filters)
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
-        status, headers, body = 400, {"Content-Type": "application/json"}, json.dumps({"error": str(exc)}).encode()
-    finally: session.close()
-    reason = {200: "OK", 400: "Bad Request", 403: "Forbidden"}.get(status, "Error")
-    start_response(f"{status} {reason}", list(headers.items()))
-    return [body]
+        raise ValueError(f"{key} must be a valid ISO-8601 datetime") from exc
 
 
 def _json_response(start_response: Callable[..., Any], status: int, payload: dict[str, Any]):
-    reason = {200: "OK", 400: "Bad Request", 404: "Not Found", 405: "Method Not Allowed"}.get(status, "Error")
-    start_response(f"{status} {reason}", [("Content-Type", "application/json")])
-    return [json.dumps(payload).encode()]
+    body = json.dumps(payload, default=str).encode("utf-8")
+    start_response(f"{status} {HTTP_STATUS.get(status, 'OK')}", [("Content-Type", "application/json"), ("Content-Length", str(len(body)))])
+    return [body]
 
 
-def _optional_header(environ: dict[str, Any], key: str) -> str | None:
-    value = environ.get(key)
-    return value.strip() if value and value.strip() else None
+HTTP_STATUS = {200: "OK", 400: "Bad Request", 404: "Not Found", 405: "Method Not Allowed", 500: "Internal Server Error"}
+
+
+def _report_response(environ: dict[str, Any], start_response: Callable[..., Any], session_factory: Callable[[], Session], method: str):
+    if method != "GET": return _json_response(start_response, 405, {"error": "method not allowed"})
+    query = parse_qs(environ.get("QUERY_STRING", ""))
+    try: as_of = _query_datetime(query, "as_of")
+    except ValueError as exc: return _json_response(start_response, 400, {"error": str(exc)})
+    try:
+        filters = ObservationExportFilters.from_query(query)
+    except ValueError as exc:
+        return _json_response(start_response, 400, {"error": str(exc)})
+    session = session_factory()
+    try:
+        return export_response(session, start_response, filters, as_of=as_of)
+    finally:
+        session.close()
