@@ -1,7 +1,8 @@
-from api.errors import AuthenticationError, AuthorizationError
 """HTTP adapter for authenticated manual YouTube evaluation."""
 
 from __future__ import annotations
+
+from api.errors import AuthenticationError, AuthorizationError
 
 import json
 from typing import Any, Callable

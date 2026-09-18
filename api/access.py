@@ -1,7 +1,8 @@
-from api.errors import AuthorizationError
 """Authorization and validation rules for dashboard video workflows."""
 
 from __future__ import annotations
+
+from api.errors import AuthorizationError
 
 from dataclasses import dataclass
 from enum import StrEnum

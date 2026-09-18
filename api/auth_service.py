@@ -1,7 +1,8 @@
-from api.errors import AuthenticationError
 """Account registration, approval, login, and authenticated capability resolution."""
 
 from __future__ import annotations
+
+from api.errors import AuthenticationError
 
 import re
 
