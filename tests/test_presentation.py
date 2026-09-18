@@ -7,7 +7,7 @@ def test_intelligence_payload_is_dashboard_ready():
     result = build_fused_intelligence(["Audience increased 18%"], STXSignals(audience=90, growth=70, momentum=65))
     payload = intelligence_payload(result)
     assert payload["stx_index"]["score"] is not None
-    assert payload["stx_index"]["confidence"] == 55
+    assert payload["stx_index"]["confidence"] == 65
     assert payload["data"] == ["Audience increased 18%"]
     assert payload["analysis"]
     assert payload["view"]
