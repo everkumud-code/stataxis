@@ -41,7 +41,7 @@
     const score = Number(stx.score), confidence = Number(stx.confidence || 0);
     $('#stx-score') && ($('#stx-score').textContent = score.toFixed(1));
     $('#stx-score-large') && ($('#stx-score-large').textContent = score.toFixed(1));
-    $('#stx-confidence') && ($('#stx-confidence').textContent = `Confidence ${Math.round(confidence * 100)}%`);
+    $('#stx-confidence') && ($('#stx-confidence').textContent = `Confidence ${Math.round(confidence)}%`);
     $('#stx-meter') && ($('#stx-meter').style.width = `${Math.max(0, Math.min(100, score))}%`);
     const box = $('#signal-drivers'), components = stx.components || {};
     if (box && Object.keys(components).length) {
@@ -91,7 +91,7 @@
       if (!Array.isArray(data.channels) || !data.channels.length) return;
       const body=$('#market-channel-body');
       $('#market-title').textContent = data.filters?.market || data.filters?.language || 'Live Market';
-      body.innerHTML=data.channels.map((r,i)=>{ const stx=r.stx || {}; const badge=stx.score==null?'':`<span class="live-stx">STX ${Number(stx.score).toFixed(1)} <em>${Math.round(Number(stx.confidence||0)*100)}%</em></span>`; return `<tr><td>#${r.rank ?? i+1}</td><td><strong>${r.channel || r.name || 'Channel'}</strong></td><td>${r.current_concurrent==null?'—':fmt(r.current_concurrent)}</td><td>${r.average_concurrent==null?'—':fmt(Math.round(r.average_concurrent))}</td><td>${r.peak_concurrent==null?'—':fmt(r.peak_concurrent)}</td><td>${r.view_delta==null?'—':fmt(r.view_delta)}</td><td>${data.market?.view_delta_total?((Number(r.view_delta||0)/Number(data.market.view_delta_total))*100).toFixed(1)+'%':'—'}</td><td><span class="${r.rank_change>=0?'trend-up':'trend-down'}">${r.rank_change==null?'—':`${r.rank_change>=0?'+':''}${r.rank_change}`}</span>${badge}</td></tr>`; }).join('');
+      body.innerHTML=data.channels.map((r,i)=>{ const stx=r.stx || {}; const badge=stx.score==null?'':`<span class="live-stx">STX ${Number(stx.score).toFixed(1)} <em>${Math.round(Number(stx.confidence||0))}%</em></span>`; return `<tr><td>#${r.rank ?? i+1}</td><td><strong>${r.channel || r.name || 'Channel'}</strong></td><td>${r.current_concurrent==null?'—':fmt(r.current_concurrent)}</td><td>${r.average_concurrent==null?'—':fmt(Math.round(r.average_concurrent))}</td><td>${r.peak_concurrent==null?'—':fmt(r.peak_concurrent)}</td><td>${r.view_delta==null?'—':fmt(r.view_delta)}</td><td>${data.market?.view_delta_total?((Number(r.view_delta||0)/Number(data.market.view_delta_total))*100).toFixed(1)+'%':'—'}</td><td><span class="${r.rank_change>=0?'trend-up':'trend-down'}">${r.rank_change==null?'—':`${r.rank_change>=0?'+':''}${r.rank_change}`}</span>${badge}</td></tr>`; }).join('');
       renderStx(data.channels[0].stx);
       renderCompetition(data.channels);
       await loadChannelContent(data.channels[0].channel_id, p, scope);

@@ -32,7 +32,7 @@
       set("#result-name", payload.display_name);
       set("#result-channel", payload.channel_name);
       set("#result-score", payload.stx_index == null ? "—" : Number(payload.stx_index).toFixed(1));
-      set("#result-confidence", `${Math.round(Number(payload.confidence) > 1 ? payload.confidence : payload.confidence * 100)}%`);
+      set("#result-confidence", `${Math.round(Number(payload.confidence))}%`);
       set("#result-count", String(payload.observation_count));
       set("#result-data", (payload.data || []).join(" "));
       set("#result-analysis", (payload.analysis || []).join(" "));
