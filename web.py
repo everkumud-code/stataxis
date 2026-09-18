@@ -59,6 +59,14 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
 
     if path == "/":
         path = "/index.html"
+    elif path == "/admin":
+        path = "/admin.html"
+    elif path == "/login":
+        path = "/login.html"
+    elif path == "/apply":
+        path = "/apply.html"
+    elif path == "/workspace":
+        path = "/workspace.html"
     if path.startswith("/") and ".." not in Path(path).parts:
         file_path = DASHBOARD / path.lstrip("/")
         if file_path.is_file():
