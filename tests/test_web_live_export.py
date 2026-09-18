@@ -71,7 +71,7 @@ def test_live_export_free_plan_is_403(monkeypatch):
 
     monkeypatch.setattr("api.live_http.policy_for_identity", lambda _identity: object())
     monkeypatch.setattr("api.live_http.require_capability", deny)
-    app = live_application(lambda: None)
+    app = live_application(lambda: _Session())
 
     status, _, body = _call(app, "/api/v1/audience/live/export", "Bearer free")
     assert status == "403 Forbidden"
@@ -83,7 +83,7 @@ def test_live_export_premium_plan_is_200_xlsx(monkeypatch):
     monkeypatch.setattr("api.live_http.policy_for_identity", lambda _identity: object())
     monkeypatch.setattr("api.live_http.require_capability", lambda _policy, _capability: None)
     monkeypatch.setattr("api.live_http.export_live_audience_xlsx", lambda *args, **kwargs: b"PK\x03\x04xlsx")
-    app = live_application(lambda: None)
+    app = live_application(lambda: _Session())
 
     status, headers, body = _call(app, "/api/v1/audience/live/export", "Bearer premium")
     assert status == "200 OK"

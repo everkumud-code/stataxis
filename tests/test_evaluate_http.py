@@ -44,7 +44,7 @@ def test_evaluate_returns_403_for_authorization_failure(monkeypatch):
         "api.evaluate_http.evaluate_youtube_url",
         lambda *args: (_ for _ in ()).throw(AuthorizationError("premium access required")),
     )
-    app = evaluate_application(lambda: None)
+    app = evaluate_application(lambda: _Session())
 
     status, body = _request(app, "Bearer test")
 
