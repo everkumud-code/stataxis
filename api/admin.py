@@ -91,6 +91,18 @@ def rename_channel(session: Session, identity: AuthIdentity, channel_id: int, di
     return {"channel_id": channel.id, "name": channel.name}
 
 
+def deactivate_channel(session: Session, identity: AuthIdentity, channel_id: int) -> dict[str, object]:
+    require_admin(identity)
+    if channel_id <= 0:
+        raise ValueError("channel_id must be positive")
+    channel = session.get(Channel, channel_id)
+    if channel is None:
+        raise LookupError("channel not found")
+    channel.active = False
+    session.commit()
+    return {"channel_id": channel.id, "name": channel.name, "active": False}
+
+
 def add_video(session: Session, identity: AuthIdentity, url: str, display_name: str, *, client: YouTubeClient | None = None) -> dict[str, object]:
     require_admin(identity)
     youtube_id = extract_youtube_video_id(url)
