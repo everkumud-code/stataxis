@@ -1,3 +1,4 @@
+from api.errors import AuthenticationError
 """Password hashing and signed bearer-token primitives for StatAxis accounts."""
 
 from __future__ import annotations

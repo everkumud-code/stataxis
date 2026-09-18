@@ -1,3 +1,4 @@
+from api.errors import AuthenticationError
 """Account registration, approval, login, and authenticated capability resolution."""
 
 from __future__ import annotations
@@ -63,11 +64,14 @@ def login(session: Session, email: str, password: str) -> dict:
 
 def authenticate(authorization: str | None) -> AuthIdentity:
     if not authorization or not authorization.startswith("Bearer "):
-        raise PermissionError("authentication required")
+        raise AuthenticationError("authentication required")
     token = authorization[7:].strip()
     if not token:
         raise PermissionError("authentication required")
-    return verify_token(token)
+    try:
+        return verify_token(token)
+    except ValueError as exc:
+        raise AuthenticationError("authentication required") from exc
 
 
 def policy_for_identity(identity: AuthIdentity) -> VideoAccessPolicy:

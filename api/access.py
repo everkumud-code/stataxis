@@ -1,3 +1,4 @@
+from api.errors import AuthorizationError
 """Authorization and validation rules for dashboard video workflows."""
 
 from __future__ import annotations
@@ -106,4 +107,4 @@ def require_capability(policy: VideoAccessPolicy, capability: str) -> None:
     }:
         raise ValueError(f"unknown capability: {capability}")
     if not getattr(policy, capability):
-        raise PermissionError(policy.reason)
+        raise AuthorizationError(policy.reason)
