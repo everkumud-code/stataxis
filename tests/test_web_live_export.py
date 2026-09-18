@@ -5,7 +5,7 @@ import web
 from api.live_http import live_application
 
 
-def _call(app, path, authorization=None):
+class _Session:\n    def close(self):\n        pass\n\n\ndef _call(app, path, authorization=None):
     captured = {}
     environ = {
         "REQUEST_METHOD": "GET",
@@ -38,7 +38,7 @@ def test_web_routes_live_export_and_live_paths_exactly(monkeypatch):
         assert body == b"routed"
 
     status, _, _ = _call(web.application, "/api/v1/audience/live/export/extra")
-    assert status == "404 Not Found"
+    assert status == "401 Unauthorized"
     assert calls == [
         "/api/v1/audience/live/export",
         "/api/v1/audience/live",
@@ -51,7 +51,7 @@ def test_live_export_no_token_is_401(monkeypatch):
         raise PermissionError("authentication required")
 
     monkeypatch.setattr("api.live_http.authenticate", fake_auth)
-    app = live_application(lambda: None)
+    app = live_application(lambda: _Session())
 
     status, _, body = _call(app, "/api/v1/audience/live/export")
     assert status == "401 Unauthorized"

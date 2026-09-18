@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from api.errors import AuthenticationError
-
 import base64
 import hashlib
 import hmac

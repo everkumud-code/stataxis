@@ -1,3 +1,7 @@
+class _Session:
+    def close(self):
+        pass
+
 import io
 import json
 
@@ -26,7 +30,7 @@ def test_evaluate_returns_401_for_authentication_failure(monkeypatch):
         "api.evaluate_http.authenticate",
         lambda _authorization: (_ for _ in ()).throw(AuthenticationError("authentication required")),
     )
-    app = evaluate_application(lambda: None)
+    app = evaluate_application(lambda: _Session())
 
     status, body = _request(app, None)
 
