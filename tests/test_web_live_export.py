@@ -5,7 +5,12 @@ import web
 from api.live_http import live_application
 
 
-class _Session:\n    def close(self):\n        pass\n\n\ndef _call(app, path, authorization=None):
+class _Session:
+    def close(self):
+        pass
+
+
+def _call(app, path, authorization=None):
     captured = {}
     environ = {
         "REQUEST_METHOD": "GET",
