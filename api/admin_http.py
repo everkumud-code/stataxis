@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, Callable
 
-from api.admin import add_channel, add_video, remove_video, rename_channel, set_channel_language
+from api.admin import add_channel, add_video, deactivate_channel, remove_video, rename_channel, set_channel_language
 from api.auth_service import authenticate
 from api.package_config import list_package_slots, update_package_slot
 from collector.storage import User
@@ -53,6 +53,8 @@ def admin_application(session_factory: Callable[[], Any]):
                     return _json(start_response, 200, {"users": [_user_payload(user) for user in users]})
                 if path == "/api/v1/admin/channels":
                     return _json(start_response, 200, add_channel(session, identity, body.get("url", ""), body.get("display_name", ""), body.get("language", ""), body.get("region", ""), body.get("market", "")))
+                if path == "/api/v1/admin/channels/deactivate":
+                    return _json(start_response, 200, deactivate_channel(session, identity, int(body.get("channel_id"))))
                 if path == "/api/v1/admin/channels/rename":
                     return _json(start_response, 200, rename_channel(session, identity, int(body.get("channel_id")), body.get("display_name", "")))
                 if path == "/api/v1/admin/videos/remove":
