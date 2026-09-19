@@ -9,13 +9,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT:-8000} web:application"]
+    command: ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT:-8000} --workers 2 --threads 4 --timeout 120 web:application"]
 
   worker:
     build: .
     restart: unless-stopped
     env_file:
       - .env
+    healthcheck:
+      disable: true
     depends_on:
       postgres:
         condition: service_healthy
