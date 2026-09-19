@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from collector.main import load_targets
 from collector.run import run_collection_pass
@@ -16,6 +17,14 @@ logger = logging.getLogger("stx-collector-once")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_CREDENTIAL_URL_RE = re.compile(r"(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*://)(?P<credentials>[^/@\\s]+)@")
+
+def _sanitize_error_message(message: str, secrets: tuple[str | None, ...] = ()) -> str:
+    sanitized = _CREDENTIAL_URL_RE.sub(r"\\g<scheme>[REDACTED]@", message)
+    for secret in secrets:
+        if secret:
+            sanitized = sanitized.replace(secret, "[REDACTED]")
+    return sanitized
 
 
 def main() -> int:
@@ -43,7 +52,9 @@ def main() -> int:
         )
         return 0
     except Exception as exc:
-        logger.error("collection cycle failed: %s", type(exc).__name__)
+        secrets = (os.getenv("DATABASE_URL"), os.getenv("YOUTUBE_API_KEY"))
+        message = _sanitize_error_message(str(exc), secrets)
+        logger.error("collection cycle failed: %s: %s", type(exc).__name__, message)
         return 1
 
 
