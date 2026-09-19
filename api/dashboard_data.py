@@ -158,7 +158,7 @@ def channel_stx_trend(
     now = _utc(as_of or datetime.now(UTC))
     end_day = now.date()
     start_day = end_day - timedelta(days=days - 1)
-    first_window_start = datetime.combine(start_day, datetime.min.time(), tzinfo=UTC)
+    first_window_start = datetime.combine(start_day, datetime.min.time(), tzinfo=UTC) - timedelta(days=1)
     query_end = datetime.combine(end_day + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
     rows = session.scalars(
         select(Observation)
