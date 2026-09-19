@@ -115,3 +115,75 @@ def test_save_observations_backfills_topic_for_existing_video():
             [observation],
         )
         assert session.query(Video).one().topic == "Politics"
+
+
+def test_channel_stats_support_large_64_bit_values():
+    engine = create_database("sqlite:///:memory:")
+    observed_at = datetime(2026, 9, 19, tzinfo=UTC)
+    with Session(engine) as session:
+        save_observations(
+            session,
+            "Large Stats",
+            "channel-large-stats",
+            "Network",
+            "Hindi",
+            [],
+            channel_stats=(observed_at, 41_000_000_000, 41_000_000_000, 41_000_000_000),
+        )
+        stats = session.query(ChannelStats).one()
+        assert stats.subscribers == 41_000_000_000
+        assert stats.total_views == 41_000_000_000
+        assert stats.video_count == 41_000_000_000
+
+
+def test_save_observations_does_not_overwrite_video_metadata_with_none():
+    engine = create_database("sqlite:///:memory:")
+    observed_at = datetime(2026, 9, 19, tzinfo=UTC)
+    with Session(engine) as session:
+        first = VideoObservation(
+            video_id="video-metadata-preserve",
+            channel_id="channel-metadata-preserve",
+            observed_at=observed_at,
+            title="Original title",
+            published_at="2026-09-18T10:00:00Z",
+            view_count=100,
+            like_count=5,
+            comment_count=1,
+            concurrent_viewers=None,
+            is_live=False,
+            classification="REGULAR_VIDEO",
+            live_started_at=None,
+            live_ended_at=None,
+            thumbnail_url="https://example.com/original.jpg",
+            category_id="25",
+            topic="Politics",
+        )
+        save_observations(
+            session, "Metadata", "channel-metadata-preserve", "Network", "Hindi", [first]
+        )
+        second = VideoObservation(
+            video_id="video-metadata-preserve",
+            channel_id="channel-metadata-preserve",
+            observed_at=observed_at + timedelta(minutes=1),
+            title="Updated title",
+            published_at="2026-09-18T10:00:00Z",
+            view_count=200,
+            like_count=6,
+            comment_count=2,
+            concurrent_viewers=None,
+            is_live=False,
+            classification="REGULAR_VIDEO",
+            live_started_at=None,
+            live_ended_at=None,
+            thumbnail_url=None,
+            category_id=None,
+            topic=None,
+        )
+        save_observations(
+            session, "Metadata", "channel-metadata-preserve", "Network", "Hindi", [second]
+        )
+        video = session.query(Video).one()
+        assert video.title == "Updated title"
+        assert video.thumbnail_url == "https://example.com/original.jpg"
+        assert video.category_id == "25"
+        assert video.topic == "Politics"
