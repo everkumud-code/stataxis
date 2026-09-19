@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 
 from api.http import _export_filters_from_query, get_channel_report, get_collection_health, get_video_intelligence, wsgi_application
 
@@ -172,4 +172,4 @@ def test_export_filters_normalize_mixed_naive_and_aware_values() -> None:
         "end": ["2026-09-02T00:00:00+05:30"],
     })
     assert filters.start_at == datetime(2026, 9, 1, tzinfo=UTC)
-    assert filters.end_at == datetime(2026, 9, 2, 0, tzinfo=__import__("datetime").timezone(__import__("datetime").timedelta(hours=5, minutes=30)))
+    assert filters.end_at == datetime(2026, 9, 2, 0, tzinfo=timezone(timedelta(hours=5, minutes=30)))
