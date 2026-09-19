@@ -4,6 +4,7 @@ from collector import run_once
 
 
 def test_run_once_returns_nonzero_without_database_url(monkeypatch, caplog):
+    caplog.set_level("INFO", logger="stx-collector-once")
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("YOUTUBE_API_KEY", "secret-key")
 
@@ -12,6 +13,7 @@ def test_run_once_returns_nonzero_without_database_url(monkeypatch, caplog):
 
 
 def test_run_once_returns_zero_and_logs_counts(monkeypatch, caplog):
+    caplog.set_level("INFO", logger="stx-collector-once")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:password@example.invalid/db")
     monkeypatch.setenv("YOUTUBE_API_KEY", "secret-key")
 
