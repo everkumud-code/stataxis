@@ -39,6 +39,13 @@ def test_evaluate_returns_401_for_authentication_failure(monkeypatch):
     assert body == {"error": "authentication required"}
 
 
+def test_evaluate_returns_401_for_empty_bearer_token():
+    app = evaluate_application(lambda: _Session())
+    status, body = _request(app, "Bearer ")
+    assert status == "401 Unauthorized"
+    assert body == {"error": "authentication required"}
+
+
 def test_evaluate_returns_403_for_authorization_failure(monkeypatch):
     monkeypatch.setattr("api.evaluate_http.authenticate", lambda _authorization: object())
     monkeypatch.setattr(
