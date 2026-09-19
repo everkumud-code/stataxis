@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Workspace — StatAxis</title>
+<link rel="icon" href="assets/stataxis-favicon.svg">
+<style>
+:root{--bg:#061322;--panel:#0b1b2b;--panel2:#0f2438;--line:#20394e;--muted:#7f9ab2;--text:#e8f1f8;--blue:#159de8;--gold:#e1b94f;--green:#35d399;--red:#ff7180;--amber:#f2a93b}
+*{box-sizing:border-box}
+html{color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Manrope,Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--blue)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.skip{position:absolute;left:-999px;top:8px;background:var(--gold);color:#061322;padding:8px 12px;border-radius:6px;font-weight:800;z-index:50}
+.skip:focus{left:8px}
+
+.top{height:60px;background:#071725;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 20px;position:sticky;top:0;z-index:30}
+.logo{font-weight:900;letter-spacing:.16em;font-size:17px}
+.logo small{display:block;font-size:9px;font-weight:600;letter-spacing:.08em;color:var(--muted);margin-top:1px}
+.plan{border:1px solid #8b7131;color:var(--gold);padding:3px 10px;border-radius:99px;font-size:12px;font-weight:800}
+.who{margin-left:auto;color:var(--muted);font-size:13px;text-align:right;line-height:1.3}
+.who b{display:block;color:var(--text);font-weight:700}
+.btn{border:1px solid var(--line);background:#091a29;color:#dbe8f1;border-radius:8px;padding:8px 12px;font:inherit;font-weight:700;cursor:pointer}
+.btn:hover{border-color:var(--gold);color:var(--gold)}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#04121f}
+.btn.primary:hover{background:var(--gold);border-color:var(--gold);color:#061322}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+
+.layout{display:grid;grid-template-columns:230px minmax(0,1fr);min-height:calc(100vh - 60px)}
+.side{border-right:1px solid var(--line);padding:14px 10px;position:sticky;top:60px;align-self:start;max-height:calc(100vh - 60px);overflow:auto}
+.side h2{margin:14px 10px 6px;font-size:12px;font-weight:700;color:#5d7891;letter-spacing:.04em}
+.side h2:first-child{margin-top:4px}
+.nav{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;color:#9eb2c2;text-decoration:none;font-weight:650}
+.nav:hover{background:#0e2438;color:var(--text)}
+.nav[aria-current="page"]{background:#10304a;color:var(--text);box-shadow:inset 3px 0 0 var(--gold)}
+.nav .lock{color:var(--muted);font-size:11px;font-weight:600}
+
+.main{padding:22px 26px 60px;max-width:1500px;width:100%}
+.head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;margin-bottom:6px}
+.head h1{margin:0;font-size:26px;line-height:1.15;letter-spacing:-.01em}
+.lede{color:var(--muted);margin:4px 0 16px;max-width:75ch}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 18px}
+.filters label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+select,input[type=text],input[type=url]{background:#091a29;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;min-width:140px}
+input::placeholder{color:#59738a}
+
+.grid{display:grid;gap:14px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:14px}
+.cols{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;min-width:0}
+.card h2,.card h3{margin:0 0 10px;font-size:16px}
+.kpi .l{color:var(--muted);font-size:12.5px}
+.kpi .v{font-size:28px;font-weight:800;line-height:1.2;margin:3px 0;overflow-wrap:anywhere}
+.kpi .v.name{font-size:22px}
+.kpi .s{color:var(--muted);font-size:12.5px}
+.gold{color:var(--gold)}.green{color:var(--green)}.red{color:var(--red)}.muted{color:var(--muted)}
+
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.wrap{overflow-x:auto}
+.tbl th{text-align:left;color:var(--muted);font-weight:650;font-size:12.5px;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:9px 10px;border-bottom:1px solid #152c40;vertical-align:top}
+.tbl td.n,.tbl th.n{text-align:right;font-variant-numeric:tabular-nums}
+.tbl tr:last-child td{border-bottom:0}
+
+.badge{display:inline-block;border-radius:99px;padding:2px 9px;font-size:12px;font-weight:750;border:1px solid var(--line)}
+.badge.ok{color:var(--green);border-color:#1f6b52}
+.badge.warn{color:var(--amber);border-color:#7a5a20}
+.badge.bad{color:var(--red);border-color:#7c3039}
+
+.bar{display:grid;grid-template-columns:150px 1fr 54px;gap:10px;align-items:center;margin:9px 0;font-size:13px}
+.bar i{display:block;height:8px;border-radius:99px;background:#122a3f;overflow:hidden}
+.bar i b{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--gold))}
+.bar span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+
+.list{list-style:none;margin:0;padding:0}
+.list li{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #152c40}
+.list li:last-child{border-bottom:0}
+.decide{border-left:3px solid var(--blue);padding:4px 0 4px 12px;margin:0 0 14px}
+.decide:last-child{margin-bottom:0}
+.decide b{display:block}
+.evidence{margin-top:16px;padding:10px 14px;border:1px dashed #2b4a63;border-radius:8px;color:var(--muted);font-size:12.5px}
+.evidence strong{color:var(--text)}
+
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+.tab{border:1px solid var(--line);background:#091a29;color:#9eb2c2;border-radius:99px;padding:6px 14px;font:inherit;font-weight:700;cursor:pointer}
+.tab[aria-pressed="true"]{background:#10304a;color:var(--text);border-color:var(--gold)}
+
+.state{padding:26px;border:1px dashed #2b4a63;border-radius:10px;background:#081827}
+.state h3{margin:0 0 6px}
+.state p{margin:0 0 10px;color:var(--muted);max-width:70ch}
+.err{border-color:#7c3039}
+.spark{width:100%;height:auto;display:block}
+.spark path.line{fill:none;stroke:var(--blue);stroke-width:2}
+.spark path.area{fill:rgba(21,157,232,.12);stroke:none}
+.spark text{fill:var(--muted);font-size:11px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form{display:grid;gap:10px;max-width:560px}
+.form label{display:grid;gap:4px;color:var(--muted);font-size:12.5px}
+.form input{width:100%}
+.kv{display:grid;grid-template-columns:minmax(120px,220px) 1fr;gap:6px 14px;margin:0}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:#0f2438;border:1px solid var(--line);border-radius:99px;padding:4px 11px}
+.chip b{color:var(--gold);margin-left:6px}
+
+@media(max-width:900px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .side{position:static;max-height:none;display:flex;gap:4px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px}
+  .side h2{display:none}
+  .nav{white-space:nowrap}
+  .main{padding:16px 14px 50px}
+  .who{display:none}
+  .bar{grid-template-columns:110px 1fr 46px}
+  .row2{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<a class="skip" href="#view">Skip to content</a>
+<header class="top">
+  <div class="logo">STATAXIS<small>Intelligence workspace</small></div>
+  <span class="plan" id="plan" hidden></span>
+  <div class="who" id="who"></div>
+  <button class="btn" id="signout" type="button">Sign out</button>
+</header>
+
+<div class="layout">
+  <nav class="side" id="nav" aria-label="Workspace sections"></nav>
+  <main class="main" id="view" tabindex="-1"></main>
+</div>
+
+<script>
+"use strict";
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const compact = n => n == null || !isFinite(n) ? "—" : new Intl.NumberFormat("en-US", {notation: "compact", maximumFractionDigits: 1}).format(n);
+const whole = n => n == null || !isFinite(n) ? "—" : Number(n).toLocaleString("en-IN");
+const dec = (n, d = 1) => n == null || !isFinite(n) ? "—" : Number(n).toLocaleString("en-IN", {maximumFractionDigits: d});
+/* Confidence arrives on two scales today: 0-100 (STX Index) and 0-1 (what-changed).
+   The smallest possible STX confidence is 5, so anything <= 1 is a fraction. */
+const pct = c => c == null || !isFinite(c) ? "—" : Math.round(c <= 1 ? c * 100 : c) + "%";
+const when = iso => { if (!iso) return "—"; const d = new Date(iso); return isNaN(d) ? "—" : d.toLocaleString("en-IN", {dateStyle: "medium", timeStyle: "short"}); };
+const signed = n => n == null ? "—" : (n > 0 ? "+" : "") + whole(n);
+
+/* ---------- session ---------- */
+const token = () => sessionStorage.getItem("stataxis_token") || localStorage.getItem("stataxis_access_token") || "";
+const account = () => { try { return JSON.parse(sessionStorage.getItem("stataxis_account") || localStorage.getItem("stataxis_account") || "null"); } catch { return null; } };
+function signOut() {
+  ["stataxis_token", "stataxis_account", "sx_ws_filters"].forEach(k => sessionStorage.removeItem(k));
+  ["stataxis_access_token", "stataxis_account"].forEach(k => localStorage.removeItem(k));
+  location.href = "login.html";
+}
+const acct = account();
+if (!acct || !token()) { location.replace("login.html"); }
+
+/* ---------- API ---------- */
+class ApiError extends Error { constructor(status, message) { super(message); this.status = status; } }
+const cache = new Map();
+async function api(path, params = {}, opts = {}) {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== "" && v != null) q.set(k, v);
+  const url = path + (q.toString() ? "?" + q : "");
+  const key = (opts.method || "GET") + " " + url;
+  if (!opts.method && cache.has(key) && Date.now() - cache.get(key).t < 60000) return cache.get(key).d;
+  let res;
+  try {
+    res = await fetch(url, {
+      method: opts.method || "GET",
+      headers: {Authorization: "Bearer " + token(), ...(opts.body ? {"Content-Type": "application/json"} : {})},
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    });
+  } catch { throw new ApiError(0, "Could not reach the server. Check your connection and try again."); }
+  let data = null; try { data = await res.json(); } catch { /* non-JSON body */ }
+  const msg = (data && data.error) || res.statusText || "Request failed";
+  if (res.status === 401 && !/premium|plan/i.test(msg)) { signOut(); throw new ApiError(401, "Session expired"); }
+  if (!res.ok) throw new ApiError(res.status, msg);
+  if (!opts.method) cache.set(key, {t: Date.now(), d: data});
+  return data;
+}
+const friendly = e => e.status === 403 || /premium/i.test(e.message)
+  ? "This is not included in your current plan."
+  : e.status === 404 ? "This data is not available yet."
+  : e.status >= 500 ? "The server could not complete this request. Try again in a moment."
+  : e.message;
+
+/* ---------- state ---------- */
+const PERIODS = [["1h","Last hour"],["3h","Last 3 hours"],["6h","Last 6 hours"],["today","Today"],["7d","Last 7 days"],["3w","Last 3 weeks"],["month","Last month"],["quarter","Last quarter"],["year","Last year"]];
+const SCOPES = [["all","All streams"],["live","Live"],["replay","Live replays"],["video","Videos"]];
+const F = Object.assign({language: "", period: "7d", stream: "all", channel: ""}, JSON.parse(sessionStorage.getItem("sx_ws_filters") || "{}"));
+let channels = [];
+const saveF = () => sessionStorage.setItem("sx_ws_filters", JSON.stringify(F));
+const channelName = id => (channels.find(c => c.id === Number(id)) || {}).name || "Channel " + id;
+const marketReport = (scope = F.stream) => api("/api/v1/markets/report", {period: F.period, language: F.language, stream_scope: scope, limit: 200});
+const readiness = () => api("/api/v1/operations/readiness", {min_snapshot_coverage: 0.5});
+
+/* ---------- UI building blocks ---------- */
+const kpi = (l, v, s = "", cls = "") => `<div class="card kpi"><div class="l">${esc(l)}</div><div class="v ${cls}">${esc(v)}</div><div class="s">${esc(s)}</div></div>`;
+const state = (title, body, action = "", cls = "") => `<div class="state ${cls}"><h3>${esc(title)}</h3><p>${esc(body)}</p>${action}</div>`;
+const badge = (ok, yes, no, warn) => `<span class="badge ${ok === true ? "ok" : ok === false ? "bad" : "warn"}">${esc(ok === true ? yes : ok === false ? no : warn)}</span>`;
+const bar = (label, value) => { const v = Math.max(0, Math.min(100, Number(value) || 0)); return `<div class="bar"><span>${esc(label)}</span><i><b style="width:${v}%"></b></i><span>${value == null ? "—" : Math.round(v) + "%"}</span></div>`; };
+const evidence = text => `<div class="evidence"><strong>Evidence.</strong> ${esc(text)} Missing values are shown as “—”, never as zero.</div>`;
+const retry = () => `<button class="btn" data-retry type="button">Try again</button>`;
+const errCard = e => state("This section could not load", friendly(e), retry(), "err");
+
+function table(cols, rows, empty = "No rows to show.") {
+  if (!rows.length) return `<p class="muted">${esc(empty)}</p>`;
+  return `<div class="wrap"><table class="tbl"><thead><tr>${cols.map(c => `<th class="${c.n ? "n" : ""}">${esc(c.h)}</th>`).join("")}</tr></thead><tbody>${
+    rows.map(r => `<tr>${cols.map(c => `<td class="${c.n ? "n" : ""}">${c.html ? c.v(r) : esc(c.v(r))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+function spark(points, key = "value", label = "") {
+  const pts = points.map(p => ({t: p.observed_at, v: Number(p[key])})).filter(p => isFinite(p.v));
+  if (pts.length < 2) return `<p class="muted">Not enough observations yet to draw a trend. At least two are needed.</p>`;
+  const W = 900, H = 210, L = 8, R = 8, T = 26, B = 28;
+  const min = Math.min(...pts.map(p => p.v)), max = Math.max(...pts.map(p => p.v)), rng = Math.max(max - min, 1);
+  const x = i => L + i / (pts.length - 1) * (W - L - R), y = v => T + (1 - (v - min) / rng) * (H - T - B);
+  const line = pts.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.v).toFixed(1)).join(" ");
+  const d0 = new Date(pts[0].t), d1 = new Date(pts[pts.length - 1].t), short = (d1 - d0) < 2 * 864e5;
+  const f = d => isNaN(d) ? "" : short ? d.toLocaleTimeString("en-IN", {hour: "2-digit", minute: "2-digit"}) : d.toLocaleDateString("en-IN", {day: "numeric", month: "short"});
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)} from ${esc(f(d0))} to ${esc(f(d1))}, low ${esc(compact(min))}, high ${esc(compact(max))}">
+    <path class="area" d="${line} L${x(pts.length - 1)} ${H - B} L${L} ${H - B} Z"/><path class="line" d="${line}"/>
+    <text x="${L}" y="14">High ${esc(compact(max))} · Low ${esc(compact(min))}</text>
+    <text x="${L}" y="${H - 8}">${esc(f(d0))}</text><text x="${W - R}" y="${H - 8}" text-anchor="end">${esc(f(d1))}</text></svg>`;
+}
+const opts = (list, cur) => list.map(([v, l]) => `<option value="${esc(v)}"${String(v) === String(cur) ? " selected" : ""}>${esc(l)}</option>`).join("");
+function filterBar({period = true, stream = true, language = true, channel = false} = {}) {
+  const langs = [...new Set(channels.map(c => c.language).filter(l => l && l !== "unknown"))].sort();
+  return `<form class="filters" data-filters>
+    ${language ? `<label>Language<select name="language"><option value="">All languages</option>${opts(langs.map(l => [l, l]), F.language)}</select></label>` : ""}
+    ${period ? `<label>Period<select name="period">${opts(PERIODS, F.period)}</select></label>` : ""}
+    ${stream ? `<label>Streams<select name="stream">${opts(SCOPES, F.stream)}</select></label>` : ""}
+    ${channel ? `<label>Channel<select name="channel">${opts(channels.map(c => [c.id, c.name]), F.channel)}</select></label>` : ""}
+    <button class="btn primary" type="submit">Apply</button></form>`;
+}
+const head = (title, lede) => `<div class="head"><h1>${esc(title)}</h1></div><p class="lede">${esc(lede)}</p>`;
+const noChannels = () => state("No channels are being tracked yet", "This workspace fills up once channels are added and the collector has run. Admins can add channels in Manager & Packages.", "");
+const provText = (n, a, b) => `Based on ${whole(n)} stored observations${a && b ? " between " + when(a) + " and " + when(b) : ""}.`;
+
+/* ---------- market table (shared) ---------- */
+function marketRows(report) {
+  const rows = report.channels || [];
+  const total = Number(report.market?.view_delta_total) || 0;
+  const leader = rows.map(r => r.view_delta).filter(v => v != null).sort((a, b) => b - a)[0];
+  return rows.map(r => ({...r,
+    share: total > 0 && r.view_delta != null ? r.view_delta / total * 100 : null,
+    gap: leader != null && r.view_delta != null ? leader - r.view_delta : null}));
+}
+const moveHtml = r => r.rank_change == null ? `<span class="muted">—</span>` : r.rank_change > 0 ? `<span class="green">▲ ${r.rank_change}</span>` : r.rank_change < 0 ? `<span class="red">▼ ${-r.rank_change}</span>` : `<span class="muted">no change</span>`;
+const stxCell = r => r.stx && r.stx.score != null ? `${dec(r.stx.score)} <span class="muted">(${pct(r.stx.confidence)})</span>` : `<span class="muted">Not enough history</span>`;
+const nameCell = r => `<strong>${esc(r.channel)}</strong>`;
+
+/* ---------- views ---------- */
+const VIEWS = {};
+const add = (id, group, title, render, extra = {}) => VIEWS[id] = {id, group, title, render, ...extra};
+
+add("overview", "Intelligence", "Overview", async el => {
+  el.innerHTML = head("Market overview", "The state of the market you follow, from the first observation to the latest.") + filterBar({channel: false}) + `<div id="ov"><p class="muted">Loading…</p></div>`;
+  const [m, r, w] = await Promise.allSettled([marketReport(), readiness(), api("/api/v1/insights/what-changed", {hours: 24})]);
+  const box = $("#ov", el);
+  if (m.status !== "fulfilled") { box.innerHTML = errCard(m.reason); return; }
+  const rep = m.value, rows = marketRows(rep), scored = rows.filter(x => x.stx && x.stx.score != null);
+  if (!rows.length) { box.innerHTML = channels.length ? state("No observations in this window", "Try a longer period or clear the language filter. If the window is right, the collector may not have run yet — see Operations.") : noChannels(); return; }
+  const videos = rows.reduce((s, x) => s + (x.videos_observed || 0), 0);
+  const avgStx = scored.length ? scored.reduce((s, x) => s + x.stx.score, 0) / scored.length : null;
+  const avgConf = scored.length ? scored.reduce((s, x) => s + x.stx.confidence, 0) / scored.length : null;
+  const rd = r.status === "fulfilled" ? r.value : null;
+  const ageP = rd && rd.collection.latest_run ? Math.max(0, 100 - rd.collection.latest_run.age_minutes / rd.collection.stale_after_minutes * 100) : null;
+  const mover = rows.filter(x => x.rank_change).sort((a, b) => Math.abs(b.rank_change) - Math.abs(a.rank_change))[0];
+  const wc = w.status === "fulfilled" ? w.value : null;
+  box.innerHTML = `<div class="grid kpis">
+      ${kpi("Views gained", compact(rep.market.view_delta_total), "In the selected window")}
+      ${kpi("Average concurrent viewers", compact(rep.market.average_concurrent_total), "Sum across channels")}
+      ${kpi("Channels", whole(rep.market.channel_count), whole(scored.length) + " with usable history")}
+      ${kpi("Videos observed", compact(videos), "Stored observations")}
+      ${kpi("Average STX", avgStx == null ? "—" : dec(avgStx), avgConf == null ? "No scored channels yet" : "Average confidence " + pct(avgConf), "gold")}</div>
+    <div class="grid cols">
+      <section class="card"><h2>Market snapshot</h2>
+        ${bar("Channels with usable history", rows.length ? scored.length / rows.length * 100 : null)}
+        ${bar("Snapshot coverage", rd ? rd.intelligence.coverage * 100 : null)}
+        ${bar("Collection freshness", ageP)}
+        <p class="muted">${rd && rd.collection.latest_run ? "Last collection run " + when(rd.collection.latest_run.finished_at || rd.collection.latest_run.started_at) + "." : "The collector has not run yet."}</p></section>
+      <section class="card"><h2>Pipeline status</h2>${rd ? `<ul class="list">
+        <li><span>Collection</span>${badge(rd.collection.fresh, "Fresh", "Stale", "Unknown")}</li>
+        <li><span>Data integrity</span>${badge(rd.integrity.ok, "No issues", rd.integrity.issue_count + " issue(s)")}</li>
+        <li><span>Intelligence</span>${badge(rd.ready, "Ready", "Not ready")}</li></ul>
+        <p class="muted">${esc(readyReason(rd.reason))}</p>` : errCard(r.reason)}</section>
+      <section class="card"><h2>Decision surfaces</h2>
+        <div class="decide"><b>Who is moving?</b>${mover ? `${esc(mover.channel)} ${mover.rank_change > 0 ? "climbed " : "fell "}${Math.abs(mover.rank_change)} place(s).` : "No rank movement recorded in this window."}</div>
+        <div class="decide"><b>What is moving?</b>${wc && wc.changes.length ? `${esc(wc.changes[0].title)} (${signed(wc.changes[0].view_delta)} views).` : "No video moved measurably in the last 24 hours."}</div>
+        <div class="decide"><b>What changed?</b>${wc ? esc(wc.headline) : "Change data is unavailable right now."}</div></section></div>
+    ${evidence(provText(rep.provenance.observation_count, rep.start_at, rep.end_at))}`;
+});
+
+const readyReason = r => ({ready: "Collection is fresh and intelligence covers the latest run.", collection_not_fresh: "The latest collection run is older than the freshness limit.",
+  no_collection_run: "The collector has not completed a run yet.", no_videos_observed: "The latest run observed no videos.",
+  intelligence_coverage_below_threshold: "Not every observed video has an intelligence snapshot yet.", data_integrity_failed: "A data integrity check failed. See Data integrity."}[r] || r || "");
+
+function marketTable(rows, scope) {
+  const live = scope === "live";
+  const cols = [{h: "#", n: 1, v: r => r.rank}, {h: "Channel", html: 1, v: nameCell}, {h: "Movement", html: 1, v: moveHtml},
+    {h: "Views gained", n: 1, v: r => whole(r.view_delta)}, {h: live ? "Current viewers" : "Avg concurrent", n: 1, v: r => whole(live ? r.current_concurrent : r.average_concurrent)},
+    {h: "Peak concurrent", n: 1, v: r => whole(r.peak_concurrent)}, {h: "Views / min", n: 1, v: r => dec(r.view_velocity_per_minute)}, {h: "STX (confidence)", html: 1, v: stxCell}];
+  return table(cols, rows, "No channels have observations in this window.");
+}
+add("market", "Intelligence", "Market", async el => {
+  el.innerHTML = head("Market intelligence", "Every channel in the window, ranked by views gained.") + filterBar() + `<div id="mk"><p class="muted">Loading…</p></div>`;
+  const rep = await marketReport(), rows = marketRows(rep);
+  $("#mk", el).innerHTML = (channels.length ? marketTable(rows, F.stream) : noChannels()) + (rows.length ? `<p><button class="btn" id="csv" type="button">Download this view (CSV)</button></p>` : "")
+    + evidence(provText(rep.provenance.observation_count, rep.start_at, rep.end_at));
+  const b = $("#csv", el); if (b) b.onclick = () => downloadCsv(rows, "stataxis-market-" + F.period + ".csv");
+});
+
+const channelHead = (title, lede) => head(title, lede) + (channels.length ? filterBar({language: false, channel: true, stream: true}) : "");
+const needChannel = () => { if (!F.channel || !channels.some(c => c.id === Number(F.channel))) { F.channel = channels[0] ? String(channels[0].id) : ""; saveF(); } return F.channel; };
+const channelMedia = () => api(`/api/v1/channels/${Number(needChannel())}/media-intelligence`, {period: F.period, stream_scope: F.stream});
+
+add("channel", "Intelligence", "Channel", async el => {
+  el.innerHTML = channelHead("Channel intelligence", "Audience, momentum and content for one channel.");
+  if (!channels.length) { el.insertAdjacentHTML("beforeend", noChannels()); return; }
+  el.insertAdjacentHTML("beforeend", `<div id="ch"><p class="muted">Loading…</p></div>`);
+  const d = await channelMedia();
+  $("#ch", el).innerHTML = `<div class="grid kpis">
+    ${kpi("Current concurrent", whole(d.audience.current_concurrent), "Latest observed")}
+    ${kpi("Average concurrent", whole(d.audience.average_concurrent), "In the window")}
+    ${kpi("Peak concurrent", whole(d.audience.peak_concurrent))}
+    ${kpi("Views gained", whole(d.momentum.view_delta), dec(d.momentum.view_velocity_per_minute) + " views per minute")}
+    ${kpi("STX", d.stx && d.stx.score != null ? dec(d.stx.score) : "—", d.stx && d.stx.score != null ? "Confidence " + pct(d.stx.confidence) : "Not enough history yet", "gold")}</div>
+    <div class="grid cols"><section class="card"><h2>Momentum</h2><dl class="kv">
+      <dt>Likes gained</dt><dd>${whole(d.momentum.like_delta)}</dd><dt>Comments gained</dt><dd>${whole(d.momentum.comment_delta)}</dd>
+      <dt>Engagement per minute</dt><dd>${dec(d.momentum.engagement_velocity_per_minute)}</dd></dl></section>
+      <section class="card"><h2>Content</h2><dl class="kv">
+      <dt>Videos observed</dt><dd>${whole(d.content.videos_observed)}</dd><dt>Uploads in window</dt><dd>${whole(d.content.uploads_in_window)}</dd>
+      <dt>Uploads per week</dt><dd>${dec(d.content.upload_cadence_per_week)}</dd></dl></section>
+      <section class="card"><h2>About this channel</h2><dl class="kv"><dt>Network</dt><dd>${esc(d.channel.network)}</dd><dt>Language</dt><dd>${esc(d.channel.language)}</dd>
+      <dt>Region</dt><dd>${esc(d.channel.region)}</dd></dl></section></div>
+    ${evidence(provText(d.provenance.observation_count, d.provenance.first_observed_at, d.provenance.last_observed_at))}`;
+});
+
+add("stream", "Intelligence", "Streams", async el => {
+  el.innerHTML = head("Stream intelligence", "Live, replay and video audiences compared.") + filterBar({stream: false}) +
+    `<div class="tabs" role="group" aria-label="Stream type">${SCOPES.map(([v, l]) => `<button class="tab" type="button" data-scope="${v}" aria-pressed="${v === F.stream}">${esc(l)}</button>`).join("")}</div><div id="st"><p class="muted">Loading…</p></div>`;
+  el.querySelectorAll("[data-scope]").forEach(b => b.onclick = () => { F.stream = b.dataset.scope; saveF(); render(); });
+  const rep = await marketReport(F.stream), rows = marketRows(rep);
+  $("#st", el).innerHTML = (channels.length ? marketTable(rows, F.stream) : noChannels()) + evidence(provText(rep.provenance.observation_count, rep.start_at, rep.end_at));
+});
+
+add("content", "Intelligence", "Content", async el => {
+  el.innerHTML = channelHead("Content intelligence", "The videos that moved most for this channel.");
+  if (!channels.length) { el.insertAdjacentHTML("beforeend", noChannels()); return; }
+  el.insertAdjacentHTML("beforeend", `<div id="ct"><p class="muted">Loading…</p></div>`);
+  const d = await channelMedia();
+  const link = r => /^[\w-]{11}$/.test(r.youtube_video_id || "") ? `<a href="https://www.youtube.com/watch?v=${esc(r.youtube_video_id)}" target="_blank" rel="noopener noreferrer">${esc(r.title || "Untitled")}</a>` : esc(r.title || "Untitled");
+  $("#ct", el).innerHTML = table([{h: "Video", html: 1, v: link}, {h: "Type", v: r => (r.classification || "").replaceAll("_", " ").toLowerCase()},
+    {h: "Views gained", n: 1, v: r => whole(r.view_delta)}, {h: "Views / min", n: 1, v: r => dec(r.view_velocity_per_minute)}, {h: "Observations", n: 1, v: r => whole(r.observation_count)},
+    {h: "Last seen", v: r => when(r.last_observed_at)}], d.content.top_videos, "No videos were observed for this channel in the window.")
+    + evidence(provText(d.provenance.observation_count, d.provenance.first_observed_at, d.provenance.last_observed_at));
+});
+
+add("competition", "Intelligence", "Competition", async el => {
+  el.innerHTML = head("Competition", "Who leads, who is climbing and how far behind everyone is.") + filterBar() + `<div id="cp"><p class="muted">Loading…</p></div>`;
+  const rep = await marketReport(), rows = marketRows(rep);
+  if (!rows.length) { $("#cp", el).innerHTML = channels.length ? state("No competitive data in this window", "Choose a longer period or a different language.") : noChannels(); return; }
+  const lead = rows[0], climb = [...rows].filter(r => r.rank_change > 0).sort((a, b) => b.rank_change - a.rank_change)[0], fall = [...rows].filter(r => r.rank_change < 0).sort((a, b) => a.rank_change - b.rank_change)[0];
+  const cols = [{h: "#", n: 1, v: r => r.rank}, {h: "Channel", html: 1, v: nameCell}, {h: "Movement", html: 1, v: moveHtml}, {h: "Share of views gained", n: 1, v: r => r.share == null ? "—" : dec(r.share) + "%"},
+    {h: "Gap to leader", n: 1, v: r => r.gap == null ? "—" : whole(r.gap)}, {h: "Views / min", n: 1, v: r => dec(r.view_velocity_per_minute)}];
+  const sel = n => `<label>${n}<select data-h2h="${n}">${rows.map((r, i) => `<option value="${r.channel_id}"${(n === "A" ? i === 0 : i === Math.min(1, rows.length - 1)) ? " selected" : ""}>${esc(r.channel)}</option>`).join("")}</select></label>`;
+  $("#cp", el).innerHTML = `<div class="grid cols"><section class="card kpi"><div class="l">Leader</div><div class="v name">${esc(lead.channel)}</div><div class="s">${whole(lead.view_delta)} views gained</div></section>
+    <section class="card kpi"><div class="l">Biggest climber</div><div class="v green name">${climb ? esc(climb.channel) : "—"}</div><div class="s">${climb ? "Up " + climb.rank_change + " place(s)" : "No one moved up"}</div></section>
+    <section class="card kpi"><div class="l">Biggest faller</div><div class="v red name">${fall ? esc(fall.channel) : "—"}</div><div class="s">${fall ? "Down " + -fall.rank_change + " place(s)" : "No one moved down"}</div></section></div>
+    <section class="card" style="margin-top:14px"><h2>Ranking</h2>${table(cols, rows)}</section>
+    <section class="card" style="margin-top:14px"><h2>Head to head</h2><div class="filters">${sel("A")}${sel("B")}</div><div id="h2h"></div></section>
+    ${evidence("Rank movement compares this window with the one before it. Share is each channel’s part of all views gained in this window; a change in share needs an earlier snapshot and is not shown yet. " + provText(rep.provenance.observation_count, rep.start_at, rep.end_at))}`;
+  const draw = () => {
+    const [a, b] = ["A", "B"].map(n => rows.find(r => String(r.channel_id) === $(`[data-h2h="${n}"]`, el).value));
+    const line = (l, f) => `<tr><td>${l}</td><td class="n">${f(a)}</td><td class="n">${f(b)}</td></tr>`;
+    $("#h2h", el).innerHTML = `<div class="wrap"><table class="tbl"><thead><tr><th>Measure</th><th class="n">${esc(a.channel)}</th><th class="n">${esc(b.channel)}</th></tr></thead><tbody>
+      ${line("Rank", r => "#" + r.rank)}${line("Views gained", r => whole(r.view_delta))}${line("Average concurrent", r => whole(r.average_concurrent))}${line("Views per minute", r => dec(r.view_velocity_per_minute))}
+      ${line("STX", r => r.stx && r.stx.score != null ? dec(r.stx.score) : "—")}</tbody></table></div>`;
+  };
+  el.querySelectorAll("[data-h2h]").forEach(s => s.onchange = draw); draw();
+});
+
+add("trends", "Intelligence", "Audience & trends", async el => {
+  el.innerHTML = channelHead("Audience and trends", "How a channel’s total views have moved over time.") + `<div class="tabs" role="group" aria-label="Range">${[7, 30, 90].map(d => `<button class="tab" type="button" data-days="${d}" aria-pressed="${d === (Number(F.days) || 30)}">${d} days</button>`).join("")}</div>`;
+  if (!channels.length) { el.insertAdjacentHTML("beforeend", noChannels()); return; }
+  el.querySelectorAll("[data-days]").forEach(b => b.onclick = () => { F.days = b.dataset.days; saveF(); render(); });
+  el.insertAdjacentHTML("beforeend", `<div id="tr"><p class="muted">Loading…</p></div>`);
+  const days = Number(F.days) || 30;
+  const [s, d] = await Promise.all([api(`/api/v1/channels/${Number(needChannel())}/series`, {days}), channelMedia()]);
+  $("#tr", el).innerHTML = `<section class="card"><h2>Total views, ${esc(channelName(F.channel))}</h2>${spark(s.points || [], "value", "Total views")}</section>
+    <div class="grid kpis" style="margin-top:14px">${kpi("Average concurrent", whole(d.audience.average_concurrent), "In the selected period")}${kpi("Peak concurrent", whole(d.audience.peak_concurrent))}${kpi("Views gained", whole(d.momentum.view_delta))}</div>
+    ${evidence("Each point is the last observed total in its time bucket; nothing is interpolated between points.")}`;
+});
+
+add("live", "Intelligence", "Live audience", async el => {
+  const span = Number(F.liveHours) || 6;
+  el.innerHTML = head("Live audience", "Concurrent viewers across live channels, exactly as observed.") + filterBar({period: false, stream: false}) +
+    `<div class="tabs" role="group" aria-label="Window">${[1, 6, 24].map(h => `<button class="tab" type="button" data-h="${h}" aria-pressed="${h === span}">Last ${h}h</button>`).join("")}</div><div id="lv"><p class="muted">Loading…</p></div>`;
+  el.querySelectorAll("[data-h]").forEach(b => b.onclick = () => { F.liveHours = b.dataset.h; saveF(); render(); });
+  const end = new Date(), start = new Date(end - span * 3600e3);
+  let d; try { d = await api("/api/v1/audience/live", {start: start.toISOString(), end: end.toISOString(), language: F.language}); }
+  catch (e) { if (e.status === 403 || /premium/i.test(e.message)) { $("#lv", el).innerHTML = state("Live audience is a paid feature", "Your plan does not include live audience windows. Ask your admin to change your plan.", ""); return; } throw e; }
+  const langs = Object.entries(d.languages || {});
+  $("#lv", el).innerHTML = `<div class="grid kpis">${kpi("Current concurrent", whole(d.overall.current_concurrent), "Sum of each channel’s latest sample")}${kpi("Peak concurrent", whole(d.overall.peak_concurrent))}${kpi("Live channels", whole(d.overall.channel_count))}</div>
+    <section class="card"><h2>Total concurrent viewers</h2>${spark(d.timeline || [], "total_concurrent", "Total concurrent viewers")}</section>
+    <div class="grid cols" style="margin-top:14px"><section class="card"><h2>By language</h2>${table([{h: "Language", v: r => r[0]}, {h: "Channels", n: 1, v: r => whole(r[1].channel_count)}, {h: "Now", n: 1, v: r => whole(r[1].current_concurrent)}, {h: "Peak", n: 1, v: r => whole(r[1].peak_concurrent)}], langs, "No live samples in this window.")}</section>
+    <section class="card"><h2>By channel</h2>${table([{h: "Channel", v: r => r.name}, {h: "Now", n: 1, v: r => whole(r.current_concurrent)}, {h: "Peak", n: 1, v: r => whole(r.peak_concurrent)}, {h: "Last sample", v: r => when(r.observed_at)}], d.channels || [], "No live channels in this window.")}</section></div>
+    ${evidence(`Samples run from ${when(d.overall.earliest_observed_at)} to ${when(d.overall.latest_observed_at)}. Values are not interpolated.`)}`;
+});
+
+const STX = [["audience","Audience",30],["growth","Growth",20],["momentum","Momentum",15],["acceleration","Acceleration",10],["consistency","Consistency",10],["competitive_position","Competition",10],["anomaly_event","Anomaly or event",5]]; // mirrors metrics/stx_index.py WEIGHTS
+add("stx", "Intelligence", "STX Index", async el => {
+  el.innerHTML = channelHead("STX Index", "One transparent score, split into the signals behind it.");
+  if (!channels.length) { el.insertAdjacentHTML("beforeend", noChannels()); return; }
+  el.insertAdjacentHTML("beforeend", `<div id="sx"><p class="muted">Loading…</p></div>`);
+  const d = await channelMedia(), s = d.stx || {}, hasScore = s.score != null;
+  $("#sx", el).innerHTML = `<div class="grid kpis">${kpi("STX Index", hasScore ? dec(s.score) : "—", hasScore ? "Out of 100" : "Withheld until there is enough history", "gold")}${kpi("Confidence", hasScore ? pct(s.confidence) : "—", hasScore ? whole(s.available_signals) + " of 7 signals available" : "")}</div>
+    <section class="card"><h2>What makes up the score</h2>${table([{h: "Signal", v: r => r[1]}, {h: "Weight", n: 1, v: r => r[2] + "%"},
+      {h: "Reading (0–100)", n: 1, html: 1, v: r => (s.signals || {})[r[0]] == null ? `<span class="muted">Not enough history</span>` : dec(s.signals[r[0]])},
+      {h: "Points contributed", n: 1, v: r => (s.components || {})[r[0]] == null ? "—" : dec(s.components[r[0]], 2)}], STX)}</section>
+    ${evidence("Weights are provisional (v0). Missing signals are left out and the remaining weights are rescaled, so confidence shows how much of the index is backed by data.")}`;
+});
+
+add("changed", "Intelligence", "What changed", async el => {
+  const hours = Number(F.hours) || 24;
+  el.innerHTML = head("What changed", "The videos that moved, with the evidence attached.") + `<div class="tabs" role="group" aria-label="Window">${[24, 72, 168].map(h => `<button class="tab" type="button" data-hrs="${h}" aria-pressed="${h === hours}">${h === 168 ? "7 days" : h + " hours"}</button>`).join("")}</div><div id="wc"><p class="muted">Loading…</p></div>`;
+  el.querySelectorAll("[data-hrs]").forEach(b => b.onclick = () => { F.hours = b.dataset.hrs; saveF(); render(); });
+  const d = await api("/api/v1/insights/what-changed", {hours});
+  $("#wc", el).innerHTML = `<section class="card"><h2>${esc(d.headline)}</h2>${table([{h: "Video", v: r => r.title || "Untitled"}, {h: "Channel", v: r => channelName(r.channel_id)}, {h: "Views change", n: 1, v: r => signed(r.view_delta)}], d.changes, "No video changed measurably in this window.")}</section>
+    ${evidence(`${whole(d.evidence.current_observation_count)} observations in this window, ${whole(d.evidence.previous_observation_count)} in the window before. ${d.evidence.causality_inferred ? "" : "No causes are inferred."}`)}`;
+});
+
+add("research", "Research & output", "Research signals", async el => {
+  const hours = Number(F.hours) || 72;
+  el.innerHTML = head("Research signals", "Tone and topics in titles, with the method and confidence stated.") + `<div class="tabs" role="group" aria-label="Window">${[24, 72, 168].map(h => `<button class="tab" type="button" data-hrs="${h}" aria-pressed="${h === hours}">${h === 168 ? "7 days" : h + " hours"}</button>`).join("")}</div><div id="rs"><p class="muted">Loading…</p></div>`;
+  el.querySelectorAll("[data-hrs]").forEach(b => b.onclick = () => { F.hours = b.dataset.hrs; saveF(); render(); });
+  const d = await api("/api/v1/insights/what-changed", {hours});
+  const terms = d.narrative.top_terms || [];
+  $("#rs", el).innerHTML = `<div class="grid cols"><section class="card"><h2>Tone of titles</h2><div class="v" style="font-size:24px;font-weight:800">${esc(d.sentiment.label)}</div>
+      <p class="muted">Score ${dec(d.sentiment.score, 2)} · word coverage ${pct(d.sentiment.lexical_coverage)} · confidence ${pct(d.sentiment.confidence)}</p><p class="muted">Method: ${esc(String(d.sentiment.method).replaceAll("_", " "))}.</p></section>
+    <section class="card"><h2>Most repeated terms</h2>${terms.length ? `<div class="chips">${terms.map(t => `<span class="chip">${esc(t.term)}<b>${whole(t.mentions)}</b></span>`).join("")}</div>` : `<p class="muted">Not enough titles in this window.</p>`}
+      <p class="muted">Method: ${esc(String(d.narrative.method).replaceAll("_", " "))}; confidence ${pct(d.narrative.confidence)}.</p></section></div>
+    ${evidence("Tone is counted from words in titles and is a rough guide, not a finding. No cause is inferred from either signal.")}`;
+});
+
+add("evaluate", "Research & output", "Evaluate & reports", async el => {
+  const free = acct && acct.plan === "sx_free";
+  el.innerHTML = head("Evaluate a video", "Paste a public YouTube link to add it to the record and read its STX Index.") +
+    (free ? state("URL evaluation is a paid feature", "Your plan is SX Free. Your admin can move you to a plan that includes evaluation and reports.") : "") +
+    `<section class="card"><form class="form" id="ev"><label>YouTube link<input type="url" name="url" required placeholder="https://www.youtube.com/watch?v=…"></label>
+      <label>Name to show<input type="text" name="name" required maxlength="120" placeholder="Prime-time bulletin"></label>
+      <div><button class="btn primary" type="submit"${free ? " disabled" : ""}>Evaluate</button></div></form><div id="evr" style="margin-top:14px" aria-live="polite"></div></section>
+    <section class="card" style="margin-top:14px"><h2>Reports</h2><p class="muted">Download the market table for the current filters as a spreadsheet-ready CSV.</p><button class="btn" id="csv2" type="button">Download market view (CSV)</button></section>`;
+  $("#csv2", el).onclick = async () => { const rep = await marketReport(); downloadCsv(marketRows(rep), "stataxis-market-" + F.period + ".csv"); };
+  $("#ev", el).onsubmit = async ev => {
+    ev.preventDefault(); const fd = new FormData(ev.target), out = $("#evr", el), btn = ev.target.querySelector("button"); btn.disabled = true; out.innerHTML = `<p class="muted">Evaluating…</p>`;
+    try {
+      const r = await api("/api/v1/evaluate/youtube", {}, {method: "POST", body: {url: fd.get("url"), display_name: fd.get("name")}});
+      out.innerHTML = `<dl class="kv"><dt>Video</dt><dd>${esc(r.display_name)}</dd><dt>Channel</dt><dd>${esc(r.channel_name)}</dd><dt>Observations stored</dt><dd>${whole(r.observation_count)}</dd>
+        <dt>STX Index</dt><dd>${r.stx_index == null ? "Withheld" : dec(r.stx_index)}</dd><dt>Confidence</dt><dd>${r.stx_index == null ? "—" : pct(r.confidence)}</dd></dl>
+        <p>${esc(r.view)}</p>${(r.analysis || []).map(a => `<p class="muted">${esc(a)}</p>`).join("")}`;
+    } catch (e) { out.innerHTML = state("Could not evaluate this link", friendly(e), "", "err"); }
+    btn.disabled = free;
+  };
+});
+
+add("integrity", "Research & output", "Data integrity", async el => {
+  el.innerHTML = head("Data integrity", "Checks that stored observations are complete and consistent.") + `<div id="di"><p class="muted">Loading…</p></div>`;
+  const rd = await readiness(), i = rd.integrity;
+  $("#di", el).innerHTML = `<div class="grid kpis">${kpi("Status", i.ok ? "No issues" : i.issue_count + " issue(s)", "", i.ok ? "green" : "red")}${kpi("Channels checked", whole(i.checked_channels))}${kpi("Videos checked", whole(i.checked_videos))}${kpi("Observations checked", whole(i.checked_observations))}${kpi("Collection runs checked", whole(i.checked_collection_runs))}</div>
+    <section class="card"><h2>Issues</h2>${i.issues.length ? table([{h: "Code", v: r => r.code}, {h: "Detail", v: r => r.message}], i.issues) : `<p class="muted">Every check passed.</p>`}</section>`;
+});
+
+add("operations", "Research & output", "Operations", async el => {
+  el.innerHTML = head("Operations", "Whether the collector is running and how fresh the data is.") + `<div id="op"><p class="muted">Loading…</p></div>`;
+  const rd = await readiness(), c = rd.collection, run = c.latest_run;
+  $("#op", el).innerHTML = `<div class="grid kpis">${kpi("Collection", c.status === "unknown" ? "Never run" : c.status, c.fresh ? "Fresh" : "Not fresh", c.fresh ? "green" : "red")}${kpi("Intelligence", rd.ready ? "Ready" : "Not ready", readyReason(rd.reason))}${kpi("Snapshot coverage", pct(rd.intelligence.coverage * 100), whole(rd.intelligence.videos_with_intelligence) + " of " + whole(rd.intelligence.videos_observed) + " videos")}</div>
+    <section class="card"><h2>Latest collection run</h2>${run ? `<dl class="kv"><dt>Run</dt><dd>#${whole(run.id)}</dd><dt>Started</dt><dd>${when(run.started_at)}</dd><dt>Finished</dt><dd>${when(run.finished_at)}</dd>
+      <dt>Channels attempted</dt><dd>${whole(run.channels_attempted)}</dd><dt>Videos observed</dt><dd>${whole(run.videos_observed)}</dd><dt>Age</dt><dd>${dec(run.age_minutes, 0)} minutes (fresh for ${whole(c.stale_after_minutes)})</dd>
+      ${run.error_message ? `<dt>Error</dt><dd class="red">${esc(run.error_message)}</dd>` : ""}</dl>` : state("The collector has not run yet", "No collection run is recorded. Check that the collector worker is deployed and has a YouTube API key.")}</section>`;
+});
+
+add("manager", "Research & output", "Manager & packages", async el => {
+  const admin = acct && acct.is_admin;
+  el.innerHTML = head("Manager and packages", "Applications, channels and package settings.") + (admin ? `<div class="grid cols">
+    <a class="card" href="admin.html" style="text-decoration:none;color:inherit"><h3>Applications and admin</h3><p class="muted">Approve accounts, add channels and videos, set languages.</p></a>
+    <a class="card" href="channel-manager.html" style="text-decoration:none;color:inherit"><h3>Channel manager</h3><p class="muted">Review and organise the tracked channels.</p></a>
+    <a class="card" href="package-config.html" style="text-decoration:none;color:inherit"><h3>Package configuration</h3><p class="muted">Edit what each package slot includes.</p></a></div>`
+    : state("Admins only", "This area is available to administrators. If you need a change to your account or plan, ask your admin."));
+}, {admin: 1});
+
+/* ---------- csv ---------- */
+function downloadCsv(rows, name) {
+  const cell = v => { let s = v == null ? "" : String(v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n]/.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s; };
+  const head = ["Rank", "Channel", "Views gained", "Average concurrent", "Peak concurrent", "Views per minute", "STX", "STX confidence (0-100)"];
+  const body = rows.map(r => [r.rank, r.channel, r.view_delta, r.average_concurrent, r.peak_concurrent, r.view_velocity_per_minute, r.stx && r.stx.score, r.stx && r.stx.score != null ? Math.round(r.stx.confidence <= 1 ? r.stx.confidence * 100 : r.stx.confidence) : ""]);
+  const blob = new Blob(["\ufeff" + [head, ...body].map(r => r.map(cell).join(",")).join("\r\n")], {type: "text/csv;charset=utf-8"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ---------- shell ---------- */
+function buildNav(current) {
+  let last = "", html = "";
+  for (const v of Object.values(VIEWS)) {
+    if (v.group !== last) { html += `<h2>${esc(v.group)}</h2>`; last = v.group; }
+    html += `<a class="nav" href="#/${v.id}"${v.id === current ? ' aria-current="page"' : ""}>${esc(v.title)}${v.admin && !(acct && acct.is_admin) ? '<span class="lock">admin</span>' : ""}</a>`;
+  }
+  $("#nav").innerHTML = html;
+}
+let seq = 0;
+async function render() {
+  const id = (location.hash.match(/^#\/([a-z]+)/) || [])[1]; const v = VIEWS[id] || VIEWS.overview, mine = ++seq;
+  const host = $("#view"), el = document.createElement("div");
+  buildNav(v.id); document.title = v.title + " — StatAxis workspace"; el.innerHTML = `<p class="muted">Loading…</p>`; host.replaceChildren(el);
+  try { await v.render(el); }
+  catch (e) { if (mine !== seq) return; el.innerHTML = head(v.title, "") + errCard(e); }
+  if (mine !== seq) return;
+  el.querySelectorAll("[data-retry]").forEach(b => b.onclick = () => { cache.clear(); render(); });
+  const f = el.querySelector("[data-filters]");
+  if (f) f.onsubmit = ev => { ev.preventDefault(); const fd = new FormData(f); for (const [k, val] of fd.entries()) F[k] = val; saveF(); render(); };
+}
+window.addEventListener("hashchange", () => { render(); $("#view").focus({preventScroll: true}); });
+$("#signout").onclick = signOut;
+
+(async function boot() {
+  if (!acct) return;
+  const p = $("#plan"); if (acct.plan) { p.textContent = acct.plan.replace(/^sx_/, "SX ").replace(/\b\w/g, c => c.toUpperCase()); p.hidden = false; }
+  $("#who").innerHTML = `<b>${esc(acct.full_name || acct.email || "")}</b>${esc(acct.organization || "")}`;
+  try { channels = (await api("/api/v1/channels")).channels || []; } catch { channels = []; }
+  render();
+})();
+</script>
+</body>
+</html>
