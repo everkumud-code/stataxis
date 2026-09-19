@@ -156,36 +156,41 @@ def run_service(
             if now >= collect_due:
                 try:
                     with Session(engine) as session:
-                        result = run_collection_pass(session, client, load_targets())
-                        logger.info(
-                            "collection counts: channels=%d videos=%d snapshots=%d errors=%d",
-                            len(load_targets()),
-                            result.videos_observed,
-                            result.intelligence.snapshots_built,
-                            result.intelligence.errors,
-                        )
-                    quota_backoff = 0
+                        targets = load_targets()
+                        result = run_collection_pass(session, client, targets)
+                    logger.info(
+                        "collection counts: channels=%d videos=%d snapshots=%d errors=%d",
+                        len(targets), result.videos_observed,
+                        result.intelligence.snapshots_built, result.intelligence.errors,
+                    )
+                    collection_quota_backoff = 0
+                    collection_failures = 0
                 except YouTubeAPIError as exc:
+                    collection_failures += 1
                     if exc.status_code in {403, 429}:
-                        quota_backoff = min(MAX_QUOTA_BACKOFF, max(30, 2 ** min(cycles, 8)))
-                    logger.error("collection error: type=%s", type(exc).__name__)
-                except Exception as exc:
-                    logger.error("collection error: type=%s", type(exc).__name__)
-                collect_due = time.monotonic() + collect_seconds
+                        collection_quota_backoff = quota_backoff_seconds(collection_failures)
+                    logger.info("collection counts: channels=0 videos=0 snapshots=0 errors=%d", collection_failures)
+                except Exception:
+                    collection_failures += 1
+                    logger.info("collection counts: channels=0 videos=0 snapshots=0 errors=%d", collection_failures)
+                collect_due = time.monotonic() + max(collect_seconds, collection_quota_backoff)
 
             if now >= live_due and not stop_event.is_set():
                 try:
                     with Session(engine) as session:
                         fetched, saved = poll_live_once(session, client)
                     logger.info("live poll counts: videos=%d observations=%d", fetched, saved)
-                    quota_backoff = 0
+                    live_quota_backoff = 0
+                    live_failures = 0
                 except YouTubeAPIError as exc:
+                    live_failures += 1
                     if exc.status_code in {403, 429}:
-                        quota_backoff = min(MAX_QUOTA_BACKOFF, max(30, 2 ** min(cycles, 8)))
-                    logger.error("live poll error: type=%s", type(exc).__name__)
-                except Exception as exc:
-                    logger.error("live poll error: type=%s", type(exc).__name__)
-                live_due = time.monotonic() + max(live_poll_seconds, quota_backoff)
+                        live_quota_backoff = quota_backoff_seconds(live_failures)
+                    logger.info("live poll counts: videos=0 observations=0 errors=%d", live_failures)
+                except Exception:
+                    live_failures += 1
+                    logger.info("live poll counts: videos=0 observations=0 errors=%d", live_failures)
+                live_due = time.monotonic() + max(live_poll_seconds, live_quota_backoff)
 
             cycles += 1
             if max_cycles is not None and cycles >= max_cycles:
@@ -197,15 +202,17 @@ def run_service(
             )
             _sleep_with_stop(stop_event, wait)
 
-
-def main() -> None:
-    stop_event = threading.Event()
-
+def install_signal_handlers(stop_event: threading.Event) -> None:
     def stop(*_: object) -> None:
         stop_event.set()
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
+
+
+def main() -> None:
+    stop_event = threading.Event()
+    install_signal_handlers(stop_event)
     logging.basicConfig(
         level=os.getenv("STX_LOG_LEVEL", "INFO"),
         format="%(asctime)s %(levelname)s %(message)s",
