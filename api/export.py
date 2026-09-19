@@ -11,7 +11,8 @@ from openpyxl import Workbook
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
-from api.access import UserRole, require_capability, video_access_policy
+from api.access import UserRole, plan_video_access_policy, require_capability, video_access_policy
+from api.plans import SXPlan, get_plan
 from api.live_monitor import live_audience_window
 from collector.storage import Channel, Observation, Video
 from metrics.persistence import IntelligenceSnapshotRecord
@@ -171,9 +172,12 @@ def export_live_audience_xlsx(
     return output.getvalue()
 
 
-def export_for_role(session: Session, role: UserRole | str, filters: ObservationExportFilters) -> bytes:
-    """Authorize and export the dashboard report for an authenticated role."""
-    policy = video_access_policy(role)
+def export_for_role(session: Session, role: UserRole | SXPlan | str, filters: ObservationExportFilters) -> bytes:
+    """Authorize and export the dashboard report for an authenticated role or plan."""
+    try:
+        policy = plan_video_access_policy(get_plan(role).code)
+    except ValueError:
+        policy = video_access_policy(role)
     require_capability(policy, "can_download_report")
     return export_observations_xlsx(session, filters)
 
