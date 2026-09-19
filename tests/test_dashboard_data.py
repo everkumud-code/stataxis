@@ -70,3 +70,48 @@ def test_create_database_migrates_dashboard_columns_safely():
         video_columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(stx_videos)")}
         assert {"avatar_url", "handle"} <= channel_columns
         assert {"thumbnail_url", "category_id", "topic"} <= video_columns
+
+
+def test_save_observations_backfills_topic_for_existing_video():
+    engine = create_database("sqlite:///:memory:")
+    observed_at = datetime(2026, 9, 19, tzinfo=UTC)
+    with Session(engine) as session:
+        channel = Channel(youtube_channel_id="channel-backfill", name="Backfill", language="Hindi")
+        session.add(channel)
+        session.flush()
+        video = Video(
+            youtube_video_id="video-backfill",
+            channel_id=channel.id,
+            title="Election update",
+            topic=None,
+        )
+        session.add(video)
+        session.commit()
+
+        observation = VideoObservation(
+            video_id="video-backfill",
+            channel_id="channel-backfill",
+            observed_at=observed_at,
+            title="Election update",
+            published_at=None,
+            view_count=100,
+            like_count=5,
+            comment_count=1,
+            concurrent_viewers=None,
+            is_live=False,
+            classification="REGULAR_VIDEO",
+            live_started_at=None,
+            live_ended_at=None,
+            thumbnail_url=None,
+            category_id="25",
+            topic=None,
+        )
+        save_observations(
+            session,
+            "Backfill",
+            "channel-backfill",
+            "Network",
+            "Hindi",
+            [observation],
+        )
+        assert session.query(Video).one().topic == "Politics"
