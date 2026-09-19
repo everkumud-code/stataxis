@@ -9,7 +9,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from collector.storage import Channel, ChannelStats, Observation, Video
-from metrics.persistence import IntelligenceSnapshotRecord
+from metrics.engine import ObservationPoint
+from metrics.pipeline import build_intelligence_snapshot
+from metrics.timeseries import compare_metric
 
 
 def _utc(value: datetime) -> datetime:
@@ -139,33 +141,53 @@ def channel_stx_trend(
     days: int = 30,
     as_of: datetime | None = None,
 ) -> dict[str, Any] | None:
+    """Compute one daily STX value from observations persisted for the channel."""
     channel = session.get(Channel, channel_id)
     if channel is None:
         return None
     now = _utc(as_of or datetime.now(UTC))
     days = max(1, min(int(days), 365))
     start = (now - timedelta(days=days - 1)).date()
-    records = session.execute(
-        select(IntelligenceSnapshotRecord.generated_at, IntelligenceSnapshotRecord.score, Video.id)
-        .join(Video, Video.id == IntelligenceSnapshotRecord.video_id)
-        .where(
-            Video.channel_id == channel_id,
-            IntelligenceSnapshotRecord.generated_at >= datetime.combine(start, datetime.min.time(), tzinfo=UTC),
-            IntelligenceSnapshotRecord.generated_at <= now,
-            IntelligenceSnapshotRecord.score.is_not(None),
-        )
-    ).all()
-    by_day: dict[date, list[float]] = {}
-    for generated_at, score, _video_id in records:
-        by_day.setdefault(_utc(generated_at).date(), []).append(float(score))
+    videos = session.scalars(select(Video).where(Video.channel_id == channel_id)).all()
     timeline = []
     for offset in range(days):
         day = start + timedelta(days=offset)
-        values = by_day.get(day)
+        cutoff = datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=UTC) - timedelta(microseconds=1)
+        scores = []
+        for video in videos:
+            rows = session.scalars(
+                select(Observation)
+                .where(Observation.video_id == video.id, Observation.observed_at <= cutoff)
+                .order_by(Observation.observed_at.desc(), Observation.id.desc())
+                .limit(25)
+            ).all()
+            if len(rows) < 2:
+                continue
+            ordered = list(reversed(rows))
+            points = [
+                ObservationPoint(
+                    observed_at=_utc(row.observed_at),
+                    view_count=row.view_count,
+                    concurrent_viewers=row.concurrent_viewers,
+                    like_count=row.like_count,
+                    comment_count=row.comment_count,
+                )
+                for row in ordered
+            ]
+            first, last = points[0], points[-1]
+            snapshot = build_intelligence_snapshot(
+                data=[video.title] if video.title else [],
+                observations=points,
+                audience_change=compare_metric(first.concurrent_viewers, last.concurrent_viewers),
+                growth_change=compare_metric(first.view_count, last.view_count),
+            )
+            score = snapshot.intelligence.index.score
+            if score is not None:
+                scores.append(float(score))
         timeline.append({
             "date": day.isoformat(),
-            "stx": round(sum(values) / len(values), 4) if values else None,
-            "reason": None if values else "insufficient stored observation-derived STX history",
+            "stx": round(sum(scores) / len(scores), 4) if scores else None,
+            "reason": None if scores else "insufficient stored observations for daily STX",
         })
     return {"channel_id": channel_id, "days": days, "timeline": timeline}
 
