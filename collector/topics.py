@@ -18,7 +18,7 @@ def assign_topic(title: str, keywords: dict[str, list[str]] | None = None) -> st
     """Assign the first configured matching topic; unmatched titles are Other."""
     value = (title or "").casefold()
     rules = keywords if keywords is not None else load_topic_keywords()
-    for topic in ("Politics", "Current Affairs", "Entertainment", "Sports", "Business"):
+    for topic in ("Politics", "Sports", "Entertainment", "Business", "Current Affairs"):
         if any(keyword in value for keyword in rules.get(topic, [])):
             return topic
     return "Other"
