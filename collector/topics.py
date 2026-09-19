@@ -19,7 +19,7 @@ def load_topic_keywords(path: Path | None = None) -> dict[str, list[str]]:
 
 def _keyword_matches(value: str, keyword: str) -> bool:
     if any("a" <= char <= "z" for char in keyword):
-        return re.search(rf"\\b{re.escape(keyword)}\\b", value) is not None
+        return re.search(rf"\b{re.escape(keyword)}\b", value) is not None
     return keyword in value
 
 
