@@ -122,6 +122,7 @@ def live_audience_window(session: Session, *, start_at: datetime, end_at: dateti
                 "observed_at": timestamp.isoformat(),
                 **averages,
                 "total_concurrent": sum(averages.values()),
+                "peak_concurrent": max((max(samples) for samples in values.values() if samples), default=0),
             })
         sample_resolution = "1-minute buckets"
     else:
