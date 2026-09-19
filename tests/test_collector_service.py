@@ -143,3 +143,82 @@ def test_poll_live_once_propagates_quota_errors_for_service_backoff(monkeypatch)
         assert exc.status_code == 429
     else:
         raise AssertionError("quota error was swallowed")
+
+
+def test_interval_seconds_uses_default_for_empty_or_whitespace(monkeypatch):
+    monkeypatch.setenv("COLLECT_SECONDS", "   ")
+    assert service.interval_seconds("COLLECT_SECONDS", 600, 60) == 600
+
+
+def test_run_service_one_iteration_runs_collection_and_live_poll(monkeypatch):
+    monkeypatch.setenv("COLLECT_SECONDS", "600")
+    monkeypatch.setenv("LIVE_POLL_SECONDS", "30")
+    engine = create_database("sqlite:///:memory:")
+    stop_event = Event()
+    calls = []
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+    def fake_collection(session, client, targets):
+        calls.append("collection")
+        return SimpleNamespace(
+            videos_observed=0,
+            intelligence=SimpleNamespace(snapshots_built=0, errors=0),
+        )
+
+    def fake_live(session, client, now=None):
+        calls.append("live")
+        stop_event.set()
+        return service.LivePollResult(0, 0, 0, 0, 0)
+
+    monkeypatch.setattr(service, "create_database", lambda url: engine)
+    monkeypatch.setattr(service, "load_targets", lambda path: [])
+    monkeypatch.setattr(service, "run_collection_pass", fake_collection)
+    monkeypatch.setattr(service, "poll_live_once", fake_live)
+    monkeypatch.setattr(service, "install_signal_handlers", lambda event: None)
+
+    service.run_service("sqlite:///:memory:", client_factory=FakeClient, stop_event=stop_event)
+
+    assert calls == ["collection", "live"]
+
+
+def test_service_logs_sanitized_exception(monkeypatch, caplog):
+    monkeypatch.setenv("COLLECT_SECONDS", "600")
+    monkeypatch.setenv("LIVE_POLL_SECONDS", "30")
+    stop_event = Event()
+    database_url = "postgresql+psycopg://user:password@db.example/stataxis"
+    api_key = "youtube-secret-key"
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+    def failing_collection(session, client, targets):
+        raise RuntimeError(
+            f"connect {database_url} key={api_key}"
+        )
+
+    monkeypatch.setenv("YOUTUBE_API_KEY", api_key)
+    monkeypatch.setattr(service, "create_database", lambda url: create_database("sqlite:///:memory:"))
+    monkeypatch.setattr(service, "load_targets", lambda path: [])
+    monkeypatch.setattr(service, "run_collection_pass", failing_collection)
+    monkeypatch.setattr(service, "poll_live_once", lambda *args, **kwargs: stop_event.set() or service.LivePollResult(0, 0, 0, 0, 0))
+    monkeypatch.setattr(service, "install_signal_handlers", lambda event: None)
+
+    with caplog.at_level("ERROR", logger="stataxis-service"):
+        service.run_service(database_url, client_factory=FakeClient, stop_event=stop_event)
+
+    message = "
+".join(record.getMessage() for record in caplog.records)
+    assert "RuntimeError" in message
+    assert "postgresql+psycopg://[REDACTED]@db.example/stataxis" in message
+    assert database_url not in message
+    assert api_key not in message
