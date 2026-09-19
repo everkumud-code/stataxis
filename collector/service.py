@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import signal
 import time
 from dataclasses import dataclass
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from collector.main import load_targets
 from collector.run import run_collection_pass
+from collector.run_once import _sanitize_error_message
 from collector.storage import Channel, Observation, Video, create_database, save_observations
 from collector.youtube.client import YouTubeAPIError, YouTubeClient
 from collector.youtube.collector import normalize_video
@@ -37,9 +39,11 @@ class LivePollResult:
 
 
 def interval_seconds(name: str, default: int, minimum: int) -> int:
-    raw = os.getenv(name, str(default))
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        raw = str(default)
     try:
-        value = int(raw)
+        value = int(raw.strip())
     except ValueError as exc:
         raise ValueError(f"{name} must be an integer") from exc
     if value < minimum:
@@ -155,6 +159,11 @@ def install_signal_handlers(stop_event: Event) -> None:
     signal.signal(signal.SIGINT, stop)
 
 
+def _log_loop_error(loop: str, exc: Exception, secrets: tuple[str | None, ...]) -> None:
+    message = _sanitize_error_message(str(exc), secrets)
+    logger.error("%s loop failed: %s: %s", loop, type(exc).__name__, message)
+
+
 def run_service(
     database_url: str,
     *,
@@ -167,6 +176,7 @@ def run_service(
     engine = create_database(database_url)
     stop = stop_event or Event()
     install_signal_handlers(stop)
+    secrets = (database_url, os.getenv("YOUTUBE_API_KEY"))
 
     next_collect = time.monotonic()
     next_live = next_collect
@@ -194,9 +204,11 @@ def run_service(
                 except YouTubeAPIError as exc:
                     collect_quota_attempt += 1
                     delay = quota_backoff_seconds(collect_quota_attempt) if exc.status_code in {403, 429} else collect_seconds
+                    _log_loop_error("collection", exc, secrets)
                     logger.info("collection counts channels=0 videos=0 snapshots=0 errors=1")
                     next_collect = now + delay
-                except Exception:
+                except Exception as exc:
+                    _log_loop_error("collection", exc, secrets)
                     logger.info("collection counts channels=0 videos=0 snapshots=0 errors=1")
                     next_collect = now + collect_seconds
 
@@ -217,9 +229,11 @@ def run_service(
                 except YouTubeAPIError as exc:
                     live_quota_attempt += 1
                     delay = quota_backoff_seconds(live_quota_attempt) if exc.status_code in {403, 429} else live_poll_seconds
+                    _log_loop_error("live", exc, secrets)
                     logger.info("live poll counts candidates=0 batches=0 saved=0 ended=0 errors=1")
                     next_live = now + delay
-                except Exception:
+                except Exception as exc:
+                    _log_loop_error("live", exc, secrets)
                     logger.info("live poll counts candidates=0 batches=0 saved=0 ended=0 errors=1")
                     next_live = now + live_poll_seconds
 
@@ -231,7 +245,7 @@ def run_service(
 
 def main() -> int:
     database_url = os.getenv("DATABASE_URL")
-    if not database_url:
+    if not database_url or not database_url.strip():
         raise ValueError("DATABASE_URL is not configured")
     run_service(database_url)
     return 0
