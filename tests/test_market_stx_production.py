@@ -38,7 +38,7 @@ def test_market_stx_uses_persisted_history_and_exposes_evidence():
     assert 0 < result[1]["available_signals"] <= 7
     assert result[1]["confidence"] > 0
     assert "audience" in result[1]["components"]
-    assert "anomaly_event" in result[1]["components"]
+    assert "momentum" in result[1]["components"]
 
 
 def test_market_stx_does_not_invent_score_without_observations():

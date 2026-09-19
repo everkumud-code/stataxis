@@ -290,7 +290,7 @@ def _query_datetime(query: dict[str, list[str]], key: str) -> datetime | None:
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00").replace(" ", "+"))
     except ValueError as exc:
-        raise ValueError(f"{key} must be a valid ISO-8601 datetime") from exc
+        raise ValueError(f"{key} must be an ISO datetime") from exc
 
 
 def _json_response(start_response: Callable[..., Any], status: int, payload: dict[str, Any]):
