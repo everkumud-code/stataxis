@@ -103,7 +103,10 @@ class PackageConfig(Base):
 
 
 def create_database(url: str):
-    engine = create_engine(url, future=True)
+    if url.startswith("sqlite:"):
+        engine = create_engine(url, future=True)
+    else:
+        engine = create_engine(url, future=True, pool_pre_ping=True, pool_recycle=240)
     Base.metadata.create_all(engine)
     with engine.begin() as connection:
         columns = {item["name"] for item in inspect(connection).get_columns("stx_users")}

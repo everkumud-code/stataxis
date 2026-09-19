@@ -53,6 +53,7 @@ def run_collection_pass(
                 network=target.network,
                 language=target.language,
                 observations=observations,
+                region=target.region,
             )
             videos_observed += len({item.video_id for item in observations})
             if saved < 0:  # pragma: no cover - defensive invariant guard
