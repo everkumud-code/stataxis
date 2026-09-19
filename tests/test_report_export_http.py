@@ -101,7 +101,7 @@ def test_report_export_returns_xlsx_for_premium_plan(monkeypatch):
         {
             "REQUEST_METHOD": "GET",
             "PATH_INFO": "/api/v1/reports/export",
-            "QUERY_STRING": "language=Hindi&region=North%20India&classification=VOD",
+            "QUERY_STRING": "start=2026-09-01T00:00:00%2B00:00&end=2026-09-02T00:00:00%2B00:00&language=Hindi&region=North%20India&classification=VOD",
             "HTTP_AUTHORIZATION": "Bearer test",
         },
     )
