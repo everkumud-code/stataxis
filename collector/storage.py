@@ -8,6 +8,7 @@ from decimal import Decimal
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
+from collector.topics import assign_topic
 from collector.youtube.collector import VideoObservation
 
 
@@ -206,7 +207,7 @@ def save_observations(
             video = Video(
                 youtube_video_id=item.video_id, channel_id=channel.id, title=item.title,
                 published_at=item.published_at, thumbnail_url=item.thumbnail_url,
-                category_id=item.category_id, topic=item.topic,
+                category_id=item.category_id, topic=item.topic or assign_topic(item.title),
             )
             session.add(video)
             session.flush()
@@ -215,7 +216,8 @@ def save_observations(
             video.published_at = item.published_at
             video.thumbnail_url = item.thumbnail_url
             video.category_id = item.category_id
-            video.topic = item.topic
+            if video.topic is None:
+                video.topic = item.topic or assign_topic(video.title)
         if session.query(Observation.id).filter_by(video_id=video.id, observed_at=item.observed_at).first() is not None:
             continue
         session.add(Observation(video_id=video.id, channel_id=channel.id, observed_at=item.observed_at, view_count=item.view_count, like_count=item.like_count, comment_count=item.comment_count, concurrent_viewers=item.concurrent_viewers, is_live=item.is_live, classification=item.classification))
