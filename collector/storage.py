@@ -24,6 +24,8 @@ class Channel(Base):
     language: Mapped[str] = mapped_column(String(100), default="unknown")
     region: Mapped[str] = mapped_column(String(100), default="unknown", index=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    handle: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
 class ChannelLanguageOverride(Base):
@@ -42,6 +44,20 @@ class Video(Base):
     channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
     title: Mapped[str] = mapped_column(Text)
     published_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    thumbnail_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    category_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    topic: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class ChannelStats(Base):
+    __tablename__ = "stx_channel_stats"
+    __table_args__ = (UniqueConstraint("channel_id", "observed_at", name="uq_stx_channel_stats_channel_timestamp"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    subscribers: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_views: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    video_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class Observation(Base):
@@ -124,6 +140,14 @@ def create_database(url: str):
             if name not in columns:
                 connection.execute(text(f"ALTER TABLE stx_users ADD COLUMN {name} {definition}"))
         connection.execute(text("UPDATE stx_users SET approval_status='approved' WHERE approval_status IS NULL"))
+        channel_columns = {item["name"] for item in inspect(connection).get_columns("stx_channels")}
+        for name, definition in {"avatar_url": "VARCHAR(1000)", "handle": "VARCHAR(255)"}.items():
+            if name not in channel_columns:
+                connection.execute(text(f"ALTER TABLE stx_channels ADD COLUMN {name} {definition}"))
+        video_columns = {item["name"] for item in inspect(connection).get_columns("stx_videos")}
+        for name, definition in {"thumbnail_url": "VARCHAR(1000)", "category_id": "VARCHAR(32)", "topic": "VARCHAR(64)"}.items():
+            if name not in video_columns:
+                connection.execute(text(f"ALTER TABLE stx_videos ADD COLUMN {name} {definition}"))
     return engine
 
 
@@ -154,12 +178,19 @@ def save_observations(session: Session, channel_name: str, channel_youtube_id: s
         seen.add(key)
         video = session.query(Video).filter_by(youtube_video_id=item.video_id).one_or_none()
         if video is None:
-            video = Video(youtube_video_id=item.video_id, channel_id=channel.id, title=item.title, published_at=item.published_at)
+            video = Video(
+                youtube_video_id=item.video_id, channel_id=channel.id, title=item.title,
+                published_at=item.published_at, thumbnail_url=item.thumbnail_url,
+                category_id=item.category_id, topic=item.topic,
+            )
             session.add(video)
             session.flush()
         else:
             video.title = item.title
             video.published_at = item.published_at
+            video.thumbnail_url = item.thumbnail_url
+            video.category_id = item.category_id
+            video.topic = item.topic
         if session.query(Observation.id).filter_by(video_id=video.id, observed_at=item.observed_at).first() is not None:
             continue
         session.add(Observation(video_id=video.id, channel_id=channel.id, observed_at=item.observed_at, view_count=item.view_count, like_count=item.like_count, comment_count=item.comment_count, concurrent_viewers=item.concurrent_viewers, is_live=item.is_live, classification=item.classification))
