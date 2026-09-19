@@ -1,8 +1,6 @@
 name: StatAxis Scheduled Collection
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
