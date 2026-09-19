@@ -23,6 +23,9 @@ def test_quota_error_keeps_api_reason_without_credentials(monkeypatch) -> None:
                 request=httpx.Request("GET", url, params=params),
             )
 
+        def close(self):
+            return None
+
     monkeypatch.setattr(youtube_client, "DEFAULT_BUDGET", FakeBudget())
     client = youtube_client.YouTubeClient(api_key="private-key")
     client.client = FakeHTTPClient()
