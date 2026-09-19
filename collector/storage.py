@@ -137,7 +137,7 @@ def save_observations(session: Session, channel_name: str, channel_youtube_id: s
         session.flush()
     else:
         override = session.query(ChannelLanguageOverride).filter_by(channel_id=channel.id).one_or_none()
-        channel.language = override.language if override is not None else language
+        channel.language = override.language if override is not None else (language if language and language.strip().lower() != "unknown" else channel.language)
         if region is not None:
             channel.region = region
     saved = 0
