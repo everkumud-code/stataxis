@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from collector.classification import VideoClassification
-from collector.storage import Base, save_observations
+from collector.storage import Base, Channel, ChannelLanguageOverride, save_observations
 from collector.youtube.collector import VideoObservation
 
 
@@ -115,6 +115,15 @@ def test_save_observations_does_not_overwrite_curated_region_when_region_is_omit
         save_observations(
             session, "Collector Name", "channel-curated", "youtube", "unknown", [observation],
         )
-        from collector.storage import Channel
         channel = session.query(Channel).filter_by(youtube_channel_id="channel-curated").one()
         assert channel.region == "Jharkhand"
+        assert channel.language == "Hindi"
+
+        override = ChannelLanguageOverride(channel_id=channel.id, language="Bhojpuri")
+        session.add(override)
+        session.commit()
+        save_observations(
+            session, "Collector Name", "channel-curated", "youtube", "English", [observation],
+        )
+        session.refresh(channel)
+        assert channel.language == "Bhojpuri"
