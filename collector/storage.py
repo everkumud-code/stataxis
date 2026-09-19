@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, create_engine, inspect, text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from collector.topics import assign_topic
@@ -56,9 +56,9 @@ class ChannelStats(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    subscribers: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    total_views: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    video_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    subscribers: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    total_views: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    video_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
 
 class Observation(Base):
@@ -214,10 +214,14 @@ def save_observations(
         else:
             video.title = item.title
             video.published_at = item.published_at
-            video.thumbnail_url = item.thumbnail_url
-            video.category_id = item.category_id
-            if video.topic is None:
-                video.topic = item.topic or assign_topic(video.title)
+            if item.thumbnail_url is not None:
+                video.thumbnail_url = item.thumbnail_url
+            if item.category_id is not None:
+                video.category_id = item.category_id
+            if item.topic is not None:
+                video.topic = item.topic
+            elif video.topic is None:
+                video.topic = assign_topic(video.title)
         if session.query(Observation.id).filter_by(video_id=video.id, observed_at=item.observed_at).first() is not None:
             continue
         session.add(Observation(video_id=video.id, channel_id=channel.id, observed_at=item.observed_at, view_count=item.view_count, like_count=item.like_count, comment_count=item.comment_count, concurrent_viewers=item.concurrent_viewers, is_live=item.is_live, classification=item.classification))
