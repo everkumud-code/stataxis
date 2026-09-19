@@ -182,7 +182,7 @@ def export_for_role(session: Session, role: UserRole | SXPlan | str, filters: Ob
     return export_observations_xlsx(session, filters)
 
 
-def export_response(session: Session, role: UserRole | str, filters: ObservationExportFilters) -> tuple[int, dict[str, str], bytes]:
+def export_response(session: Session, role: UserRole | SXPlan | str, filters: ObservationExportFilters) -> tuple[int, dict[str, str], bytes]:
     """Return an HTTP-ready report response with server-side role enforcement."""
     try:
         payload = export_for_role(session, role, filters)
