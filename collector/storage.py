@@ -158,7 +158,19 @@ def effective_channel_language(session: Session, channel: Channel, fallback: str
     return channel.language or fallback
 
 
-def save_observations(session: Session, channel_name: str, channel_youtube_id: str, network: str, language: str, observations: list[VideoObservation], region: str | None = None) -> int:
+def save_observations(
+    session: Session,
+    channel_name: str,
+    channel_youtube_id: str,
+    network: str,
+    language: str,
+    observations: list[VideoObservation],
+    region: str | None = None,
+    *,
+    avatar_url: str | None = None,
+    handle: str | None = None,
+    channel_stats: tuple[datetime, int | None, int | None, int | None] | None = None,
+) -> int:
     channel = session.query(Channel).filter_by(youtube_channel_id=channel_youtube_id).one_or_none()
     if channel is None:
         channel = Channel(youtube_channel_id=channel_youtube_id, name=channel_name, network=network, language=language, region=region or "unknown")
@@ -169,6 +181,19 @@ def save_observations(session: Session, channel_name: str, channel_youtube_id: s
         channel.language = override.language if override is not None else (language if language and language.strip().lower() != "unknown" else channel.language)
         if region is not None:
             channel.region = region
+    if avatar_url is not None:
+        channel.avatar_url = avatar_url
+    if handle is not None:
+        channel.handle = handle
+    if channel_stats is not None:
+        observed_at, subscribers, total_views, video_count = channel_stats
+        session.add(ChannelStats(
+            channel_id=channel.id,
+            observed_at=observed_at,
+            subscribers=subscribers,
+            total_views=total_views,
+            video_count=video_count,
+        ))
     saved = 0
     seen: set[tuple[str, datetime]] = set()
     for item in observations:
