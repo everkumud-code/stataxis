@@ -35,8 +35,8 @@ def get_channel_stx_trend(session: Session, channel_id: int, days: str) -> tuple
         value = int(days)
     except ValueError:
         return 400, {"error": "days must be an integer"}
-    if value < 1 or value > 365:
-        return 400, {"error": "days must be between 1 and 365"}
+    if value < 1 or value > 90:
+        return 400, {"error": "days must be between 1 and 90"}
     payload = channel_stx_trend(session, channel_id, days=value)
     return (404, {"error": "channel not found"}) if payload is None else (200, payload)
 
