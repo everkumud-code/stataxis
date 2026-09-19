@@ -12,17 +12,30 @@ class QuotaGuardError(RuntimeError):
     """Raised when the collector cannot safely issue another request."""
 
 
+def _env_positive_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        raw = str(default)
+    try:
+        value = int(raw.strip())
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer") from exc
+    if value <= 0:
+        raise ValueError(f"{name} must be positive")
+    return value
+
+
 class RequestBudget:
     """Bound API request rate and daily request budget for one worker."""
 
     def __init__(self, *, per_minute: int | None = None, daily: int | None = None) -> None:
         self.per_minute = (
-            int(os.getenv("STAXIS_YOUTUBE_REQUESTS_PER_MINUTE", "60"))
+            _env_positive_int("STAXIS_YOUTUBE_REQUESTS_PER_MINUTE", 60)
             if per_minute is None
             else per_minute
         )
         self.daily = (
-            int(os.getenv("STAXIS_YOUTUBE_REQUESTS_PER_DAY", "9000"))
+            _env_positive_int("STAXIS_YOUTUBE_REQUESTS_PER_DAY", 9000)
             if daily is None
             else daily
         )
