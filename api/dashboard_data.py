@@ -141,29 +141,68 @@ def channel_stx_trend(
     days: int = 30,
     as_of: datetime | None = None,
 ) -> dict[str, Any] | None:
-    """Compute one daily STX value from observations persisted for the channel."""
+    """Return daily STX from stored observations only.
+
+    Each day uses the trailing 24-hour window ending at that day's end. All
+    observations for the requested range plus a 24-hour lookback are fetched
+    in one query, then grouped in memory by video and day. A video contributes
+    only when it has at least two observations in that day's window.
+    """
     channel = session.get(Channel, channel_id)
     if channel is None:
         return None
+    days = int(days)
+    if days > 90:
+        raise ValueError("days must be between 1 and 90")
+    days = max(1, days)
     now = _utc(as_of or datetime.now(UTC))
-    days = max(1, min(int(days), 365))
-    start = (now - timedelta(days=days - 1)).date()
-    videos = session.scalars(select(Video).where(Video.channel_id == channel_id)).all()
+    end_day = now.date()
+    start_day = end_day - timedelta(days=days - 1)
+    first_window_start = datetime.combine(start_day, datetime.min.time(), tzinfo=UTC)
+    query_end = datetime.combine(end_day + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
+    rows = session.scalars(
+        select(Observation)
+        .where(
+            Observation.channel_id == channel_id,
+            Observation.observed_at >= first_window_start,
+            Observation.observed_at < query_end,
+        )
+        .order_by(Observation.observed_at, Observation.id)
+    ).all()
+
+    grouped: dict[tuple[date, int], list[Observation]] = {}
+    for row in rows:
+        observed_at = _utc(row.observed_at)
+        day = observed_at.date()
+        grouped.setdefault((day, row.video_id), []).append(row)
+
+    video_ids = {row.video_id for row in rows}
+    videos = {
+        video.id: video
+        for video in session.scalars(select(Video).where(Video.id.in_(video_ids))).all()
+    } if video_ids else {}
+
     timeline = []
     for offset in range(days):
-        day = start + timedelta(days=offset)
-        cutoff = datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=UTC) - timedelta(microseconds=1)
+        day = start_day + timedelta(days=offset)
+        day_end = datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
+        window_start = day_end - timedelta(days=1)
         scores = []
-        for video in videos:
-            rows = session.scalars(
-                select(Observation)
-                .where(Observation.video_id == video.id, Observation.observed_at <= cutoff)
-                .order_by(Observation.observed_at.desc(), Observation.id.desc())
-                .limit(25)
-            ).all()
-            if len(rows) < 2:
+        video_rows: dict[int, list[Observation]] = {}
+        for (row_day, video_id), observations in grouped.items():
+            if row_day == day or (day == start_day and row_day == window_start.date()):
+                video_rows.setdefault(video_id, []).extend(observations)
+
+        for video_id, observations in video_rows.items():
+            observations = [
+                row for row in observations
+                if window_start <= _utc(row.observed_at) < day_end
+            ]
+            if len(observations) < 2:
                 continue
-            ordered = list(reversed(rows))
+            video = videos.get(video_id)
+            if video is None:
+                continue
             points = [
                 ObservationPoint(
                     observed_at=_utc(row.observed_at),
@@ -172,7 +211,7 @@ def channel_stx_trend(
                     like_count=row.like_count,
                     comment_count=row.comment_count,
                 )
-                for row in ordered
+                for row in observations
             ]
             first, last = points[0], points[-1]
             snapshot = build_intelligence_snapshot(
@@ -189,8 +228,12 @@ def channel_stx_trend(
             "stx": round(sum(scores) / len(scores), 4) if scores else None,
             "reason": None if scores else "insufficient stored observations for daily STX",
         })
-    return {"channel_id": channel_id, "days": days, "timeline": timeline}
-
+    return {
+        "channel_id": channel_id,
+        "days": days,
+        "definition": "Daily STX uses each day's trailing 24-hour window ending at day end; only videos with at least two stored observations in that window contribute, and days without usable data return null with a reason.",
+        "timeline": timeline,
+    }
 
 def market_topic_distribution(
     session: Session,
