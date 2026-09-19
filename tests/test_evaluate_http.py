@@ -1,6 +1,5 @@
-class _Session:
-    def close(self):
-        pass
+import io
+import json
 
 import io
 import json
