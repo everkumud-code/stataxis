@@ -288,10 +288,7 @@ def _query_datetime(query: dict[str, list[str]], key: str) -> datetime | None:
     if not value:
         return None
     try:
-        value = value.replace("Z", "+00:00")
-        if len(value) >= 6 and value[-6] == " " and value[-5:-3].isdigit() and value[-2:].isdigit() and value[-3] == ":":
-            value = f"{value[:-6]}+{value[-5:]}"
-        return datetime.fromisoformat(value)
+        return datetime.fromisoformat(value.replace("Z", "+00:00").replace(" ", "+"))
     except ValueError as exc:
         raise ValueError(f"{key} must be an ISO datetime") from exc
 
