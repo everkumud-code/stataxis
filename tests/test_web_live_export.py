@@ -2,6 +2,7 @@ import io
 import json
 
 import web
+from api.errors import AuthenticationError, AuthorizationError
 from api.live_http import live_application
 
 
@@ -53,7 +54,7 @@ def test_web_routes_live_export_and_live_paths_exactly(monkeypatch):
 
 def test_live_export_no_token_is_401(monkeypatch):
     def fake_auth(_authorization):
-        raise PermissionError("authentication required")
+        raise AuthenticationError("authentication required")
 
     monkeypatch.setattr("api.live_http.authenticate", fake_auth)
     app = live_application(lambda: _Session())
@@ -67,7 +68,7 @@ def test_live_export_free_plan_is_403(monkeypatch):
     monkeypatch.setattr("api.live_http.authenticate", lambda _authorization: object())
 
     def deny(_policy, _capability):
-        raise PermissionError("premium access required")
+        raise AuthorizationError("premium access required")
 
     monkeypatch.setattr("api.live_http.policy_for_identity", lambda _identity: object())
     monkeypatch.setattr("api.live_http.require_capability", deny)
