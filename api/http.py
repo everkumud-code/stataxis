@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Callable
 from urllib.parse import parse_qs
 
@@ -343,7 +343,7 @@ def _export_filters_from_query(query: dict[str, list[str]]) -> ObservationExport
         raise ValueError("start and end dates are required for report export")
     if end_at < start_at:
         raise ValueError("end date must be on or after start date")
-    if end_at - start_at > __import__("datetime").timedelta(days=92):
+    if end_at - start_at > timedelta(days=92):
         raise ValueError("report export date range cannot exceed 92 days")
     return ObservationExportFilters(
         start_at=start_at,
