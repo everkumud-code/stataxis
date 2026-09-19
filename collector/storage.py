@@ -103,6 +103,8 @@ class PackageConfig(Base):
 
 
 def create_database(url: str):
+    if url.startswith(("postgres://", "postgresql://")):
+        url = "postgresql+psycopg://" + url.split("://", 1)[1]
     if url.startswith("sqlite:"):
         engine = create_engine(url, future=True)
     else:

@@ -53,3 +53,26 @@ def test_run_once_returns_zero_and_logs_counts(monkeypatch, caplog):
     assert "collection cycle complete" in caplog.text
     assert "run_id=7" in caplog.text
     assert "secret-key" not in caplog.text
+
+
+def test_run_once_sanitizes_failure_message_and_credentials(monkeypatch, caplog):
+    caplog.set_level("INFO", logger="stx-collector-once")
+    database_url = "postgresql://env-user:env-password@example.invalid/db"
+    api_key = "secret-api-key"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    monkeypatch.setenv("YOUTUBE_API_KEY", api_key)
+
+    def fail(_url):
+        raise RuntimeError(
+            "request failed for https://user:password@example.invalid/path "
+            "with api key secret-api-key"
+        )
+
+    monkeypatch.setattr(run_once, "create_database", fail)
+
+    assert run_once.main() == 1
+    assert "RuntimeError" in caplog.text
+    assert "https://[REDACTED]@example.invalid/path" in caplog.text
+    assert "env-password" not in caplog.text
+    assert "secret-api-key" not in caplog.text
+    assert "user:password" not in caplog.text
