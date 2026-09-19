@@ -56,7 +56,7 @@ def channel_overview(
     now = _utc(as_of or datetime.now(UTC))
     window_start = now - timedelta(days=max(1, min(window_days, 365)))
     current = _latest_stats(session, channel_id, now)
-    baseline = _latest_stats(session, channel_id, now - timedelta(days=30))
+    baseline = _latest_stats(session, channel_id, window_start)
     latest_videos = _latest_observations(session, channel_id)
     video_ids = [row.video_id for row in latest_videos]
     videos = {video.id: video for video in session.scalars(select(Video).where(Video.id.in_(video_ids))).all()} if video_ids else {}
@@ -107,6 +107,13 @@ def channel_overview(
     else:
         change_reason = "insufficient 30-day channel statistics history"
 
+    upload_change = None
+    upload_change_reason = None
+    if current is not None and baseline is not None and current.video_count is not None and baseline.video_count is not None:
+        upload_change = max(0, current.video_count - baseline.video_count)
+    else:
+        upload_change_reason = "insufficient channel statistics history"
+
     total_view_change = None
     total_view_change_reason = None
     if current is not None and baseline is not None and current.total_views is not None and baseline.total_views is not None:
@@ -127,10 +134,12 @@ def channel_overview(
         "total_views": _reasoned(current.total_views if current else None, "no stored channel statistics" if current is None else None),
         "total_views_change_30d": _reasoned(total_view_change, total_view_change_reason),
         "video_count": _reasoned(current.video_count if current else None, "no stored channel statistics" if current is None else None),
-        "uploads_in_window": _reasoned(len(published), None if published else "no stored uploads in window"),
+        "uploads_in_window": _reasoned(upload_change, upload_change_reason),
+        "observed_uploads_in_window": _reasoned(len(published), "collection only tracks the latest videos"),
         "average_views_per_video": _reasoned(avg_views, None if avg_views is not None else "no stored view observations"),
         "engagement_rate": _reasoned(engagement_rate, None if engagement_rate is not None else "insufficient stored likes/comments/views"),
-        "current_language_market_rank": _reasoned(rank, rank_reason),
+        "subscribers_rank_in_language": _reasoned(rank, rank_reason),
+        "rank_basis": "subscribers",
     }
 
 
