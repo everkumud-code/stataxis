@@ -127,3 +127,46 @@ def test_save_observations_does_not_overwrite_curated_region_when_region_is_omit
         )
         session.refresh(channel)
         assert channel.language == "Bhojpuri"
+
+
+def _stub_database_dependencies(monkeypatch):
+    from unittest.mock import MagicMock
+    import collector.storage as storage
+
+    calls = []
+    engine = MagicMock()
+    connection = MagicMock()
+    engine.begin.return_value.__enter__.return_value = connection
+
+    def fake_create_engine(*args, **kwargs):
+        calls.append((args, kwargs))
+        return engine
+
+    monkeypatch.setattr(storage, "create_engine", fake_create_engine)
+    monkeypatch.setattr(storage.Base.metadata, "create_all", lambda _engine: None)
+    monkeypatch.setattr(storage, "inspect", lambda _connection: MagicMock(get_columns=lambda _table: [
+        {"name": name} for name in (
+            "approval_status", "full_name", "mobile", "organization",
+            "purpose_of_use", "requested_plan",
+        )
+    ]))
+    return storage, calls
+
+
+def test_create_database_uses_connection_health_options_for_postgres(monkeypatch) -> None:
+    storage, calls = _stub_database_dependencies(monkeypatch)
+
+    storage.create_database("postgresql://user:pass@host/db")
+
+    assert calls == [(
+        ("postgresql://user:pass@host/db",),
+        {"future": True, "pool_pre_ping": True, "pool_recycle": 240},
+    )]
+
+
+def test_create_database_keeps_sqlite_engine_options_unchanged(monkeypatch) -> None:
+    storage, calls = _stub_database_dependencies(monkeypatch)
+
+    storage.create_database("sqlite:///:memory:")
+
+    assert calls == [(("sqlite:///:memory:",), {"future": True})]
