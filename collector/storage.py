@@ -119,6 +119,24 @@ class PackageConfig(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
 
+def _add_column_if_missing(connection, table: str, name: str, definition: str, known_columns: set[str]) -> None:
+    if name in known_columns:
+        return
+    dialect = connection.dialect.name
+    statement = (
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {name} {definition}"
+        if dialect == "postgresql"
+        else f"ALTER TABLE {table} ADD COLUMN {name} {definition}"
+    )
+    try:
+        connection.execute(text(statement))
+    except Exception as exc:
+        message = str(exc).lower()
+        duplicate_column = "duplicate column" in message or "duplicate_column" in message
+        if dialect == "postgresql" or not duplicate_column:
+            raise
+
+
 def create_database(url: str):
     if url.startswith(("postgres://", "postgresql://")):
         url = "postgresql+psycopg://" + url.split("://", 1)[1]
@@ -138,17 +156,14 @@ def create_database(url: str):
             "requested_plan": "VARCHAR(32)",
         }
         for name, definition in additions.items():
-            if name not in columns:
-                connection.execute(text(f"ALTER TABLE stx_users ADD COLUMN {name} {definition}"))
+            _add_column_if_missing(connection, "stx_users", name, definition, columns)
         connection.execute(text("UPDATE stx_users SET approval_status='approved' WHERE approval_status IS NULL"))
         channel_columns = {item["name"] for item in inspect(connection).get_columns("stx_channels")}
         for name, definition in {"avatar_url": "VARCHAR(1000)", "handle": "VARCHAR(255)"}.items():
-            if name not in channel_columns:
-                connection.execute(text(f"ALTER TABLE stx_channels ADD COLUMN {name} {definition}"))
+            _add_column_if_missing(connection, "stx_channels", name, definition, channel_columns)
         video_columns = {item["name"] for item in inspect(connection).get_columns("stx_videos")}
         for name, definition in {"thumbnail_url": "VARCHAR(1000)", "category_id": "VARCHAR(32)", "topic": "VARCHAR(64)"}.items():
-            if name not in video_columns:
-                connection.execute(text(f"ALTER TABLE stx_videos ADD COLUMN {name} {definition}"))
+            _add_column_if_missing(connection, "stx_videos", name, definition, video_columns)
     return engine
 
 
