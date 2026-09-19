@@ -20,6 +20,10 @@ load_dotenv(PROJECT_ROOT / ".env")
 class YouTubeAPIError(RuntimeError):
     """Raised when YouTube returns an unsuccessful API response."""
 
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
 
 class YouTubeClient:
     """HTTP client with bounded request rate and request budget."""
@@ -48,11 +52,17 @@ class YouTubeClient:
             f"{BASE_URL}/{resource}",
             params={**params, "key": self.api_key},
         )
-        if response.status_code == 429:
-            raise YouTubeAPIError("YouTube request temporarily rate limited")
+        if response.status_code in {403, 429}:
+            raise YouTubeAPIError(
+                "YouTube API quota/rate limit response",
+                status_code=response.status_code,
+            )
         if response.is_error:
             detail = response.text[:1000]
-            raise YouTubeAPIError(f"YouTube API {response.status_code} for {resource}: {detail}")
+            raise YouTubeAPIError(
+                f"YouTube API {response.status_code} for {resource}: {detail}",
+                status_code=response.status_code,
+            )
         return response.json()
 
     def get_channel(self, channel_id: str) -> dict[str, Any]:
@@ -119,6 +129,22 @@ class YouTubeClient:
             "videos",
             {
                 "part": "snippet,contentDetails,statistics,liveStreamingDetails",
+                "id": ",".join(video_ids),
+            },
+        )
+        return data.get("items", [])
+
+
+    def get_live_videos(self, video_ids: list[str]) -> list[dict[str, Any]]:
+        """Fetch live-streaming details and statistics for up to 50 videos."""
+        if not video_ids:
+            return []
+        if len(video_ids) > 50:
+            raise ValueError("get_live_videos accepts at most 50 video IDs")
+        data = self._get(
+            "videos",
+            {
+                "part": "liveStreamingDetails,statistics",
                 "id": ",".join(video_ids),
             },
         )
