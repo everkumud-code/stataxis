@@ -20,7 +20,7 @@ services:
     name: stataxis-collector
     runtime: python
     buildCommand: pip install -e .
-    startCommand: python -m collector.worker
+    startCommand: python -m collector.service
     envVars:
       - key: DATABASE_URL
         sync: false
@@ -34,3 +34,7 @@ services:
         value: "60"
       - key: STAXIS_YOUTUBE_REQUESTS_PER_DAY
         value: "9000"
+      - key: COLLECT_SECONDS
+        value: "600"
+      - key: LIVE_POLL_SECONDS
+        value: "30"
