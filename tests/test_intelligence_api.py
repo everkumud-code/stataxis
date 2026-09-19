@@ -20,11 +20,11 @@ def test_latest_video_intelligence_returns_newest_explainable_snapshot():
         base = dict(
             video_id=video.id,
             score=42.0,
-            confidence=0.8,
+            confidence=80.0,
             available_signals=3,
             view_json=json.dumps({
                 "score": 42.0,
-                "confidence": 0.8,
+                "confidence": 80.0,
                 "signals": [],
                 "data": ["Observed audience movement."],
                 "analysis": ["Momentum is positive."],
@@ -40,7 +40,7 @@ def test_latest_video_intelligence_returns_newest_explainable_snapshot():
         result = latest_video_intelligence(session, video.id)
         assert result["score"] == 55.0
         assert result["youtube_video_id"] == "video-api"
-        assert result["stx_index"] == {"score": 55.0, "confidence": 0.8, "available_signals": 3}
+        assert result["stx_index"] == {"score": 55.0, "confidence": 80.0, "available_signals": 3}
         assert result["data"] == ["Observed audience movement."]
         assert result["analysis"] == ["Momentum is positive."]
         assert result["view"] == "The available evidence supports a positive directional signal."
