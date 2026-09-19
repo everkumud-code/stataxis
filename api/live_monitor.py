@@ -67,6 +67,7 @@ def live_audience_window(session: Session, *, start_at: datetime, end_at: dateti
 
     groups = {"Hindi": [], "English": [], "Regional": [], "Unknown": []}
     timeline_samples: dict[datetime, dict[str, list[int]]] = {}
+    raw_bucket_samples: dict[datetime, dict[datetime, int]] = {}
     channel_latest: dict[int, tuple[Observation, Channel]] = {}
     channel_peaks: dict[int, int] = {}
     bucketed = end_at - start_at > timedelta(hours=2)
@@ -80,14 +81,17 @@ def live_audience_window(session: Session, *, start_at: datetime, end_at: dateti
         bucket = timeline_samples.setdefault(timestamp, {name: [] for name in groups})
         viewers = int(observation.concurrent_viewers or 0)
         bucket[group].append(viewers)
+        raw_samples = raw_bucket_samples.setdefault(timestamp, {})
+        raw_timestamp = _utc(observation.observed_at).replace(microsecond=0)
+        raw_samples[raw_timestamp] = raw_samples.get(raw_timestamp, 0) + viewers
         current = channel_latest.get(channel.id)
         if current is None or _utc(observation.observed_at) >= _utc(current[0].observed_at):
             channel_latest[channel.id] = (observation, channel)
         channel_peaks[channel.id] = max(channel_peaks.get(channel.id, 0), viewers)
 
     raw_timeline_totals = [
-        sum(max(samples) for samples in bucket.values() if samples)
-        for bucket in timeline_samples.values()
+        max(samples.values()) if samples else 0
+        for samples in raw_bucket_samples.values()
     ]
 
     summaries: dict[str, dict[str, Any]] = {}
