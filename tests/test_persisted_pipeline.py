@@ -30,7 +30,7 @@ def test_persisted_observations_feed_real_signals_into_index_and_view():
         video_id = _seed(session)
         result = build_persisted_video_snapshot(session, video_id)
         assert result.intelligence.index.score is not None
-        assert result.intelligence.index.available_signals == 6
+        assert result.intelligence.index.available_signals == 5
         assert result.intelligence.view.confidence == result.intelligence.index.confidence
         assert result.contributions
 

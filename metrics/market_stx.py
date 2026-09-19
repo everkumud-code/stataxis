@@ -68,7 +68,10 @@ def _view_delta(rows: list[dict[str, Any]]) -> float | None:
     """Aggregate per-video view deltas; never subtract unrelated videos."""
     by_video: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
-        by_video[int(row["video_id"])].append(row)
+        video_id = row.get("video_id")
+        if video_id is None:
+            return None
+        by_video[int(video_id)].append(row)
     total = 0.0
     seen = False
     for video_rows in by_video.values():
