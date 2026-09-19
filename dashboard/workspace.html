@@ -91,6 +91,15 @@ input::placeholder{color:#59738a}
 .state h3{margin:0 0 6px}
 .state p{margin:0 0 10px;color:var(--muted);max-width:70ch}
 .err{border-color:#7c3039}
+
+.chart{position:relative;touch-action:pan-y}
+.chart:focus-visible{outline:2px solid var(--gold);outline-offset:4px;border-radius:6px}
+.chart svg{cursor:crosshair}
+.spark .cx{stroke:var(--gold);stroke-width:1;stroke-dasharray:4 4}
+.spark .cd{fill:var(--gold);stroke:#061322;stroke-width:2}
+.tip{position:absolute;pointer-events:none;z-index:6;min-width:170px;max-width:260px;background:#0d2236;border:1px solid #2b4a63;border-radius:8px;padding:9px 11px;font-size:12.5px;box-shadow:0 6px 18px rgba(0,0,0,.45)}
+.tip .t{color:var(--muted);margin-bottom:4px}.tip .v{font-size:16px;font-weight:800;color:var(--gold)}
+.tip table{width:100%;border-collapse:collapse;margin-top:6px}.tip td{padding:1px 0;border:0}.tip td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 .spark{width:100%;height:auto;display:block}
 .spark path.line{fill:none;stroke:var(--blue);stroke-width:2}
 .spark path.area{fill:rgba(21,157,232,.12);stroke:none}
@@ -106,7 +115,19 @@ input::placeholder{color:#59738a}
 .chip{background:#0f2438;border:1px solid var(--line);border-radius:99px;padding:4px 11px}
 .chip b{color:var(--gold);margin-left:6px}
 
+
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.chform{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:end}
+.chform label{display:grid;gap:4px;color:var(--muted);font-size:12.5px}
+.chform input,.pkg input:not([type=checkbox]){width:100%;min-width:0}
+.pkg td{padding:6px 8px}
+.pkg input:not([type=checkbox]),input[type=number]{background:#091a29;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
+.msg{padding:10px 12px;border-radius:8px;margin-top:12px;background:#0b2032}
+.msg.ok{color:var(--green)}.msg.bad{color:var(--red)}
+input[type=number],input[type=text]{min-width:0}
 @media(max-width:900px){
+  .chform{grid-template-columns:1fr 1fr}
+  .chform>*:first-child{grid-column:1/-1}
   .layout{grid-template-columns:minmax(0,1fr)}
   .side{position:static;max-height:none;display:flex;gap:4px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px}
   .side h2{display:none}
@@ -212,8 +233,13 @@ function table(cols, rows, empty = "No rows to show.") {
   return `<div class="wrap"><table class="tbl"><thead><tr>${cols.map(c => `<th class="${c.n ? "n" : ""}">${esc(c.h)}</th>`).join("")}</tr></thead><tbody>${
     rows.map(r => `<tr>${cols.map(c => `<td class="${c.n ? "n" : ""}">${c.html ? c.v(r) : esc(c.v(r))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 }
-function spark(points, key = "value", label = "") {
-  const pts = points.map(p => ({t: p.observed_at, v: Number(p[key])})).filter(p => isFinite(p.v));
+const CHARTS = new Map();
+let chartSeq = 0;
+const SKIP_KEYS = new Set(["observed_at", "total_concurrent", "value"]);
+const fullTime = d => isNaN(d) ? "" : d.toLocaleString("en-IN", {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
+function spark(points, key = "value", label = "", {breakdown = false} = {}) {
+  const pts = points.map(p => ({t: p.observed_at, v: Number(p[key]),
+    parts: breakdown ? Object.entries(p).filter(([k, val]) => !SKIP_KEYS.has(k) && typeof val === "number").sort((a, b) => b[1] - a[1]) : []})).filter(p => isFinite(p.v));
   if (pts.length < 2) return `<p class="muted">Not enough observations yet to draw a trend. At least two are needed.</p>`;
   const W = 900, H = 210, L = 8, R = 8, T = 26, B = 28;
   const min = Math.min(...pts.map(p => p.v)), max = Math.max(...pts.map(p => p.v)), rng = Math.max(max - min, 1);
@@ -221,11 +247,48 @@ function spark(points, key = "value", label = "") {
   const line = pts.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.v).toFixed(1)).join(" ");
   const d0 = new Date(pts[0].t), d1 = new Date(pts[pts.length - 1].t), short = (d1 - d0) < 2 * 864e5;
   const f = d => isNaN(d) ? "" : short ? d.toLocaleTimeString("en-IN", {hour: "2-digit", minute: "2-digit"}) : d.toLocaleDateString("en-IN", {day: "numeric", month: "short"});
-  return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)} from ${esc(f(d0))} to ${esc(f(d1))}, low ${esc(compact(min))}, high ${esc(compact(max))}">
+  const id = "c" + (++chartSeq);
+  CHARTS.set(id, {pts, W, H, L, R, T, B, x, y, label, idx: pts.length - 1});
+  return `<div class="chart" data-chart="${id}" tabindex="0" aria-label="${esc(label)} chart. Move the pointer, or use the left and right arrow keys, to read the value at a time.">
+    <svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)} from ${esc(f(d0))} to ${esc(f(d1))}, low ${esc(compact(min))}, high ${esc(compact(max))}">
     <path class="area" d="${line} L${x(pts.length - 1)} ${H - B} L${L} ${H - B} Z"/><path class="line" d="${line}"/>
+    <line class="cx" x1="0" x2="0" y1="${T}" y2="${H - B}" visibility="hidden"/><circle class="cd" r="5" cx="0" cy="0" visibility="hidden"/>
     <text x="${L}" y="14">High ${esc(compact(max))} · Low ${esc(compact(min))}</text>
-    <text x="${L}" y="${H - 8}">${esc(f(d0))}</text><text x="${W - R}" y="${H - 8}" text-anchor="end">${esc(f(d1))}</text></svg>`;
+    <text x="${L}" y="${H - 8}">${esc(f(d0))}</text><text x="${W - R}" y="${H - 8}" text-anchor="end">${esc(f(d1))}</text></svg>
+    <div class="tip" hidden></div></div>`;
 }
+function showTip(box, i) {
+  const c = CHARTS.get(box.dataset.chart); if (!c) return;
+  i = Math.max(0, Math.min(c.pts.length - 1, i)); c.idx = i;
+  const p = c.pts[i], svg = box.querySelector("svg"), tip = box.querySelector(".tip");
+  const cx = c.x(i), cy = c.y(p.v);
+  const line = svg.querySelector(".cx"), dot = svg.querySelector(".cd");
+  line.setAttribute("x1", cx); line.setAttribute("x2", cx); line.setAttribute("visibility", "visible");
+  dot.setAttribute("cx", cx); dot.setAttribute("cy", cy); dot.setAttribute("visibility", "visible");
+  tip.innerHTML = `<div class="t">${esc(fullTime(new Date(p.t)))}</div><div class="v">${esc(whole(p.v))}</div><div class="muted">${esc(c.label)}</div>` +
+    (p.parts.length ? `<table>${p.parts.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(whole(v))}</td></tr>`).join("")}</table>` : "");
+  tip.hidden = false;
+  const r = svg.getBoundingClientRect(), px = cx / c.W * r.width, py = cy / c.H * r.height, tw = tip.offsetWidth;
+  tip.style.left = Math.max(0, Math.min(r.width - tw, px + 14 > r.width - tw ? px - tw - 14 : px + 14)) + "px";
+  tip.style.top = Math.max(0, py - tip.offsetHeight - 10) + "px";
+}
+function hideTip(box) {
+  box.querySelector(".tip").hidden = true;
+  box.querySelectorAll(".cx,.cd").forEach(n => n.setAttribute("visibility", "hidden"));
+}
+document.addEventListener("pointermove", e => {
+  const box = e.target.closest && e.target.closest(".chart"); if (!box) return;
+  const c = CHARTS.get(box.dataset.chart); if (!c) return;
+  const r = box.querySelector("svg").getBoundingClientRect(), xv = (e.clientX - r.left) / r.width * c.W;
+  showTip(box, Math.round((xv - c.L) / (c.W - c.L - c.R) * (c.pts.length - 1)));
+});
+document.addEventListener("pointerout", e => { const box = e.target.closest && e.target.closest(".chart"); if (box && !box.contains(e.relatedTarget)) hideTip(box); });
+document.addEventListener("keydown", e => {
+  const box = e.target.closest && e.target.closest(".chart"); if (!box || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+  const c = CHARTS.get(box.dataset.chart); if (!c) return; e.preventDefault();
+  showTip(box, e.key === "Home" ? 0 : e.key === "End" ? c.pts.length - 1 : c.idx + (e.key === "ArrowRight" ? 1 : -1));
+});
+document.addEventListener("focusout", e => { const box = e.target.closest && e.target.closest(".chart"); if (box && !box.contains(e.relatedTarget)) hideTip(box); });
 const opts = (list, cur) => list.map(([v, l]) => `<option value="${esc(v)}"${String(v) === String(cur) ? " selected" : ""}>${esc(l)}</option>`).join("");
 function filterBar({period = true, stream = true, language = true, channel = false} = {}) {
   const langs = [...new Set(channels.map(c => c.language).filter(l => l && l !== "unknown"))].sort();
@@ -406,7 +469,7 @@ add("live", "Intelligence", "Live audience", async el => {
   catch (e) { if (e.status === 403 || /premium/i.test(e.message)) { $("#lv", el).innerHTML = state("Live audience is a paid feature", "Your plan does not include live audience windows. Ask your admin to change your plan.", ""); return; } throw e; }
   const langs = Object.entries(d.languages || {});
   $("#lv", el).innerHTML = `<div class="grid kpis">${kpi("Current concurrent", whole(d.overall.current_concurrent), "Sum of each channel’s latest sample")}${kpi("Peak concurrent", whole(d.overall.peak_concurrent))}${kpi("Live channels", whole(d.overall.channel_count))}</div>
-    <section class="card"><h2>Total concurrent viewers</h2>${spark(d.timeline || [], "total_concurrent", "Total concurrent viewers")}</section>
+    <section class="card"><h2>Total concurrent viewers</h2>${spark(d.timeline || [], "total_concurrent", "Total concurrent viewers", {breakdown: true})}</section>
     <div class="grid cols" style="margin-top:14px"><section class="card"><h2>By language</h2>${table([{h: "Language", v: r => r[0]}, {h: "Channels", n: 1, v: r => whole(r[1].channel_count)}, {h: "Now", n: 1, v: r => whole(r[1].current_concurrent)}, {h: "Peak", n: 1, v: r => whole(r[1].peak_concurrent)}], langs, "No live samples in this window.")}</section>
     <section class="card"><h2>By channel</h2>${table([{h: "Channel", v: r => r.name}, {h: "Now", n: 1, v: r => whole(r.current_concurrent)}, {h: "Peak", n: 1, v: r => whole(r.peak_concurrent)}, {h: "Last sample", v: r => when(r.observed_at)}], d.channels || [], "No live channels in this window.")}</section></div>
     ${evidence(`Samples run from ${when(d.overall.earliest_observed_at)} to ${when(d.overall.latest_observed_at)}. Values are not interpolated.`)}`;
@@ -484,14 +547,75 @@ add("operations", "Research & output", "Operations", async el => {
       ${run.error_message ? `<dt>Error</dt><dd class="red">${esc(run.error_message)}</dd>` : ""}</dl>` : state("The collector has not run yet", "No collection run is recorded. Check that the collector worker is deployed and has a YouTube API key.")}</section>`;
 });
 
-add("manager", "Research & output", "Manager & packages", async el => {
-  const admin = acct && acct.is_admin;
-  el.innerHTML = head("Manager and packages", "Applications, channels and package settings.") + (admin ? `<div class="grid cols">
-    <a class="card" href="admin.html" style="text-decoration:none;color:inherit"><h3>Applications and admin</h3><p class="muted">Approve accounts, add channels and videos, set languages.</p></a>
-    <a class="card" href="channel-manager.html" style="text-decoration:none;color:inherit"><h3>Channel manager</h3><p class="muted">Review and organise the tracked channels.</p></a>
-    <a class="card" href="package-config.html" style="text-decoration:none;color:inherit"><h3>Package configuration</h3><p class="muted">Edit what each package slot includes.</p></a></div>`
-    : state("Admins only", "This area is available to administrators. If you need a change to your account or plan, ask your admin."));
+const isAdmin = !!(acct && acct.is_admin);
+const adminOnly = title => head(title, "") + state("Admins only", "This area is available to administrators. If you need a change to your account or plan, ask your admin.");
+const post = (path, body = {}) => { cache.clear(); return api(path, {}, {method: "POST", body}); };
+const reloadChannels = async () => { try { channels = (await api("/api/v1/channels")).channels || []; } catch { /* keep the old list */ } };
+
+add("adm-apps", "Admin", "Applications", async el => {
+  if (!isAdmin) { el.innerHTML = adminOnly("Applications"); return; }
+  el.innerHTML = head("Applications", "People who asked for access. Approve or reject each request.") + `<div id="ap"><p class="muted">Loading…</p></div>`;
+  const d = await post("/api/v1/admin/users/pending");
+  $("#ap", el).innerHTML = `<section class="card">${table([
+    {h: "Applicant", html: 1, v: u => `<strong>${esc(u.name)}</strong><br><span class="muted">${esc(u.email)}</span>`},
+    {h: "Organisation", v: u => u.organization}, {h: "Requested plan", v: u => u.requested_plan}, {h: "Purpose", v: u => u.purpose_of_use},
+    {h: "", html: 1, v: u => `<div class="btnrow"><button class="btn primary" type="button" data-adm="approve" data-id="${esc(u.id)}">Approve</button><button class="btn" type="button" data-adm="reject" data-id="${esc(u.id)}">Reject</button></div>`}
+  ], d.users, "No applications are waiting.")}</section>`;
 }, {admin: 1});
+
+add("adm-channels", "Admin", "Channels", async el => {
+  if (!isAdmin) { el.innerHTML = adminOnly("Channels"); return; }
+  el.innerHTML = head("Channels", "Add, rename or remove the YouTube channels StatAxis monitors.") + `<section class="card"><h2>Add a YouTube channel</h2>
+    <form class="chform" id="addch"><label>YouTube link<input type="url" name="url" required placeholder="https://www.youtube.com/@channel"></label>
+    <label>Name to show<input type="text" name="display_name" required maxlength="120"></label><label>Language<input type="text" name="language" placeholder="Hindi"></label>
+    <label>Market<input type="text" name="market" placeholder="News"></label><label>Region<input type="text" name="region" value="India"></label>
+    <button class="btn primary" type="submit">Add</button></form><div id="addmsg" aria-live="polite"></div></section>
+    <section class="card" style="margin-top:14px"><h2>Monitoring universe</h2><div id="chl"><p class="muted">Loading…</p></div></section>`;
+  const draw = () => { $("#chl", el).innerHTML = table([
+    {h: "Channel", html: 1, v: c => `<strong>${esc(c.name)}</strong><br><span class="muted">${esc(c.youtube_channel_id || "")}</span>`},
+    {h: "Language", v: c => c.language || "—"}, {h: "Region", v: c => c.region || "—"}, {h: "Network", v: c => c.network || "—"},
+    {h: "", html: 1, v: c => `<div class="btnrow"><button class="btn" type="button" data-adm="rename" data-id="${esc(c.id)}" data-name="${esc(c.name)}">Rename</button><button class="btn" type="button" data-adm="remove" data-id="${esc(c.id)}">Remove</button></div>`}
+  ], channels, "No active channels yet."); };
+  await reloadChannels(); draw();
+  $("#addch", el).onsubmit = async ev => {
+    ev.preventDefault(); const f = ev.target, fd = Object.fromEntries(new FormData(f)), msg = $("#addmsg", el), btn = f.querySelector("button");
+    btn.disabled = true; msg.className = "msg"; msg.textContent = "Adding…";
+    try { const d = await post("/api/v1/admin/channels", {url: fd.url, display_name: fd.display_name, language: fd.language, region: fd.region, market: fd.market});
+      msg.className = "msg ok"; msg.textContent = "Added " + d.name; f.reset(); f.region.value = "India"; await reloadChannels(); draw();
+    } catch (e) { msg.className = "msg bad"; msg.textContent = e.message; }
+    btn.disabled = false;
+  };
+}, {admin: 1});
+
+add("adm-packages", "Admin", "Packages 5–40", async el => {
+  if (!isAdmin) { el.innerHTML = adminOnly("Packages"); return; }
+  el.innerHTML = head("Packages 5–40", "Commercial name, criteria, amount and currency for each package slot.") + `<div id="pk"><p class="muted">Loading…</p></div>`;
+  const d = await api("/api/v1/admin/packages");
+  const inp = (id, v, extra = "") => `<input id="${id}" value="${esc(v ?? "")}" ${extra}>`;
+  $("#pk", el).innerHTML = `<section class="card"><div class="wrap"><table class="tbl pkg"><thead><tr><th>Slot</th><th>Name</th><th>Criteria (separate with |)</th><th>Amount</th><th>Currency</th><th>Active</th><th></th></tr></thead><tbody>${
+    d.packages.map(p => `<tr><td>${esc(p.slot)}</td><td>${inp("pn" + p.slot, p.name, `placeholder="Package ${esc(p.slot)}"`)}</td><td>${inp("pc" + p.slot, (p.criteria || []).join(" | "), 'placeholder="criteria 1 | criteria 2"')}</td>
+    <td>${inp("pa" + p.slot, p.amount, 'type="number" min="0"')}</td><td>${inp("pu" + p.slot, p.currency || "INR", 'maxlength="3"')}</td>
+    <td><input id="px${esc(p.slot)}" type="checkbox"${p.active ? " checked" : ""}></td><td><button class="btn primary" type="button" data-adm="savepkg" data-id="${esc(p.slot)}">Save</button></td></tr>`).join("")}</tbody></table></div></section>`;
+}, {admin: 1});
+
+async function adminAction(b) {
+  const act = b.dataset.adm, id = Number(b.dataset.id);
+  if (act === "approve" || act === "reject") { await post("/api/v1/admin/users/" + act, {user_id: id}); render(); }
+  else if (act === "rename") {
+    const name = prompt("New display name:", b.dataset.name || ""); if (name === null) return;
+    if (!name.trim()) return alert("Name is required");
+    await post("/api/v1/admin/channels/rename", {channel_id: id, display_name: name}); render();
+  } else if (act === "remove") {
+    if (!confirm("Remove this channel from monitoring?")) return;
+    await post("/api/v1/admin/channels/deactivate", {channel_id: id}); render();
+  } else if (act === "savepkg") {
+    const g = k => document.getElementById(k + id), amount = g("pa").value;
+    await post("/api/v1/admin/packages/configure", {slot: id, name: g("pn").value, criteria: g("pc").value.split("|").map(x => x.trim()).filter(Boolean),
+      amount: amount === "" ? null : Number(amount), currency: g("pu").value, active: g("px").checked});
+    alert("Package " + id + " saved");
+  }
+}
+document.addEventListener("click", e => { const b = e.target.closest("[data-adm]"); if (b) adminAction(b).catch(err => alert(err.message)); });
 
 /* ---------- csv ---------- */
 function downloadCsv(rows, name) {
@@ -506,14 +630,16 @@ function downloadCsv(rows, name) {
 function buildNav(current) {
   let last = "", html = "";
   for (const v of Object.values(VIEWS)) {
+    if (v.admin && !isAdmin) continue;
     if (v.group !== last) { html += `<h2>${esc(v.group)}</h2>`; last = v.group; }
-    html += `<a class="nav" href="#/${v.id}"${v.id === current ? ' aria-current="page"' : ""}>${esc(v.title)}${v.admin && !(acct && acct.is_admin) ? '<span class="lock">admin</span>' : ""}</a>`;
+    html += `<a class="nav" href="#/${v.id}"${v.id === current ? ' aria-current="page"' : ""}>${esc(v.title)}</a>`;
   }
   $("#nav").innerHTML = html;
 }
 let seq = 0;
 async function render() {
-  const id = (location.hash.match(/^#\/([a-z]+)/) || [])[1]; const v = VIEWS[id] || VIEWS.overview, mine = ++seq;
+  const id = (location.hash.match(/^#\/([a-z-]+)/) || [])[1]; let v = VIEWS[id] || VIEWS.overview; if (v.admin && !isAdmin) v = VIEWS.overview; const mine = ++seq;
+  CHARTS.clear();
   const host = $("#view"), el = document.createElement("div");
   buildNav(v.id); document.title = v.title + " — StatAxis workspace"; el.innerHTML = `<p class="muted">Loading…</p>`; host.replaceChildren(el);
   try { await v.render(el); }
@@ -528,7 +654,7 @@ $("#signout").onclick = signOut;
 
 (async function boot() {
   if (!acct) return;
-  const p = $("#plan"); if (acct.plan) { p.textContent = acct.plan.replace(/^sx_/, "SX ").replace(/\b\w/g, c => c.toUpperCase()); p.hidden = false; }
+  const p = $("#plan"); if (isAdmin) { p.textContent = "Admin"; p.hidden = false; } else if (acct.plan) { p.textContent = acct.plan.replace(/^sx_/, "SX ").replace(/\b\w/g, c => c.toUpperCase()); p.hidden = false; }
   $("#who").innerHTML = `<b>${esc(acct.full_name || acct.email || "")}</b>${esc(acct.organization || "")}`;
   try { channels = (await api("/api/v1/channels")).channels || []; } catch { channels = []; }
   render();
