@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from collector.storage import Base, Channel, ChannelStats, Observation, Video, create_database, save_observations
+from collector.storage import Base, Channel, ChannelStats, Observation, Video, _add_column_if_missing, create_database, save_observations
 from collector.topics import assign_topic
 from collector.youtube.collector import VideoObservation
 
@@ -187,3 +187,17 @@ def test_save_observations_does_not_overwrite_video_metadata_with_none():
         assert video.thumbnail_url == "https://example.com/original.jpg"
         assert video.category_id == "25"
         assert video.topic == "Politics"
+
+
+def test_dashboard_migration_ignores_duplicate_column_race():
+    class Dialect:
+        name = "sqlite"
+
+    class Connection:
+        dialect = Dialect()
+
+        def execute(self, statement):
+            assert "ADD COLUMN" in str(statement)
+            raise RuntimeError("duplicate column name: handle")
+
+    _add_column_if_missing(Connection(), "stx_channels", "handle", "VARCHAR(255)", set())
