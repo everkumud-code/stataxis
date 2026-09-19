@@ -18,6 +18,9 @@ from collector.storage import Channel, Observation, Video
 from metrics.persistence import IntelligenceSnapshotRecord
 
 
+MAX_EXPORT_ROWS = 200_000
+
+
 @dataclass(frozen=True)
 class ObservationExportFilters:
     """Optional dashboard filters for an observation export."""
@@ -56,6 +59,7 @@ def filtered_observations(session: Session, filters: ObservationExportFilters) -
         stmt = stmt.where(Observation.is_live == filters.is_live)
     if filters.classification is not None:
         stmt = stmt.where(Observation.classification == filters.classification)
+    stmt = stmt.limit(MAX_EXPORT_ROWS)
     return list(session.execute(stmt).all())
 
 
