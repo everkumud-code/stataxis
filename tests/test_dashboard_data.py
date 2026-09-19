@@ -215,5 +215,7 @@ def test_dashboard_migration_uses_postgres_if_not_exists_and_ignores_duplicate_r
 
 
 def test_topic_matching_does_not_match_english_substrings():
-    assert assign_topic("A supermarket opens today") == "Other"
-    assert assign_topic("The matchmaker arrives today") == "Other"
+    assert assign_topic("A supermarket opens") == "Other"
+    assert assign_topic("The matchmaker arrives") == "Other"
+    assert assign_topic("Share market opens") == "Business"
+    assert assign_topic("Cricket match today") == "Sports"
