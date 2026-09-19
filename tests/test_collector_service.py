@@ -216,8 +216,7 @@ def test_service_logs_sanitized_exception(monkeypatch, caplog):
     with caplog.at_level("ERROR", logger="stataxis-service"):
         service.run_service(database_url, client_factory=FakeClient, stop_event=stop_event)
 
-    message = "
-".join(record.getMessage() for record in caplog.records)
+    message = "\n".join(record.getMessage() for record in caplog.records)
     assert "RuntimeError" in message
     assert "postgresql+psycopg://[REDACTED]@db.example/stataxis" in message
     assert database_url not in message
