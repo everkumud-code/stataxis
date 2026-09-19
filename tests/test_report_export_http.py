@@ -150,7 +150,7 @@ def test_report_export_rejects_ranges_longer_than_92_days(monkeypatch):
     assert json.loads(body) == {"error": "report export date range cannot exceed 92 days"}
 
 
-def test_report_export_query_is_capped_at_200000_rows():
+def test_report_export_query_fetches_cap_plus_one_row():
     from sqlalchemy.dialects import sqlite
 
     from api.export import ObservationExportFilters, filtered_observations
@@ -174,4 +174,29 @@ def test_report_export_query_is_capped_at_200000_rows():
         ),
     )
     sql = str(captured["statement"].compile(dialect=sqlite.dialect(), compile_kwargs={"literal_binds": True}))
-    assert "LIMIT 200000" in sql
+    assert "LIMIT 50001" in sql
+
+
+def test_report_export_row_cap_returns_exact_400_message():
+    from api.export import ObservationExportFilters, filtered_observations
+
+    class Result:
+        def all(self):
+            return [object()] * 50001
+
+    class SessionStub:
+        def execute(self, statement):
+            return Result()
+
+    try:
+        filtered_observations(
+            SessionStub(),
+            ObservationExportFilters(
+                start_at=datetime(2026, 1, 1, tzinfo=UTC),
+                end_at=datetime(2026, 1, 2, tzinfo=UTC),
+            ),
+        )
+    except ValueError as exc:
+        assert str(exc) == "report has more than 50000 rows; narrow the date range or add filters"
+    else:
+        raise AssertionError("expected export row-cap ValueError")
