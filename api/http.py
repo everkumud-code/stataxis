@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 from urllib.parse import parse_qs
 
@@ -396,6 +396,10 @@ def _export_filters_from_query(query: dict[str, list[str]]) -> ObservationExport
 
     start_at = _query_datetime(query, "start")
     end_at = _query_datetime(query, "end")
+    if start_at is not None and start_at.tzinfo is None:
+        start_at = start_at.replace(tzinfo=UTC)
+    if end_at is not None and end_at.tzinfo is None:
+        end_at = end_at.replace(tzinfo=UTC)
     if start_at is None or end_at is None:
         raise ValueError("start and end dates are required for report export")
     if end_at < start_at:

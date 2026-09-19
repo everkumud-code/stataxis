@@ -93,8 +93,44 @@ def live_audience_window(session: Session, *, start_at: datetime, end_at: dateti
             "average_concurrent": round(sum(values) / len(values), 2) if values else 0,
         }
 
-    timeline_rows = [{"observed_at": timestamp.isoformat(), **values, "total_concurrent": sum(values.values())} for timestamp, values in sorted(timeline.items())]
-    overall_values = [row["total_concurrent"] for row in timeline_rows]
+    raw_timeline = {
+        timestamp: {**values, "total_concurrent": sum(values.values())}
+        for timestamp, values in timeline.items()
+    }
+    raw_peak = max(
+        (values["total_concurrent"] for values in raw_timeline.values()),
+        default=0,
+    )
+    if end_at - start_at > timedelta(hours=2):
+        bucketed: dict[datetime, dict[str, list[int]]] = {}
+        for timestamp, values in raw_timeline.items():
+            bucket = timestamp.replace(second=0, microsecond=0)
+            bucket_values = bucketed.setdefault(
+                bucket,
+                {name: [] for name in groups},
+            )
+            for name in groups:
+                if values[name]:
+                    bucket_values[name].append(values[name])
+        timeline_rows = []
+        for timestamp, values in sorted(bucketed.items()):
+            averages = {
+                name: round(sum(samples) / len(samples), 2) if samples else 0
+                for name, samples in values.items()
+            }
+            timeline_rows.append({
+                "observed_at": timestamp.isoformat(),
+                **averages,
+                "total_concurrent": sum(averages.values()),
+                "peak_concurrent": max((max(samples) for samples in values.values() if samples), default=0),
+            })
+        sample_resolution = "1-minute buckets"
+    else:
+        timeline_rows = [
+            {"observed_at": timestamp.isoformat(), **values}
+            for timestamp, values in sorted(raw_timeline.items())
+        ]
+        sample_resolution = "Observed timestamp buckets"
     latest_by_channel_total = sum(int(observation.concurrent_viewers or 0) for observation, _ in channel_latest.values())
     latest_observed_at = max((_utc(observation.observed_at) for observation, _ in channel_latest.values()), default=None)
     earliest_observed_at = min((_utc(observation.observed_at) for observation, _ in channel_latest.values()), default=None)
@@ -102,12 +138,12 @@ def live_audience_window(session: Session, *, start_at: datetime, end_at: dateti
         "start_at": start_at.isoformat(),
         "end_at": end_at.isoformat(),
         "language_filter": language,
-        "sample_resolution": "Observed timestamp buckets",
+        "sample_resolution": sample_resolution,
         "interpolation": False,
         "timeline": timeline_rows,
         "languages": summaries,
         "overall": {
-            "peak_concurrent": max(overall_values) if overall_values else 0,
+            "peak_concurrent": raw_peak,
             "current_concurrent": latest_by_channel_total,
             "observed_seconds": len(timeline_rows),
             "channel_count": len(channel_latest),

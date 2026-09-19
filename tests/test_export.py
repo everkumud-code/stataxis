@@ -5,7 +5,7 @@ from openpyxl import load_workbook
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from api.export import ObservationExportFilters, export_observations_xlsx, filtered_observations
+from api.export import MAX_EXPORT_ROWS, ObservationExportFilters, export_observations_xlsx, export_response, filtered_observations
 from collector.storage import Base, Channel, Observation, Video
 from metrics.persistence import IntelligenceSnapshotRecord
 
@@ -56,3 +56,30 @@ def test_export_contains_two_sheets_and_latest_intelligence() -> None:
     assert workbook["StatAxis Data"].max_row == 2
     assert workbook["StatAxis Intelligence"].cell(2, 4).value == 72.5
     assert workbook["StatAxis Intelligence"].cell(2, 8).value == "Positive evidence"
+
+
+def test_filtered_observations_rejects_more_than_export_cap() -> None:
+    class Result:
+        def all(self):
+            return [object()] * (MAX_EXPORT_ROWS + 1)
+
+    class FakeSession:
+        def execute(self, statement):
+            assert statement._limit_clause.value == MAX_EXPORT_ROWS + 1
+            return Result()
+
+    try:
+        filtered_observations(FakeSession(), ObservationExportFilters())
+    except ValueError as exc:
+        assert str(exc) == "report has more than 50000 rows; narrow the date range or add filters"
+    else:
+        raise AssertionError("oversized export was not rejected")
+
+
+def test_export_response_returns_400_for_oversized_report(monkeypatch) -> None:
+    message = "report has more than 50000 rows; narrow the date range or add filters"
+    monkeypatch.setattr("api.export.export_for_role", lambda *args, **kwargs: (_ for _ in ()).throw(ValueError(message)))
+    status, headers, body = export_response(object(), "PRO", ObservationExportFilters())
+    assert status == 400
+    assert headers == {"Content-Type": "application/json"}
+    assert body.decode() == '{"error": "report has more than 50000 rows; narrow the date range or add filters"}'

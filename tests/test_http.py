@@ -1,7 +1,7 @@
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 
-from api.http import get_channel_report, get_channel_stx_trend, get_collection_health, get_video_intelligence, wsgi_application
+from api.http import _export_filters_from_query, get_channel_report, get_channel_stx_trend, get_collection_health, get_video_intelligence, wsgi_application
 
 
 class FakeSession:
@@ -160,6 +160,19 @@ def test_wsgi_collection_health_is_read_only_and_timestamped(monkeypatch):
     assert session.closed is True
 
 
+def test_export_filters_treat_date_only_values_as_utc() -> None:
+    filters = _export_filters_from_query({"start": ["2026-09-01"], "end": ["2026-09-02"]})
+    assert filters.start_at == datetime(2026, 9, 1, tzinfo=UTC)
+    assert filters.end_at == datetime(2026, 9, 2, tzinfo=UTC)
+
+
+def test_export_filters_normalize_mixed_naive_and_aware_values() -> None:
+    filters = _export_filters_from_query({
+        "start": ["2026-09-01T00:00:00"],
+        "end": ["2026-09-02T00:00:00+05:30"],
+    })
+    assert filters.start_at == datetime(2026, 9, 1, tzinfo=UTC)
+    assert filters.end_at == datetime(2026, 9, 2, 0, tzinfo=timezone(timedelta(hours=5, minutes=30)))
 def test_wsgi_channel_stx_trend_rejects_days_above_90_and_accepts_90(monkeypatch):
     session = FakeSession()
     monkeypatch.setattr("api.http.channel_stx_trend", lambda _session, _channel_id, *, days: {"days": days})

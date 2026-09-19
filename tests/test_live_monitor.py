@@ -48,3 +48,37 @@ def test_live_audience_window_returns_exact_observed_seconds_without_interpolati
         assert payload["languages"]["English"]["current_concurrent"] == 70
         assert payload["languages"]["Regional"]["peak_concurrent"] == 25
         assert payload["interpolation"] is False
+
+
+def test_live_audience_window_buckets_long_windows_and_preserves_raw_peak():
+    engine = create_database("sqlite:///:memory:")
+    with Session(engine) as session:
+        channel = Channel(youtube_channel_id="UC-long", name="Long Window", language="hi-IN", active=True)
+        session.add(channel)
+        session.flush()
+        video = Video(youtube_video_id="video-long", channel_id=channel.id, title="Long")
+        session.add(video)
+        session.flush()
+        base = datetime(2026, 9, 16, 9, 0, 0, tzinfo=timezone.utc)
+        session.add_all([
+            Observation(video_id=video.id, channel_id=channel.id, observed_at=base + timedelta(seconds=10), concurrent_viewers=100, is_live=True),
+            Observation(video_id=video.id, channel_id=channel.id, observed_at=base + timedelta(seconds=20), concurrent_viewers=300, is_live=True),
+            Observation(video_id=video.id, channel_id=channel.id, observed_at=base + timedelta(seconds=50), concurrent_viewers=200, is_live=True),
+            Observation(video_id=video.id, channel_id=channel.id, observed_at=base + timedelta(minutes=1, seconds=10), concurrent_viewers=50, is_live=True),
+        ])
+        session.commit()
+
+        payload = live_audience_window(session, start_at=base, end_at=base + timedelta(hours=3))
+
+        assert payload["sample_resolution"] == "1-minute buckets"
+        assert len(payload["timeline"]) == 2
+        assert payload["timeline"][0]["Hindi"] == 200
+        assert payload["timeline"][0]["total_concurrent"] == 200
+        assert payload["timeline"][0]["peak_concurrent"] == 300
+        assert payload["timeline"][1]["Hindi"] == 50
+        assert payload["timeline"][1]["peak_concurrent"] == 50
+        assert payload["overall"]["peak_concurrent"] == 300
+        assert set(payload) == {
+            "start_at", "end_at", "language_filter", "sample_resolution",
+            "interpolation", "timeline", "languages", "overall", "channels",
+        }
