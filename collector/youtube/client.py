@@ -53,8 +53,16 @@ class YouTubeClient:
             params={**params, "key": self.api_key},
         )
         if response.status_code in {403, 429}:
+            reason = "unknown"
+            try:
+                payload = response.json()
+                errors = payload.get("error", {}).get("errors", [])
+                if errors and isinstance(errors[0], dict):
+                    reason = str(errors[0].get("reason") or "unknown")[:100]
+            except (ValueError, TypeError):
+                pass
             raise YouTubeAPIError(
-                "YouTube API quota/rate limit response",
+                f"YouTube API {response.status_code}: {reason}",
                 status_code=response.status_code,
             )
         if response.is_error:
