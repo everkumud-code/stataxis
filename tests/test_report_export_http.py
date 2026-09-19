@@ -173,5 +173,5 @@ def test_report_export_query_is_capped_at_200000_rows():
             end_at=datetime(2026, 1, 2, tzinfo=UTC),
         ),
     )
-    sql = str(captured["statement"].compile(dialect=sqlite.dialect()))
+    sql = str(captured["statement"].compile(dialect=sqlite.dialect(), compile_kwargs={"literal_binds": True}))
     assert "LIMIT 200000" in sql
