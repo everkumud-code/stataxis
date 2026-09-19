@@ -16,6 +16,7 @@ class ChannelTarget:
     name: str
     language: str = "unknown"
     network: str = "unknown"
+    region: str = "unknown"
 
 
 @dataclass(frozen=True)
