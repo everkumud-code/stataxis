@@ -18,7 +18,7 @@ from urllib.parse import parse_qs
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from collector.storage import Channel, Observation, Video, effective_channel_language
+from collector.storage import Channel, Observation, Video
 
 POSITIVE = {
     "growth", "grow", "gain", "gains", "rise", "rises", "rising", "surge", "surges",
