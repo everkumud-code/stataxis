@@ -11,7 +11,6 @@ from api.auth_service import authenticate, policy_for_identity
 from api.errors import AuthenticationError, AuthorizationError
 from api.export import export_live_audience_xlsx
 from api.live_monitor import live_audience_window, sample_live_url
-from api.access import require_capability
 
 
 def live_application(session_factory: Callable[[], Any]):
