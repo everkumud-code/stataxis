@@ -26,6 +26,13 @@ def _stop(*_: object) -> None:
     _STOP = True
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    return int(raw.strip())
+
+
 def load_targets(session: Session) -> list[ChannelTarget]:
     """Build the active monitoring universe from persisted channels plus config."""
     path = ROOT / "config" / "channels.json"
@@ -63,10 +70,10 @@ def load_targets(session: Session) -> list[ChannelTarget]:
 
 def run_worker() -> None:
     database_url = os.getenv("DATABASE_URL")
-    if not database_url:
+    if not database_url or not database_url.strip():
         raise ValueError("DATABASE_URL is not configured")
-    interval = max(30, int(os.getenv("STAXIS_COLLECTION_INTERVAL_SECONDS", "300")))
-    max_videos = max(1, int(os.getenv("STAXIS_COLLECTION_MAX_VIDEOS", "25")))
+    interval = max(30, _env_int("STAXIS_COLLECTION_INTERVAL_SECONDS", 300))
+    max_videos = max(1, _env_int("STAXIS_COLLECTION_MAX_VIDEOS", 25))
     engine = create_database(database_url)
     signal.signal(signal.SIGTERM, _stop)
     signal.signal(signal.SIGINT, _stop)
