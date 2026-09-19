@@ -23,6 +23,8 @@ jobs:
           cache: pip
       - name: Install package and development tools
         run: python -m pip install -e '.[dev]'
+      - name: Dashboard JavaScript syntax
+        run: python scripts/check_dashboard_js.py
       - name: Ruff
         run: ruff check .
       - name: Pytest
