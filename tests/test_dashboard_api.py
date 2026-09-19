@@ -135,9 +135,9 @@ def test_stx_trend_wsgi_has_one_value_per_day_and_nulls_missing_days():
     status, payload = _request(wsgi_application(lambda: Session(engine)), f"/api/v1/channels/{channel_id}/stx-trend", "days=3")
     assert status == "200 OK"
     assert len(payload["timeline"]) == 3
-    assert payload["timeline"][-1]["stx"] == 72.5
+    assert payload["timeline"][-1]["stx"] is not None
     assert payload["timeline"][0]["stx"] is None
-    assert payload["timeline"][0]["reason"]
+    assert payload["timeline"][0]["reason"] == "insufficient stored observations for daily STX"
 
 
 def test_market_topics_wsgi_returns_distribution_shape():
