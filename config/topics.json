@@ -1,0 +1,10 @@
+{
+  "topics": {
+    "Politics": ["politics", "election", "elections", "government", "parliament", "minister", "minister", "bjp", "congress", "लोकसभा", "चुनाव", "सरकार", "संसद", "मंत्री", "भाजपा", "कांग्रेस", "राजनीति"],
+    "Current Affairs": ["breaking", "latest", "update", "news", "today", "current affairs", "breaking news", "ताज़ा", "ताजा", "खबर", "समाचार", "अपडेट", "आज"],
+    "Entertainment": ["bollywood", "movie", "film", "actor", "actress", "celebrity", "music", "song", "web series", "बॉलीवुड", "फिल्म", "अभिनेता", "अभिनेत्री", "मनोरंजन", "गाना"],
+    "Sports": ["cricket", "football", "hockey", "tennis", "match", "world cup", "ipl", "olympics", "खेल", "क्रिकेट", "फुटबॉल", "हॉकी", "टेनिस", "मैच", "विश्व कप"],
+    "Business": ["business", "market", "stock", "stocks", "share market", "economy", "economics", "startup", "company", "finance", "व्यापार", "बाजार", "शेयर", "अर्थव्यवस्था", "स्टार्टअप", "कंपनी", "वित्त"],
+    "Other": []
+  }
+}

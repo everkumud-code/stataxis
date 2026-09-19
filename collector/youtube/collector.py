@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from collector.classification import classify_video
+from collector.topics import assign_topic
 from collector.youtube.client import YouTubeClient
 
 
@@ -34,6 +35,9 @@ class VideoObservation:
     classification: str
     live_started_at: str | None
     live_ended_at: str | None
+    thumbnail_url: str | None = None
+    category_id: str | None = None
+    topic: str | None = None
 
 
 def _integer(value: Any) -> int | None:
@@ -70,6 +74,12 @@ def normalize_video(
         classification=classification,
         live_started_at=live.get("actualStartTime"),
         live_ended_at=live.get("actualEndTime"),
+        thumbnail_url=(
+            video.get("snippet", {}).get("thumbnails", {}).get("high", {}).get("url")
+            or video.get("snippet", {}).get("thumbnails", {}).get("default", {}).get("url")
+        ),
+        category_id=str(video.get("snippet", {}).get("categoryId")) if video.get("snippet", {}).get("categoryId") else None,
+        topic=assign_topic(video.get("snippet", {}).get("title", "")),
     )
 
 
@@ -96,3 +106,39 @@ def collect_channel(
         normalize_video(video, target.channel_id, observed_at)
         for video in videos
     ]
+
+@dataclass(frozen=True)
+class ChannelCollection:
+    observations: list[VideoObservation]
+    subscribers: int | None
+    total_views: int | None
+    video_count: int | None
+    avatar_url: str | None
+    handle: str | None
+    observed_at: datetime
+
+
+def collect_channel_with_stats(
+    client: YouTubeClient,
+    target: ChannelTarget,
+    max_videos: int = 25,
+) -> ChannelCollection:
+    """Collect a channel once while retaining its API-level channel statistics."""
+    channel = client.get_channel(target.channel_id)
+    uploads_id = channel["contentDetails"]["relatedPlaylists"]["uploads"]
+    uploads = client.list_uploads(uploads_id, max_results=max_videos)
+    video_ids = [item.get("contentDetails", {}).get("videoId") for item in uploads.get("items", [])]
+    video_ids = [video_id for video_id in video_ids if video_id]
+    videos = client.get_videos(video_ids)
+    observed_at = datetime.now(UTC)
+    snippet = channel.get("snippet", {})
+    statistics = channel.get("statistics", {})
+    return ChannelCollection(
+        observations=[normalize_video(video, target.channel_id, observed_at) for video in videos],
+        subscribers=_integer(statistics.get("subscriberCount")),
+        total_views=_integer(statistics.get("viewCount")),
+        video_count=_integer(statistics.get("videoCount")),
+        avatar_url=snippet.get("thumbnails", {}).get("high", {}).get("url") or snippet.get("thumbnails", {}).get("default", {}).get("url"),
+        handle=str(snippet.get("customUrl")) if snippet.get("customUrl") else None,
+        observed_at=observed_at,
+    )

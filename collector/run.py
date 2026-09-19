@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from collector.intelligence import IntelligenceRunResult, process_persisted_observations
 from collector.storage import CollectionRun, save_observations
-from collector.youtube.collector import ChannelTarget, collect_channel
+from collector.youtube.collector import ChannelTarget, collect_channel_with_stats
 from collector.youtube.client import YouTubeClient
 
 
@@ -45,7 +45,8 @@ def run_collection_pass(
     videos_observed = 0
     try:
         for target in targets:
-            observations = collect_channel(client, target, max_videos)
+            collection = collect_channel_with_stats(client, target, max_videos)
+            observations = collection.observations
             saved = save_observations(
                 session=session,
                 channel_name=target.name,
@@ -54,6 +55,14 @@ def run_collection_pass(
                 language=target.language,
                 observations=observations,
                 region=target.region,
+                avatar_url=collection.avatar_url,
+                handle=collection.handle,
+                channel_stats=(
+                    collection.observed_at,
+                    collection.subscribers,
+                    collection.total_views,
+                    collection.video_count,
+                ),
             )
             videos_observed += len({item.video_id for item in observations})
             if saved < 0:  # pragma: no cover - defensive invariant guard

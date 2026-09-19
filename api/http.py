@@ -10,6 +10,7 @@ from urllib.parse import parse_qs
 from sqlalchemy.orm import Session
 
 from api.catalog import list_channels
+from api.dashboard_data import channel_overview, channel_stx_trend, market_topic_distribution
 from api.channel import channel_intelligence_comparison, channel_intelligence_overview, channel_view_series, compare_channels
 from api.export import ObservationExportFilters, export_response
 from api.intelligence import latest_video_intelligence
@@ -17,6 +18,34 @@ from api.media_intelligence import channel_media_intelligence, market_report
 from api.operations import collection_health, intelligence_readiness
 from api.report import channel_report
 from api.signals import channel_signals
+
+
+
+def get_channel_dashboard_overview(session: Session, channel_id: int) -> tuple[int, dict[str, Any]]:
+    if channel_id <= 0:
+        return 400, {"error": "channel_id must be a positive integer"}
+    payload = channel_overview(session, channel_id)
+    return (404, {"error": "channel not found"}) if payload is None else (200, payload)
+
+
+def get_channel_stx_trend(session: Session, channel_id: int, days: str) -> tuple[int, dict[str, Any]]:
+    if channel_id <= 0:
+        return 400, {"error": "channel_id must be a positive integer"}
+    try:
+        value = int(days)
+    except ValueError:
+        return 400, {"error": "days must be an integer"}
+    if value < 1 or value > 90:
+        return 400, {"error": "days must be between 1 and 90"}
+    payload = channel_stx_trend(session, channel_id, days=value)
+    return (404, {"error": "channel not found"}) if payload is None else (200, payload)
+
+
+def get_market_topics(session: Session, period: str) -> tuple[int, dict[str, Any]]:
+    try:
+        return 200, market_topic_distribution(session, period=period)
+    except (TypeError, ValueError):
+        return 400, {"error": "period must use Nd format, for example 7d or 30d"}
 
 
 def get_video_intelligence(session: Session, video_id: int) -> tuple[int, dict[str, Any]]:
@@ -158,6 +187,14 @@ def wsgi_application(session_factory: Callable[[], Session]):
             try: status, payload = get_video_intelligence(session, video_id)
             finally: session.close()
             return _json_response(start_response, status, payload)
+
+        if path == "/api/v1/markets/topics":
+            if method != "GET": return _json_response(start_response, 405, {"error": "method not allowed"})
+            query = parse_qs(environ.get("QUERY_STRING", ""))
+            session = session_factory()
+            try: status, payload = get_market_topics(session, query.get("period", ["30d"])[0])
+            finally: session.close()
+            return _json_response(start_response, status, payload)
         if path == "/api/v1/channels":
             if method != "GET": return _json_response(start_response, 405, {"error": "method not allowed"})
             session = session_factory()
@@ -220,6 +257,26 @@ def wsgi_application(session_factory: Callable[[], Session]):
             except ValueError as exc: return _json_response(start_response, 400, {"error": str(exc)})
             session = session_factory()
             try: status, payload = get_channel_report(session, channel_id, as_of=as_of, series_days=query.get("series_days", ["30"])[0], signal_hours=query.get("signal_hours", ["24"])[0])
+            finally: session.close()
+            return _json_response(start_response, status, payload)
+
+        overview_suffix = "/overview"
+        if path.startswith(channel_prefix) and path.endswith(overview_suffix):
+            if method != "GET": return _json_response(start_response, 405, {"error": "method not allowed"})
+            try: channel_id = int(path[len(channel_prefix) : -len(overview_suffix)])
+            except ValueError: return _json_response(start_response, 400, {"error": "channel_id must be a positive integer"})
+            session = session_factory()
+            try: status, payload = get_channel_dashboard_overview(session, channel_id)
+            finally: session.close()
+            return _json_response(start_response, status, payload)
+        trend_suffix = "/stx-trend"
+        if path.startswith(channel_prefix) and path.endswith(trend_suffix):
+            if method != "GET": return _json_response(start_response, 405, {"error": "method not allowed"})
+            try: channel_id = int(path[len(channel_prefix) : -len(trend_suffix)])
+            except ValueError: return _json_response(start_response, 400, {"error": "channel_id must be a positive integer"})
+            query = parse_qs(environ.get("QUERY_STRING", ""))
+            session = session_factory()
+            try: status, payload = get_channel_stx_trend(session, channel_id, query.get("days", ["30"])[0])
             finally: session.close()
             return _json_response(start_response, status, payload)
         media_suffix = "/media-intelligence"
