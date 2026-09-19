@@ -48,3 +48,104 @@ def test_api_is_read_only_and_missing_safe():
     engine = create_database("sqlite:///:memory:")
     with Session(engine) as session:
         assert get_intelligence(session, 999999) is None
+
+import json
+from datetime import UTC, timedelta
+
+from api.auth_guard import protect_application
+from api.http import wsgi_application
+from collector.storage import Channel, ChannelStats, Observation, Video
+from metrics.persistence import IntelligenceSnapshotRecord
+
+
+def _request(app, path, query=""):
+    captured = {}
+    body = app(
+        {"REQUEST_METHOD": "GET", "PATH_INFO": path, "QUERY_STRING": query},
+        lambda status, headers: captured.update(status=status, headers=headers),
+    )
+    return captured["status"], json.loads(body[0])
+
+
+def _seed_dashboard():
+    engine = create_database("sqlite:///:memory:")
+    with Session(engine) as session:
+        hindi = Channel(youtube_channel_id="UC-dashboard", name="Dashboard", language="Hindi", active=True)
+        peer = Channel(youtube_channel_id="UC-peer", name="Peer", language="Hindi", active=True)
+        session.add_all([hindi, peer])
+        session.flush()
+        now = datetime(2026, 9, 19, tzinfo=UTC)
+        session.add_all([
+            ChannelStats(channel_id=hindi.id, observed_at=now - timedelta(days=30), subscribers=900, total_views=9000, video_count=9),
+            ChannelStats(channel_id=hindi.id, observed_at=now, subscribers=1000, total_views=12000, video_count=12),
+            ChannelStats(channel_id=peer.id, observed_at=now, subscribers=1500, total_views=20000, video_count=20),
+        ])
+        video = Video(
+            youtube_video_id="video-dashboard-api",
+            channel_id=hindi.id,
+            title="Election update",
+            published_at=(now - timedelta(days=2)).isoformat(),
+            topic="Politics",
+        )
+        session.add(video)
+        session.flush()
+        session.add_all([
+            Observation(video_id=video.id, channel_id=hindi.id, observed_at=now - timedelta(hours=2), view_count=1000, like_count=40, comment_count=10),
+            Observation(video_id=video.id, channel_id=hindi.id, observed_at=now, view_count=1200, like_count=50, comment_count=15),
+        ])
+        session.add(IntelligenceSnapshotRecord(
+            video_id=video.id, generated_at=now, score=72.5, confidence=0.9,
+            available_signals=3, view_json="{}", contributions_json="[]",
+        ))
+        session.commit()
+    return engine, hindi.id
+
+
+def test_dashboard_endpoints_require_auth():
+    engine, channel_id = _seed_dashboard()
+    app = protect_application(wsgi_application(lambda: Session(engine)))
+    status, payload = _request(app, f"/api/v1/channels/{channel_id}/overview")
+    assert status == "401 Unauthorized"
+    assert payload == {"error": "authentication required"}
+
+
+def test_channel_overview_wsgi_returns_shape_and_rank():
+    engine, channel_id = _seed_dashboard()
+    status, payload = _request(wsgi_application(lambda: Session(engine)), f"/api/v1/channels/{channel_id}/overview")
+    assert status == "200 OK"
+    assert payload["subscribers"]["value"] == 1000
+    assert payload["subscribers_change_30d"]["value"] == 100
+    assert payload["total_views_change_30d"]["value"] == 3000
+    assert payload["uploads_in_window"]["value"] == 1
+    assert payload["current_language_market_rank"]["value"] == 2
+
+
+def test_channel_overview_wsgi_returns_null_reason_without_history():
+    engine = create_database("sqlite:///:memory:")
+    with Session(engine) as session:
+        channel = Channel(youtube_channel_id="UC-empty", name="Empty", language="Hindi", active=True)
+        session.add(channel)
+        session.commit()
+        channel_id = channel.id
+    status, payload = _request(wsgi_application(lambda: Session(engine)), f"/api/v1/channels/{channel_id}/overview")
+    assert status == "200 OK"
+    assert payload["subscribers"]["value"] is None
+    assert payload["subscribers"]["reason"] == "no stored channel statistics"
+    assert payload["subscribers_change_30d"]["value"] is None
+
+
+def test_stx_trend_wsgi_has_one_value_per_day_and_nulls_missing_days():
+    engine, channel_id = _seed_dashboard()
+    status, payload = _request(wsgi_application(lambda: Session(engine)), f"/api/v1/channels/{channel_id}/stx-trend", "days=3")
+    assert status == "200 OK"
+    assert len(payload["timeline"]) == 3
+    assert payload["timeline"][-1]["stx"] == 72.5
+    assert payload["timeline"][0]["stx"] is None
+    assert payload["timeline"][0]["reason"]
+
+
+def test_market_topics_wsgi_returns_distribution_shape():
+    engine, _channel_id = _seed_dashboard()
+    status, payload = _request(wsgi_application(lambda: Session(engine)), "/api/v1/markets/topics", "period=30d")
+    assert status == "200 OK"
+    assert payload["channels"][0]["topics"]["Politics"]["count"] == 1
