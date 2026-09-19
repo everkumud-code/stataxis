@@ -1,7 +1,7 @@
 import json
 from datetime import UTC, datetime, timedelta, timezone
 
-from api.http import _export_filters_from_query, get_channel_report, get_collection_health, get_video_intelligence, wsgi_application
+from api.http import _export_filters_from_query, get_channel_report, get_channel_stx_trend, get_collection_health, get_video_intelligence, wsgi_application
 
 
 class FakeSession:
@@ -173,3 +173,37 @@ def test_export_filters_normalize_mixed_naive_and_aware_values() -> None:
     })
     assert filters.start_at == datetime(2026, 9, 1, tzinfo=UTC)
     assert filters.end_at == datetime(2026, 9, 2, 0, tzinfo=timezone(timedelta(hours=5, minutes=30)))
+def test_wsgi_channel_stx_trend_rejects_days_above_90_and_accepts_90(monkeypatch):
+    session = FakeSession()
+    monkeypatch.setattr("api.http.channel_stx_trend", lambda _session, _channel_id, *, days: {"days": days})
+    app = wsgi_application(lambda: session)
+
+    captured = {}
+    body = app(
+        {"REQUEST_METHOD": "GET", "PATH_INFO": "/api/v1/channels/7/stx-trend", "QUERY_STRING": "days=91"},
+        lambda status, headers: captured.update(status=status, headers=headers),
+    )
+    assert captured["status"] == "400 Bad Request"
+    assert json.loads(body[0]) == {"error": "days must be between 1 and 90"}
+
+    captured = {}
+    body = app(
+        {"REQUEST_METHOD": "GET", "PATH_INFO": "/api/v1/channels/7/stx-trend", "QUERY_STRING": "days=90"},
+        lambda status, headers: captured.update(status=status, headers=headers),
+    )
+    assert captured["status"] == "200 OK"
+    assert json.loads(body[0]) == {"days": 90}
+
+    captured = {}
+    body = app(
+        {"REQUEST_METHOD": "GET", "PATH_INFO": "/api/v1/channels/7/stx-trend", "QUERY_STRING": "days=0"},
+        lambda status, headers: captured.update(status=status, headers=headers),
+    )
+    assert captured["status"] == "400 Bad Request"
+    assert json.loads(body[0]) == {"error": "days must be between 1 and 90"}
+
+
+def test_get_channel_stx_trend_rejects_out_of_range_days():
+    status, payload = get_channel_stx_trend(FakeSession(), 7, "0")
+    assert status == 400
+    assert payload == {"error": "days must be between 1 and 90"}
