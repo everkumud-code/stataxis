@@ -72,7 +72,7 @@ def _seed_dashboard():
         peer = Channel(youtube_channel_id="UC-peer", name="Peer", language="Hindi", active=True)
         session.add_all([hindi, peer])
         session.flush()
-        now = datetime(2026, 9, 19, tzinfo=UTC)
+        now = datetime(2026, 9, 19, 12, tzinfo=UTC)
         session.add_all([
             ChannelStats(channel_id=hindi.id, observed_at=now - timedelta(days=30), subscribers=900, total_views=9000, video_count=9),
             ChannelStats(channel_id=hindi.id, observed_at=now, subscribers=1000, total_views=12000, video_count=12),
@@ -115,7 +115,7 @@ def test_channel_overview_wsgi_returns_shape_and_rank():
     assert payload["subscribers"]["value"] == 1000
     assert payload["subscribers_change_30d"]["value"] == 100
     assert payload["total_views_change_30d"]["value"] == 3000
-    assert payload["uploads_in_window"]["value"] == 1
+    assert payload["uploads_in_window"]["value"] == 3
     assert payload["subscribers_rank_in_language"]["value"] == 2
     assert payload["rank_basis"] == "subscribers"
     assert payload["uploads_in_window"]["value"] == 3
