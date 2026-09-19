@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from api.errors import AuthenticationError
-
 import re
 
 from sqlalchemy.orm import Session
 
 from api.access import VideoAccessPolicy, plan_video_access_policy
 from api.auth import AuthIdentity, hash_password, issue_token, verify_password, verify_token
+from api.errors import AuthenticationError
 from api.plans import SXPlan, get_plan
 from collector.storage import User
 
@@ -68,7 +67,7 @@ def authenticate(authorization: str | None) -> AuthIdentity:
         raise AuthenticationError("authentication required")
     token = authorization[7:].strip()
     if not token:
-        raise PermissionError("authentication required")
+        raise AuthenticationError("authentication required")
     try:
         return verify_token(token)
     except ValueError as exc:
