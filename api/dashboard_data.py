@@ -110,7 +110,7 @@ def channel_overview(
     upload_change = None
     upload_change_reason = None
     if current is not None and baseline is not None and current.video_count is not None and baseline.video_count is not None:
-        upload_change = max(0, current.video_count - baseline.video_count)
+        upload_change = current.video_count - baseline.video_count
     else:
         upload_change_reason = "insufficient channel statistics history"
 
