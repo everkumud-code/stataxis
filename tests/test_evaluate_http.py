@@ -1,11 +1,13 @@
 import io
 import json
 
-import io
-import json
-
 from api.errors import AuthenticationError, AuthorizationError
 from api.evaluate_http import evaluate_application
+
+
+class _Session:
+    def close(self):
+        pass
 
 
 def _request(app, authorization):
