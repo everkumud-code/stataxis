@@ -353,5 +353,5 @@ def _export_filters_from_query(query: dict[str, list[str]]) -> ObservationExport
 
 def _bytes_response(start_response: Callable[..., Any], status: int, headers: dict[str, str], body: bytes):
     response_headers = [*headers.items(), ("Content-Length", str(len(body)))]
-    start_response(f"{status} {HTTP_STATUS.get(status, "Internal Server Error")}", response_headers)
+    start_response(f"{status} {HTTP_STATUS.get(status, 'Internal Server Error')}", response_headers)
     return [body]
