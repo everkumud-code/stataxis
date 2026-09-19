@@ -20,7 +20,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _CREDENTIAL_URL_RE = re.compile(r"(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*://)(?P<credentials>[^/@\\s]+)@")
 
 def _sanitize_error_message(message: str, secrets: tuple[str | None, ...] = ()) -> str:
-    sanitized = _CREDENTIAL_URL_RE.sub(r"\\g<scheme>[REDACTED]@", message)
+    sanitized = _CREDENTIAL_URL_RE.sub(r"\g<scheme>[REDACTED]@", message)
     for secret in secrets:
         if secret:
             sanitized = sanitized.replace(secret, "[REDACTED]")
