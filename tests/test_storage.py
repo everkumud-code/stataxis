@@ -153,13 +153,25 @@ def _stub_database_dependencies(monkeypatch):
     return storage, calls
 
 
-def test_create_database_uses_connection_health_options_for_postgres(monkeypatch) -> None:
+def test_create_database_normalizes_postgres_urls(monkeypatch) -> None:
     storage, calls = _stub_database_dependencies(monkeypatch)
 
+    storage.create_database("postgres://user:pass@host/db")
     storage.create_database("postgresql://user:pass@host/db")
 
+    assert calls == [
+        (("postgresql+psycopg://user:pass@host/db",), {"future": True, "pool_pre_ping": True, "pool_recycle": 240}),
+        (("postgresql+psycopg://user:pass@host/db",), {"future": True, "pool_pre_ping": True, "pool_recycle": 240}),
+    ]
+
+
+def test_create_database_keeps_existing_postgres_driver_urls_unchanged(monkeypatch) -> None:
+    storage, calls = _stub_database_dependencies(monkeypatch)
+
+    storage.create_database("postgresql+psycopg://user:pass@host/db")
+
     assert calls == [(
-        ("postgresql://user:pass@host/db",),
+        ("postgresql+psycopg://user:pass@host/db",),
         {"future": True, "pool_pre_ping": True, "pool_recycle": 240},
     )]
 
