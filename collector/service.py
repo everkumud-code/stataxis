@@ -28,6 +28,10 @@ MAX_LIVE_BATCH = 50
 MAX_QUOTA_BACKOFF = 300
 
 
+def quota_backoff_seconds(attempt: int) -> int:
+    return min(MAX_QUOTA_BACKOFF, max(30, 30 * (2 ** max(0, attempt - 1))))
+
+
 def _bounded_interval(name: str, default: int, minimum: int) -> int:
     try:
         value = int(os.getenv(name, str(default)))
@@ -140,7 +144,10 @@ def run_service(
     engine = create_database(database_url)
     collect_due = time.monotonic()
     live_due = collect_due
-    quota_backoff = 0
+    live_quota_backoff = 0
+    collection_quota_backoff = 0
+    live_failures = 0
+    collection_failures = 0
     cycles = 0
 
     with YouTubeClient() as client:
