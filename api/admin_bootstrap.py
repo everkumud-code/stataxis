@@ -26,11 +26,13 @@ def bootstrap_admin(session: Session) -> bool:
             plan=SXPlan.ENTERPRISE.value,
             is_admin=True,
             active=True,
+            approval_status="approved",
         )
         session.add(user)
     else:
         user.is_admin = True
         user.active = True
         user.plan = SXPlan.ENTERPRISE.value
+        user.approval_status = "approved"
     session.commit()
     return True
