@@ -288,7 +288,10 @@ def _query_datetime(query: dict[str, list[str]], key: str) -> datetime | None:
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00").replace(" ", "+"))
+        value = value.replace("Z", "+00:00")
+        if len(value) >= 6 and value[-6] == " " and value[-5:-3].isdigit() and value[-2:].isdigit() and value[-3] == ":":
+            value = f"{value[:-6]}+{value[-5:]}"
+        return datetime.fromisoformat(value)
     except ValueError as exc:
         raise ValueError(f"{key} must be an ISO datetime") from exc
 
@@ -299,20 +302,56 @@ def _json_response(start_response: Callable[..., Any], status: int, payload: dic
     return [body]
 
 
-HTTP_STATUS = {200: "OK", 400: "Bad Request", 404: "Not Found", 405: "Method Not Allowed", 500: "Internal Server Error"}
+HTTP_STATUS = {200: "OK", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed", 500: "Internal Server Error"}
 
 
 def _report_response(environ: dict[str, Any], start_response: Callable[..., Any], session_factory: Callable[[], Session], method: str):
     if method != "GET": return _json_response(start_response, 405, {"error": "method not allowed"})
     query = parse_qs(environ.get("QUERY_STRING", ""))
-    try: as_of = _query_datetime(query, "as_of")
-    except ValueError as exc: return _json_response(start_response, 400, {"error": str(exc)})
     try:
-        filters = ObservationExportFilters.from_query(query)
+        filters = _export_filters_from_query(query)
     except ValueError as exc:
         return _json_response(start_response, 400, {"error": str(exc)})
+    plan = environ.get("STATAXIS_PLAN")
+    if not plan:
+        return _json_response(start_response, 401, {"error": "authentication required"})
     session = session_factory()
     try:
-        return export_response(session, start_response, filters, as_of=as_of)
+        status, headers, body = export_response(session, plan, filters)
     finally:
         session.close()
+    if status == 200:
+        response_headers = [*headers.items(), ("Content-Length", str(len(body)))]
+        start_response("200 OK", response_headers)
+        return [body]
+    return _bytes_response(start_response, status, headers, body)
+
+
+def _export_filters_from_query(query: dict[str, list[str]]) -> ObservationExportFilters:
+    def optional_int(key: str) -> int | None:
+        value = _optional_query(query, key)
+        if value is None:
+            return None
+        try:
+            parsed = int(value)
+        except ValueError as exc:
+            raise ValueError(f"{key} must be an integer") from exc
+        if parsed <= 0:
+            raise ValueError(f"{key} must be a positive integer")
+        return parsed
+
+    return ObservationExportFilters(
+        start_at=_query_datetime(query, "start"),
+        end_at=_query_datetime(query, "end"),
+        language=_optional_query(query, "language"),
+        region=_optional_query(query, "region"),
+        channel_id=optional_int("channel_id"),
+        video_id=optional_int("video_id"),
+        classification=_optional_query(query, "classification"),
+    )
+
+
+def _bytes_response(start_response: Callable[..., Any], status: int, headers: dict[str, str], body: bytes):
+    response_headers = [*headers.items(), ("Content-Length", str(len(body)))]
+    start_response(f"{status} {HTTP_STATUS.get(status, "Internal Server Error")}", response_headers)
+    return [body]
