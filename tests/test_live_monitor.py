@@ -74,7 +74,9 @@ def test_live_audience_window_buckets_long_windows_and_preserves_raw_peak():
         assert len(payload["timeline"]) == 2
         assert payload["timeline"][0]["Hindi"] == 200
         assert payload["timeline"][0]["total_concurrent"] == 200
+        assert payload["timeline"][0]["peak_concurrent"] == 300
         assert payload["timeline"][1]["Hindi"] == 50
+        assert payload["timeline"][1]["peak_concurrent"] == 50
         assert payload["overall"]["peak_concurrent"] == 300
         assert set(payload) == {
             "start_at", "end_at", "language_filter", "sample_resolution",
