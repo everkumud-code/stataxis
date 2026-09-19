@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
-\nfrom metrics.market_stx import build_market_stx
+
+from metrics.market_stx import build_market_stx
 
 
 def _row(video_id, observed_at, views):
