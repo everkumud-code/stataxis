@@ -11,7 +11,7 @@ import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from collector.run import run_collection_pass
@@ -53,27 +53,34 @@ def load_targets() -> list[ChannelTarget]:
 def _live_video_ids(session: Session, *, now: datetime | None = None) -> list[tuple[str, Channel]]:
     now = now or datetime.now(UTC)
     cutoff = now - timedelta(minutes=LIVE_WINDOW_MINUTES)
+    latest = (
+        select(
+            Observation.video_id.label("video_id"),
+            func.max(Observation.observed_at).label("latest_at"),
+        )
+        .group_by(Observation.video_id)
+        .subquery()
+    )
     rows = session.execute(
-        select(Observation.video_id, Channel)
+        select(Observation, Channel)
+        .join(latest, (latest.c.video_id == Observation.video_id) & (latest.c.latest_at == Observation.observed_at))
         .join(Channel, Channel.id == Observation.channel_id)
         .where(
             Observation.is_live.is_(True),
             Observation.observed_at >= cutoff,
             Channel.active.is_(True),
         )
-        .order_by(Observation.observed_at.desc(), Observation.id.desc())
     ).all()
-    channel_by_video: dict[int, Channel] = {}
-    for video_id, channel in rows:
-        channel_by_video.setdefault(video_id, channel)
     videos = {
         video.id: video
-        for video in session.query(Video).filter(Video.id.in_(channel_by_video)).all()
+        for video in session.query(Video).filter(
+            Video.id.in_([observation.video_id for observation, _ in rows])
+        ).all()
     }
     return [
-        (videos[video_id].youtube_video_id, channel)
-        for video_id, channel in channel_by_video.items()
-        if video_id in videos
+        (videos[observation.video_id].youtube_video_id, channel)
+        for observation, channel in rows
+        if observation.video_id in videos
     ]
 
 
