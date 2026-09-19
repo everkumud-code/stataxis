@@ -80,11 +80,12 @@ def test_live_poller_stops_after_final_non_live_observation():
         assert service._live_video_ids(session, now=now + timedelta(seconds=1)) == []
 
 
-def test_live_poller_enforces_minimum_interval():
+def test_live_poller_enforces_minimum_interval(monkeypatch):
     import pytest
 
+    monkeypatch.setenv("LIVE_POLL_SECONDS", "29")
     with pytest.raises(ValueError):
-        service._bounded_interval("LIVE_POLL_SECONDS", 30, 30)
+        service.service_intervals()
 
 
 def test_quota_backoff_grows_and_is_capped():
