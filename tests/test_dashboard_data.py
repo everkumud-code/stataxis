@@ -201,3 +201,8 @@ def test_dashboard_migration_ignores_duplicate_column_race():
             raise RuntimeError("duplicate column name: handle")
 
     _add_column_if_missing(Connection(), "stx_channels", "handle", "VARCHAR(255)", set())
+
+
+def test_topic_matching_does_not_match_english_substrings():
+    assert assign_topic("A supermarket opens today") == "Other"
+    assert assign_topic("The matchmaker arrives today") == "Other"
