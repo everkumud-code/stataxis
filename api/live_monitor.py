@@ -66,20 +66,29 @@ def live_audience_window(session: Session, *, start_at: datetime, end_at: dateti
         rows = [row for row in rows if language_group(effective[row[1].id]).lower() == target or effective[row[1].id].lower() == target]
 
     groups = {"Hindi": [], "English": [], "Regional": [], "Unknown": []}
-    timeline: dict[datetime, dict[str, int]] = {}
+    timeline_samples: dict[datetime, dict[str, list[int]]] = {}
     channel_latest: dict[int, tuple[Observation, Channel]] = {}
     channel_peaks: dict[int, int] = {}
+    bucketed = end_at - start_at > timedelta(hours=2)
 
     for observation, channel in rows:
         group = language_group(effective[channel.id])
         groups[group].append((observation, channel))
         timestamp = _utc(observation.observed_at).replace(microsecond=0)
-        bucket = timeline.setdefault(timestamp, {name: 0 for name in groups})
-        bucket[group] += int(observation.concurrent_viewers or 0)
+        if bucketed:
+            timestamp = timestamp.replace(second=0)
+        bucket = timeline_samples.setdefault(timestamp, {name: [] for name in groups})
+        viewers = int(observation.concurrent_viewers or 0)
+        bucket[group].append(viewers)
         current = channel_latest.get(channel.id)
         if current is None or _utc(observation.observed_at) >= _utc(current[0].observed_at):
             channel_latest[channel.id] = (observation, channel)
-        channel_peaks[channel.id] = max(channel_peaks.get(channel.id, 0), int(observation.concurrent_viewers or 0))
+        channel_peaks[channel.id] = max(channel_peaks.get(channel.id, 0), viewers)
+
+    raw_timeline_totals = [
+        sum(max(samples) for samples in bucket.values() if samples)
+        for bucket in timeline_samples.values()
+    ]
 
     summaries: dict[str, dict[str, Any]] = {}
     for group, items in groups.items():
@@ -93,8 +102,20 @@ def live_audience_window(session: Session, *, start_at: datetime, end_at: dateti
             "average_concurrent": round(sum(values) / len(values), 2) if values else 0,
         }
 
-    timeline_rows = [{"observed_at": timestamp.isoformat(), **values, "total_concurrent": sum(values.values())} for timestamp, values in sorted(timeline.items())]
-    overall_values = [row["total_concurrent"] for row in timeline_rows]
+    timeline_rows = []
+    for timestamp, values in sorted(timeline_samples.items()):
+        averaged = {
+            group: round(sum(samples) / len(samples), 2) if samples else 0
+            for group, samples in values.items()
+        }
+        timeline_rows.append(
+            {
+                "observed_at": timestamp.isoformat(),
+                **averaged,
+                "total_concurrent": round(sum(averaged.values()), 2),
+            }
+        )
+    overall_values = raw_timeline_totals if bucketed else [row["total_concurrent"] for row in timeline_rows]
     latest_by_channel_total = sum(int(observation.concurrent_viewers or 0) for observation, _ in channel_latest.values())
     latest_observed_at = max((_utc(observation.observed_at) for observation, _ in channel_latest.values()), default=None)
     earliest_observed_at = min((_utc(observation.observed_at) for observation, _ in channel_latest.values()), default=None)
@@ -102,7 +123,7 @@ def live_audience_window(session: Session, *, start_at: datetime, end_at: dateti
         "start_at": start_at.isoformat(),
         "end_at": end_at.isoformat(),
         "language_filter": language,
-        "sample_resolution": "Observed timestamp buckets",
+        "sample_resolution": "1-minute buckets" if bucketed else "Observed timestamp buckets",
         "interpolation": False,
         "timeline": timeline_rows,
         "languages": summaries,
