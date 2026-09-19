@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from metrics.market_stx import build_market_stx
 
 
@@ -15,6 +17,6 @@ def test_stx_provenance_and_missing_data_are_explicit():
 
 def test_competitive_delta_never_crosses_video_boundaries():
     result = build_market_stx([
-        _row(1, 1, 100), _row(2, 2, 1000), _row(1, 3, 160), _row(2, 4, 1125)
+        _row(1, datetime(2026, 9, 16, 10, 0, tzinfo=UTC), 100), _row(2, datetime(2026, 9, 16, 10, 1, tzinfo=UTC), 1000), _row(1, datetime(2026, 9, 16, 10, 3, tzinfo=UTC), 160), _row(2, datetime(2026, 9, 16, 10, 4, tzinfo=UTC), 1125)
     ], [], channel_ids=[1])[1]
     assert result["provenance"]["observation_count"] == 4

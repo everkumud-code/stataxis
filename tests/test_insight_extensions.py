@@ -17,7 +17,7 @@ def test_what_changed_is_evidence_first_and_deterministic():
         session.add(video)
         session.flush()
         session.add_all([
-            Observation(video_id=video.id, channel_id=channel.id, observed_at=now - timedelta(hours=2), view_count=100, source="test", collector_version="test"),
+            Observation(video_id=video.id, channel_id=channel.id, observed_at=now - timedelta(hours=26), view_count=100, source="test", collector_version="test"),
             Observation(video_id=video.id, channel_id=channel.id, observed_at=now - timedelta(minutes=5), view_count=175, source="test", collector_version="test"),
         ])
         session.commit()

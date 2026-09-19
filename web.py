@@ -46,7 +46,7 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
     path = environ.get("PATH_INFO", "/")
     if path.startswith("/api/v1/auth/"):
         return _auth_api(environ, start_response)
-    if path == "/api/v1/evaluate/youtube/live-sample" or path == "/api/v1/audience/live":
+    if path in {"/api/v1/evaluate/youtube/live-sample", "/api/v1/audience/live", "/api/v1/audience/live/export"}:
         return _live_api(environ, start_response)
     if path.startswith("/api/v1/evaluate/youtube"):
         return _evaluate_api(environ, start_response)

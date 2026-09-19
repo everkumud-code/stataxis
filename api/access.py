@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from api.errors import AuthorizationError
+
 from dataclasses import dataclass
 from enum import StrEnum
 from urllib.parse import parse_qs, urlparse
@@ -106,4 +108,4 @@ def require_capability(policy: VideoAccessPolicy, capability: str) -> None:
     }:
         raise ValueError(f"unknown capability: {capability}")
     if not getattr(policy, capability):
-        raise PermissionError(policy.reason)
+        raise AuthorizationError(policy.reason)

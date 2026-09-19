@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from collector.classification import VideoClassification
-from collector.storage import Base, save_observations
+from collector.storage import Base, Channel, ChannelLanguageOverride, save_observations
 from collector.youtube.collector import VideoObservation
 
 
@@ -85,3 +85,45 @@ def test_observations_are_append_only_and_duplicate_safe() -> None:
         assert len(rows) == 2
         assert rows[0].view_count == 100
         assert rows[1].view_count == 150
+
+
+def test_save_observations_does_not_overwrite_curated_region_when_region_is_omitted() -> None:
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+
+    observation = VideoObservation(
+        video_id="video-curated",
+        channel_id="channel-curated",
+        observed_at=datetime.now(UTC),
+        title="Curated",
+        published_at=None,
+        view_count=100,
+        like_count=10,
+        comment_count=2,
+        concurrent_viewers=25,
+        is_live=True,
+        classification=VideoClassification.LIVE.value,
+        live_started_at=None,
+        live_ended_at=None,
+    )
+
+    with Session(engine) as session:
+        save_observations(
+            session, "Curated Channel", "channel-curated", "Network", "Hindi", [observation],
+            region="Jharkhand",
+        )
+        save_observations(
+            session, "Collector Name", "channel-curated", "youtube", "unknown", [observation],
+        )
+        channel = session.query(Channel).filter_by(youtube_channel_id="channel-curated").one()
+        assert channel.region == "Jharkhand"
+        assert channel.language == "Hindi"
+
+        override = ChannelLanguageOverride(channel_id=channel.id, language="Bhojpuri")
+        session.add(override)
+        session.commit()
+        save_observations(
+            session, "Collector Name", "channel-curated", "youtube", "English", [observation],
+        )
+        session.refresh(channel)
+        assert channel.language == "Bhojpuri"

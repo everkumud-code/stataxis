@@ -6,10 +6,11 @@ import json
 from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 
+from api.access import require_capability
 from api.auth_service import authenticate, policy_for_identity
+from api.errors import AuthenticationError, AuthorizationError
 from api.export import export_live_audience_xlsx
 from api.live_monitor import live_audience_window, sample_live_url
-from api.access import require_capability
 
 
 def live_application(session_factory: Callable[[], Any]):
@@ -43,9 +44,10 @@ def live_application(session_factory: Callable[[], Any]):
                     ("Content-Length", str(len(body))),
                 ])
                 return [body]
-            except PermissionError as exc:
-                message = str(exc)
-                return _json(start_response, 403 if "premium" in message or "access" in message else 401, {"error": message})
+            except AuthenticationError as exc:
+                return _json(start_response, 401, {"error": str(exc)})
+            except AuthorizationError as exc:
+                return _json(start_response, 403, {"error": str(exc)})
             except ValueError as exc:
                 return _json(start_response, 400, {"error": str(exc)})
 
@@ -64,9 +66,10 @@ def live_application(session_factory: Callable[[], Any]):
                 finally:
                     session.close()
                 return _json(start_response, 200, payload)
-            except PermissionError as exc:
-                message = str(exc)
-                return _json(start_response, 403 if "premium" in message or "access" in message else 401, {"error": message})
+            except AuthenticationError as exc:
+                return _json(start_response, 401, {"error": str(exc)})
+            except AuthorizationError as exc:
+                return _json(start_response, 403, {"error": str(exc)})
             except ValueError as exc:
                 return _json(start_response, 400, {"error": str(exc)})
 
@@ -88,9 +91,10 @@ def live_application(session_factory: Callable[[], Any]):
                 finally:
                     session.close()
                 return _json(start_response, 200, result)
-            except PermissionError as exc:
-                message = str(exc)
-                return _json(start_response, 403 if "premium" in message or "access" in message else 401, {"error": message})
+            except AuthenticationError as exc:
+                return _json(start_response, 401, {"error": str(exc)})
+            except AuthorizationError as exc:
+                return _json(start_response, 403, {"error": str(exc)})
             except ValueError as exc:
                 return _json(start_response, 400, {"error": str(exc)})
             except RuntimeError as exc:

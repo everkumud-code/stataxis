@@ -9,7 +9,6 @@ from urllib.parse import parse_qs
 
 from sqlalchemy.orm import Session
 
-from api.access import UserRole
 from api.catalog import list_channels
 from api.channel import channel_intelligence_comparison, channel_intelligence_overview, channel_view_series, compare_channels
 from api.export import ObservationExportFilters, export_response
@@ -151,6 +150,14 @@ def wsgi_application(session_factory: Callable[[], Session]):
         if path == "/health":
             start_response("200 OK", [("Content-Type", "application/json")])
             return [b'{"status":"ok","service":"stataxis"}']
+        if path.startswith("/api/v1/videos/") and path.endswith("/intelligence"):
+            if method != "GET": return _json_response(start_response, 405, {"error": "method not allowed"})
+            try: video_id = int(path[len("/api/v1/videos/") : -len("/intelligence")])
+            except ValueError: return _json_response(start_response, 400, {"error": "video_id must be a positive integer"})
+            session = session_factory()
+            try: status, payload = get_video_intelligence(session, video_id)
+            finally: session.close()
+            return _json_response(start_response, status, payload)
         if path == "/api/v1/channels":
             if method != "GET": return _json_response(start_response, 405, {"error": "method not allowed"})
             session = session_factory()
@@ -281,9 +288,9 @@ def _query_datetime(query: dict[str, list[str]], key: str) -> datetime | None:
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return datetime.fromisoformat(value.replace("Z", "+00:00").replace(" ", "+"))
     except ValueError as exc:
-        raise ValueError(f"{key} must be a valid ISO-8601 datetime") from exc
+        raise ValueError(f"{key} must be an ISO datetime") from exc
 
 
 def _json_response(start_response: Callable[..., Any], status: int, payload: dict[str, Any]):

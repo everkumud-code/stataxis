@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from api.access import VideoAccessPolicy, plan_video_access_policy
 from api.auth import AuthIdentity, hash_password, issue_token, verify_password, verify_token
+from api.errors import AuthenticationError
 from api.plans import SXPlan, get_plan
 from collector.storage import User
 
@@ -63,11 +64,14 @@ def login(session: Session, email: str, password: str) -> dict:
 
 def authenticate(authorization: str | None) -> AuthIdentity:
     if not authorization or not authorization.startswith("Bearer "):
-        raise PermissionError("authentication required")
+        raise AuthenticationError("authentication required")
     token = authorization[7:].strip()
     if not token:
-        raise PermissionError("authentication required")
-    return verify_token(token)
+        raise AuthenticationError("authentication required")
+    try:
+        return verify_token(token)
+    except ValueError as exc:
+        raise AuthenticationError("authentication required") from exc
 
 
 def policy_for_identity(identity: AuthIdentity) -> VideoAccessPolicy:

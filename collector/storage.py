@@ -129,16 +129,17 @@ def effective_channel_language(session: Session, channel: Channel, fallback: str
     return channel.language or fallback
 
 
-def save_observations(session: Session, channel_name: str, channel_youtube_id: str, network: str, language: str, observations: list[VideoObservation], region: str = "unknown") -> int:
+def save_observations(session: Session, channel_name: str, channel_youtube_id: str, network: str, language: str, observations: list[VideoObservation], region: str | None = None) -> int:
     channel = session.query(Channel).filter_by(youtube_channel_id=channel_youtube_id).one_or_none()
     if channel is None:
-        channel = Channel(youtube_channel_id=channel_youtube_id, name=channel_name, network=network, language=language, region=region)
+        channel = Channel(youtube_channel_id=channel_youtube_id, name=channel_name, network=network, language=language, region=region or "unknown")
         session.add(channel)
         session.flush()
     else:
         override = session.query(ChannelLanguageOverride).filter_by(channel_id=channel.id).one_or_none()
-        channel.language = override.language if override is not None else language
-        channel.region = region
+        channel.language = override.language if override is not None else (language if language and language.strip().lower() != "unknown" else channel.language)
+        if region is not None:
+            channel.region = region
     saved = 0
     seen: set[tuple[str, datetime]] = set()
     for item in observations:

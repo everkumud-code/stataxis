@@ -55,8 +55,8 @@ def test_wsgi_rejects_non_get_routes():
         {"REQUEST_METHOD": "POST", "PATH_INFO": "/api/v1/videos/7/intelligence"},
         lambda status, headers: captured.update(status=status, headers=headers),
     )
-    assert captured["status"] == "404 Not Found"
-    assert json.loads(body[0]) == {"error": "not found"}
+    assert captured["status"] == "405 Method Not Allowed"
+    assert json.loads(body[0]) == {"error": "method not allowed"}
 
 
 def test_wsgi_passes_as_of_to_channel_comparison(monkeypatch):

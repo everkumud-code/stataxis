@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from api.errors import AuthenticationError, AuthorizationError
+
 import json
 from typing import Any, Callable
 
@@ -32,10 +34,10 @@ def evaluate_application(session_factory: Callable[[], Session]):
             finally:
                 session.close()
             return _json(start_response, 200, result.as_dict())
-        except PermissionError as exc:
-            message = str(exc)
-            status = 403 if "can_evaluate" in message else 401
-            return _json(start_response, status, {"error": message})
+        except AuthenticationError as exc:
+            return _json(start_response, 401, {"error": str(exc)})
+        except AuthorizationError as exc:
+            return _json(start_response, 403, {"error": str(exc)})
         except ValueError as exc:
             return _json(start_response, 400, {"error": str(exc)})
 

@@ -49,8 +49,7 @@ def run_manual_live_watch(
                 channel_youtube_id=observation.channel_id,
                 network="youtube",
                 language="unknown",
-                observations=[observation],
-                region="unknown",
+                observations=[observation] ,
             )
             logger.info(
                 "saved live observation video=%s live=%s concurrent=%s",
