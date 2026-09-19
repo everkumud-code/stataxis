@@ -21,7 +21,20 @@ from collector.storage import create_database
 
 ROOT = Path(__file__).resolve().parent
 DASHBOARD = ROOT / "dashboard"
-DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("STAXIS_DATABASE_URL") or "sqlite:///stataxis.db"
+
+
+def database_url_from_env(environ: dict[str, str] | None = None) -> str:
+    values = os.environ if environ is None else environ
+    database_url = values.get("DATABASE_URL", "").strip()
+    if database_url:
+        return database_url
+    fallback = values.get("STAXIS_DATABASE_URL", "").strip()
+    if fallback:
+        return fallback
+    return "sqlite:///stataxis.db"
+
+
+DATABASE_URL = database_url_from_env()
 
 _engine = create_database(DATABASE_URL)
 
