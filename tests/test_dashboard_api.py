@@ -1,10 +1,13 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from collector.storage import Channel, Observation, Video, create_database
+from collector.storage import Channel, ChannelStats, Observation, Video, create_database
 from collector.intelligence import persist_intelligence_snapshot
 from dashboard.api import get_intelligence
+from api.auth_guard import protect_application
+from api.http import wsgi_application
+from metrics.persistence import IntelligenceSnapshotRecord
 
 
 def test_api_returns_json_serializable_intelligence():
@@ -49,14 +52,6 @@ def test_api_is_read_only_and_missing_safe():
     with Session(engine) as session:
         assert get_intelligence(session, 999999) is None
 
-import json
-from datetime import UTC, timedelta
-
-from api.auth_guard import protect_application
-from api.http import wsgi_application
-from collector.storage import Channel, ChannelStats, Observation, Video
-from metrics.persistence import IntelligenceSnapshotRecord
-
 
 def _request(app, path, query=""):
     captured = {}
@@ -98,7 +93,8 @@ def _seed_dashboard():
             available_signals=3, view_json="{}", contributions_json="[]",
         ))
         session.commit()
-    return engine, hindi.id
+        channel_id = hindi.id
+    return engine, channel_id
 
 
 def test_dashboard_endpoints_require_auth():
