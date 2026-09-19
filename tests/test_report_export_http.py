@@ -83,7 +83,7 @@ def test_report_export_rejects_free_plan(monkeypatch):
         {
             "REQUEST_METHOD": "GET",
             "PATH_INFO": "/api/v1/reports/export",
-            "QUERY_STRING": "language=Hindi&region=North%20India&classification=VOD",
+            "QUERY_STRING": "start=2026-09-01T00:00:00%2B00:00&end=2026-09-02T00:00:00%2B00:00&language=Hindi&region=North%20India&classification=VOD",
             "HTTP_AUTHORIZATION": "Bearer test",
         },
     )
@@ -112,3 +112,66 @@ def test_report_export_returns_xlsx_for_premium_plan(monkeypatch):
     workbook = load_workbook(BytesIO(body), read_only=True)
     assert workbook.sheetnames == ["StatAxis Data", "StatAxis Intelligence"]
     assert workbook["StatAxis Data"].max_row == 2
+
+
+def test_report_export_rejects_missing_date_range_for_authenticated_request(monkeypatch):
+    monkeypatch.setattr(
+        "api.auth_guard.authenticate",
+        lambda _authorization: AuthIdentity(2, "pro@example.org", "sx_pro"),
+    )
+    captured, body = call(
+        make_app(),
+        {
+            "REQUEST_METHOD": "GET",
+            "PATH_INFO": "/api/v1/reports/export",
+            "QUERY_STRING": "language=Hindi",
+            "HTTP_AUTHORIZATION": "Bearer test",
+        },
+    )
+    assert captured["status"] == "400 Bad Request"
+    assert json.loads(body) == {"error": "start and end dates are required for report export"}
+
+
+def test_report_export_rejects_ranges_longer_than_92_days(monkeypatch):
+    monkeypatch.setattr(
+        "api.auth_guard.authenticate",
+        lambda _authorization: AuthIdentity(2, "pro@example.org", "sx_pro"),
+    )
+    captured, body = call(
+        make_app(),
+        {
+            "REQUEST_METHOD": "GET",
+            "PATH_INFO": "/api/v1/reports/export",
+            "QUERY_STRING": "start=2026-01-01T00:00:00%2B00:00&end=2026-04-04T00:00:00%2B00:00",
+            "HTTP_AUTHORIZATION": "Bearer test",
+        },
+    )
+    assert captured["status"] == "400 Bad Request"
+    assert json.loads(body) == {"error": "report export date range cannot exceed 92 days"}
+
+
+def test_report_export_query_is_capped_at_200000_rows():
+    from sqlalchemy.dialects import sqlite
+
+    from api.export import ObservationExportFilters, filtered_observations
+
+    captured = {}
+
+    class Result:
+        def all(self):
+            return []
+
+    class SessionStub:
+        def execute(self, statement):
+            captured["statement"] = statement
+            return Result()
+
+    filtered_observations(
+        SessionStub(),
+        ObservationExportFilters(
+            start_at=datetime(2026, 1, 1, tzinfo=UTC),
+            end_at=datetime(2026, 1, 2, tzinfo=UTC),
+        ),
+    )
+    sql = str(captured["statement"].compile(dialect=sqlite.dialect()))
+    assert "LIMIT 200000" in sql
