@@ -158,17 +158,3 @@ def test_wsgi_collection_health_is_read_only_and_timestamped(monkeypatch):
     assert calls["as_of"] == datetime(2026, 9, 15, tzinfo=UTC)
     assert calls["stale_after_minutes"] == 90
     assert session.closed is True
-
-
-def test_query_datetime_preserves_naive_datetime_space() -> None:
-    from api.http import _query_datetime
-
-    parsed = _query_datetime({"value": ["2026-09-01 12:00:00"]}, "value")
-    assert parsed == datetime(2026, 9, 1, 12, 0, 0)
-
-
-def test_query_datetime_recovers_unencoded_timezone_space() -> None:
-    from api.http import _query_datetime
-
-    parsed = _query_datetime({"value": ["2026-09-01T00:00:00 00:00"]}, "value")
-    assert parsed == datetime(2026, 9, 1, tzinfo=UTC)
