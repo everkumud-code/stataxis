@@ -189,18 +189,29 @@ def test_save_observations_does_not_overwrite_video_metadata_with_none():
         assert video.topic == "Politics"
 
 
-def test_dashboard_migration_ignores_duplicate_column_race():
-    class Dialect:
+def test_dashboard_migration_uses_postgres_if_not_exists_and_ignores_duplicate_race():
+    class PostgresDialect:
+        name = "postgresql"
+
+    class PostgresConnection:
+        dialect = PostgresDialect()
+
+        def execute(self, statement):
+            assert "ADD COLUMN IF NOT EXISTS" in str(statement)
+
+    _add_column_if_missing(PostgresConnection(), "stx_channels", "handle", "VARCHAR(255)", set())
+
+    class SQLiteDialect:
         name = "sqlite"
 
-    class Connection:
-        dialect = Dialect()
+    class SQLiteConnection:
+        dialect = SQLiteDialect()
 
         def execute(self, statement):
             assert "ADD COLUMN" in str(statement)
             raise RuntimeError("duplicate column name: handle")
 
-    _add_column_if_missing(Connection(), "stx_channels", "handle", "VARCHAR(255)", set())
+    _add_column_if_missing(SQLiteConnection(), "stx_channels", "handle", "VARCHAR(255)", set())
 
 
 def test_topic_matching_does_not_match_english_substrings():
