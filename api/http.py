@@ -305,13 +305,13 @@ HTTP_STATUS = {200: "OK", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidd
 def _report_response(environ: dict[str, Any], start_response: Callable[..., Any], session_factory: Callable[[], Session], method: str):
     if method != "GET": return _json_response(start_response, 405, {"error": "method not allowed"})
     query = parse_qs(environ.get("QUERY_STRING", ""))
+    plan = environ.get("STATAXIS_PLAN")
+    if not plan:
+        return _json_response(start_response, 401, {"error": "authentication required"})
     try:
         filters = _export_filters_from_query(query)
     except ValueError as exc:
         return _json_response(start_response, 400, {"error": str(exc)})
-    plan = environ.get("STATAXIS_PLAN")
-    if not plan:
-        return _json_response(start_response, 401, {"error": "authentication required"})
     session = session_factory()
     try:
         status, headers, body = export_response(session, plan, filters)
@@ -337,9 +337,17 @@ def _export_filters_from_query(query: dict[str, list[str]]) -> ObservationExport
             raise ValueError(f"{key} must be a positive integer")
         return parsed
 
+    start_at = _query_datetime(query, "start")
+    end_at = _query_datetime(query, "end")
+    if start_at is None or end_at is None:
+        raise ValueError("start and end dates are required for report export")
+    if end_at < start_at:
+        raise ValueError("end date must be on or after start date")
+    if end_at - start_at > __import__("datetime").timedelta(days=92):
+        raise ValueError("report export date range cannot exceed 92 days")
     return ObservationExportFilters(
-        start_at=_query_datetime(query, "start"),
-        end_at=_query_datetime(query, "end"),
+        start_at=start_at,
+        end_at=end_at,
         language=_optional_query(query, "language"),
         region=_optional_query(query, "region"),
         channel_id=optional_int("channel_id"),
