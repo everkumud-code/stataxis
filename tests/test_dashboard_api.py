@@ -1,11 +1,13 @@
 from datetime import UTC, datetime, timedelta, timezone
 
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from collector.storage import Channel, ChannelStats, Observation, Video, create_database
 from collector.intelligence import persist_intelligence_snapshot
 from dashboard.api import get_intelligence
 from api.auth_guard import protect_application
+from api.dashboard_data import channel_stx_trend
 from api.http import wsgi_application
 from metrics.persistence import IntelligenceSnapshotRecord
 
@@ -113,7 +115,11 @@ def test_channel_overview_wsgi_returns_shape_and_rank():
     assert payload["subscribers_change_30d"]["value"] == 100
     assert payload["total_views_change_30d"]["value"] == 3000
     assert payload["uploads_in_window"]["value"] == 1
-    assert payload["current_language_market_rank"]["value"] == 2
+    assert payload["subscribers_rank_in_language"]["value"] == 2
+    assert payload["rank_basis"] == "subscribers"
+    assert payload["uploads_in_window"]["value"] == 3
+    assert payload["observed_uploads_in_window"]["value"] == 1
+    assert payload["observed_uploads_in_window"]["reason"] == "collection only tracks the latest videos"
 
 
 def test_channel_overview_wsgi_returns_null_reason_without_history():
@@ -145,3 +151,69 @@ def test_market_topics_wsgi_returns_distribution_shape():
     status, payload = _request(wsgi_application(lambda: Session(engine)), "/api/v1/markets/topics", "period=30d")
     assert status == "200 OK"
     assert payload["channels"][0]["topics"]["Politics"]["count"] == 1
+
+
+def test_channel_stx_trend_uses_small_number_of_sql_statements_for_30_days():
+    engine = create_database("sqlite:///:memory:")
+    with Session(engine) as session:
+        channel = Channel(youtube_channel_id="UC-trend-bulk", name="Bulk", language="Hindi")
+        session.add(channel)
+        session.flush()
+        start = datetime(2026, 8, 21, tzinfo=UTC)
+        for video_number in range(5):
+            video = Video(
+                youtube_video_id=f"trend-video-{video_number}",
+                channel_id=channel.id,
+                title=f"Video {video_number}",
+            )
+            session.add(video)
+            session.flush()
+            for day in range(30):
+                day_start = start + timedelta(days=day)
+                session.add_all([
+                    Observation(
+                        video_id=video.id, channel_id=channel.id,
+                        observed_at=day_start + timedelta(hours=1),
+                        view_count=1000 + day * 10 + video_number,
+                        concurrent_viewers=100 + day,
+                        like_count=10, comment_count=2, classification="VOD",
+                    ),
+                    Observation(
+                        video_id=video.id, channel_id=channel.id,
+                        observed_at=day_start + timedelta(hours=23),
+                        view_count=1100 + day * 10 + video_number,
+                        concurrent_viewers=120 + day,
+                        like_count=12, comment_count=3, classification="VOD",
+                    ),
+                ])
+        session.commit()
+        statements = []
+        def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+            statements.append(statement)
+        event.listen(engine, "before_cursor_execute", before_cursor_execute)
+        try:
+            payload = channel_stx_trend(
+                session,
+                channel.id,
+                days=30,
+                as_of=start + timedelta(days=29, hours=23, minutes=59),
+            )
+        finally:
+            event.remove(engine, "before_cursor_execute", before_cursor_execute)
+        assert len(payload["timeline"]) == 30
+        assert payload["definition"].startswith("Daily STX uses each day's trailing 24-hour window")
+        assert sum("SELECT" in statement.upper() for statement in statements) <= 5
+
+
+def test_channel_stx_trend_rejects_more_than_90_days():
+    engine = create_database("sqlite:///:memory:")
+    with Session(engine) as session:
+        channel = Channel(youtube_channel_id="UC-trend-cap", name="Cap")
+        session.add(channel)
+        session.commit()
+        try:
+            channel_stx_trend(session, channel.id, days=91)
+        except ValueError as exc:
+            assert str(exc) == "days must be between 1 and 90"
+        else:
+            raise AssertionError("expected 90-day cap")
