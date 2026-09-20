@@ -53,6 +53,23 @@ def _validate_signal(value: float | None) -> float | None:
     return value
 
 
+def stx_display(score: float | None, confidence: float) -> dict[str, float | bool | str | None]:
+    """Return a confidence-adjusted display score without changing raw STX."""
+    clamped_confidence = max(0.0, min(100.0, float(confidence)))
+    if score is None:
+        return {
+            "display_score": None,
+            "preliminary": True,
+            "display_method": "50 + (score - 50) * confidence / 100",
+        }
+    display_score = 50 + (float(score) - 50) * (clamped_confidence / 100)
+    return {
+        "display_score": round(display_score, 1),
+        "preliminary": clamped_confidence < 50,
+        "display_method": "50 + (score - 50) * confidence / 100",
+    }
+
+
 def calculate_stx_index(signals: STXSignals) -> STXIndexResult:
     """Fuse available weighted signals without treating missing data as zero."""
     raw = {
