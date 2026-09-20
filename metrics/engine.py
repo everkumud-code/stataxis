@@ -33,7 +33,8 @@ def view_velocity(previous: ObservationPoint, current: ObservationPoint) -> floa
     elapsed = (current.observed_at - previous.observed_at).total_seconds()
     if previous.view_count is None or current.view_count is None:
         return None
-    return _rate(current.view_count - previous.view_count, elapsed) * 60
+    rate = _rate(current.view_count - previous.view_count, elapsed)
+    return rate * 60 if rate is not None else None
 
 
 def audience_momentum(previous: ObservationPoint, current: ObservationPoint) -> float | None:
@@ -41,10 +42,11 @@ def audience_momentum(previous: ObservationPoint, current: ObservationPoint) -> 
     elapsed = (current.observed_at - previous.observed_at).total_seconds()
     if previous.concurrent_viewers is None or current.concurrent_viewers is None:
         return None
-    return _rate(
+    rate = _rate(
         current.concurrent_viewers - previous.concurrent_viewers,
         elapsed,
-    ) * 60
+    )
+    return rate * 60 if rate is not None else None
 
 
 def engagement_rate(previous: ObservationPoint, current: ObservationPoint) -> float | None:
@@ -57,11 +59,12 @@ def engagement_rate(previous: ObservationPoint, current: ObservationPoint) -> fl
         or current.comment_count is None
     ):
         return None
-    return _rate(
+    rate = _rate(
         (current.like_count - previous.like_count)
         + (current.comment_count - previous.comment_count),
         elapsed,
-    ) * 60
+    )
+    return rate * 60 if rate is not None else None
 
 
 def average(values: list[int | float | None]) -> float | None:
