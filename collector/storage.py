@@ -48,6 +48,8 @@ class Video(Base):
     thumbnail_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     category_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     topic: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    live_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    live_ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ChannelStats(Base):
@@ -162,7 +164,7 @@ def create_database(url: str):
         for name, definition in {"avatar_url": "VARCHAR(1000)", "handle": "VARCHAR(255)"}.items():
             _add_column_if_missing(connection, "stx_channels", name, definition, channel_columns)
         video_columns = {item["name"] for item in inspect(connection).get_columns("stx_videos")}
-        for name, definition in {"thumbnail_url": "VARCHAR(1000)", "category_id": "VARCHAR(32)", "topic": "VARCHAR(64)"}.items():
+        for name, definition in {"thumbnail_url": "VARCHAR(1000)", "category_id": "VARCHAR(32)", "topic": "VARCHAR(64)", "live_started_at": "TIMESTAMP WITH TIME ZONE", "live_ended_at": "TIMESTAMP WITH TIME ZONE"}.items():
             _add_column_if_missing(connection, "stx_videos", name, definition, video_columns)
     return engine
 
@@ -172,6 +174,17 @@ def effective_channel_language(session: Session, channel: Channel, fallback: str
     if override is not None:
         return override.language
     return channel.language or fallback
+
+
+def _parse_rfc3339(value: str | None) -> datetime | None:
+    """Parse a YouTube RFC 3339 timestamp; return None when absent or malformed."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 def save_observations(
@@ -223,10 +236,19 @@ def save_observations(
                 youtube_video_id=item.video_id, channel_id=channel.id, title=item.title,
                 published_at=item.published_at, thumbnail_url=item.thumbnail_url,
                 category_id=item.category_id, topic=item.topic or assign_topic(item.title),
+                live_started_at=_parse_rfc3339(getattr(item, "live_started_at", None)),
+                live_ended_at=_parse_rfc3339(getattr(item, "live_ended_at", None)),
             )
             session.add(video)
             session.flush()
         else:
+            # Start/end are set once YouTube reports them; never overwritten with a missing value.
+            started = _parse_rfc3339(getattr(item, "live_started_at", None))
+            ended = _parse_rfc3339(getattr(item, "live_ended_at", None))
+            if started is not None:
+                video.live_started_at = started
+            if ended is not None:
+                video.live_ended_at = ended
             video.title = item.title
             video.published_at = item.published_at
             if item.thumbnail_url is not None:

@@ -15,6 +15,7 @@ Application:
 - `COLLECT_SECONDS` — full collection interval; default 600, minimum 60.
 - `LIVE_POLL_SECONDS` — live polling interval; default 30, minimum 30.
 - `PORT` — HTTP port supplied by the platform or used by Docker Compose.
+- `STAXIS_PRIMARY_MIN_LIVE_HOURS` — how long a live stream must have been running before it counts as a channel's Primary feed (default `12`). Other concurrent streams are Secondary feeds; All feed = Primary + Secondary.
 
 Existing collector settings:
 - `STAXIS_COLLECTION_INTERVAL_SECONDS` — interval for the legacy `collector.worker` entry point.
