@@ -1,8 +1,8 @@
 import json
 from datetime import UTC, datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
-from types import SimpleNamespace
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 
