@@ -1,8 +1,11 @@
 import json
 from datetime import UTC, datetime, timedelta, timezone
 
+import pytest
 from sqlalchemy import event
 from sqlalchemy.orm import Session
+
+import api.dashboard_data as dashboard_data
 
 from collector.storage import Channel, ChannelStats, Observation, Video, create_database
 from collector.intelligence import persist_intelligence_snapshot
@@ -65,6 +68,15 @@ def _request(app, path, query=""):
     return captured["status"], json.loads(body[0])
 
 
+@pytest.fixture
+def seeded_dashboard_now(monkeypatch):
+    monkeypatch.setattr(
+        dashboard_data,
+        "_now",
+        lambda: datetime(2026, 9, 19, 12, tzinfo=UTC),
+    )
+
+
 def _seed_dashboard():
     engine = create_database("sqlite:///:memory:")
     with Session(engine) as session:
@@ -108,7 +120,7 @@ def test_dashboard_endpoints_require_auth():
     assert payload == {"error": "authentication required"}
 
 
-def test_channel_overview_wsgi_returns_shape_and_rank():
+def test_channel_overview_wsgi_returns_shape_and_rank(seeded_dashboard_now):
     engine, channel_id = _seed_dashboard()
     status, payload = _request(wsgi_application(lambda: Session(engine)), f"/api/v1/channels/{channel_id}/overview")
     assert status == "200 OK"
@@ -137,7 +149,7 @@ def test_channel_overview_wsgi_returns_null_reason_without_history():
     assert payload["subscribers_change_30d"]["value"] is None
 
 
-def test_stx_trend_wsgi_has_one_value_per_day_and_nulls_missing_days():
+def test_stx_trend_wsgi_has_one_value_per_day_and_nulls_missing_days(seeded_dashboard_now):
     engine, channel_id = _seed_dashboard()
     status, payload = _request(wsgi_application(lambda: Session(engine)), f"/api/v1/channels/{channel_id}/stx-trend", "days=3")
     assert status == "200 OK"
@@ -147,12 +159,38 @@ def test_stx_trend_wsgi_has_one_value_per_day_and_nulls_missing_days():
     assert payload["timeline"][0]["reason"] == "insufficient stored observations for daily STX"
 
 
-def test_market_topics_wsgi_returns_distribution_shape():
+def test_market_topics_wsgi_returns_distribution_shape(seeded_dashboard_now):
     engine, _channel_id = _seed_dashboard()
     status, payload = _request(wsgi_application(lambda: Session(engine)), "/api/v1/markets/topics", "period=30d")
     assert status == "200 OK"
     assert payload["channels"][0]["topics"]["Politics"]["count"] == 1
 
+
+
+def test_dashboard_endpoints_are_time_independent(monkeypatch):
+    engine, channel_id = _seed_dashboard()
+    monkeypatch.setattr(
+        dashboard_data,
+        "_now",
+        lambda: datetime(2026, 12, 31, 12, tzinfo=UTC),
+    )
+
+    with Session(engine) as session:
+        overview = dashboard_data.channel_overview(session, channel_id)
+        assert overview is not None
+        assert overview["subscribers"]["value"] == 1000
+        assert overview["total_views"]["value"] == 12000
+        assert overview["video_count"]["value"] == 12
+        assert overview["subscribers_change_30d"]["value"] == 0
+        assert overview["uploads_in_window"]["value"] == 0
+        assert overview["observed_uploads_in_window"]["value"] == 0
+
+        trend = dashboard_data.channel_stx_trend(session, channel_id, days=3)
+        assert trend is not None
+        assert [point["stx"] for point in trend["timeline"]] == [None, None, None]
+
+        topics = dashboard_data.market_topic_distribution(session, period="30d")
+        assert topics["channels"] == []
 
 def test_channel_stx_trend_uses_small_number_of_sql_statements_for_30_days():
     engine = create_database("sqlite:///:memory:")

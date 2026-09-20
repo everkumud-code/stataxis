@@ -14,6 +14,10 @@ from metrics.pipeline import build_intelligence_snapshot
 from metrics.timeseries import compare_metric
 
 
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
 def _utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
@@ -53,7 +57,7 @@ def channel_overview(
     channel = session.get(Channel, channel_id)
     if channel is None:
         return None
-    now = _utc(as_of or datetime.now(UTC))
+    now = _utc(as_of or _now())
     window_start = now - timedelta(days=max(1, min(window_days, 365)))
     current = _latest_stats(session, channel_id, now)
     baseline = _latest_stats(session, channel_id, window_start)
@@ -164,7 +168,7 @@ def channel_stx_trend(
     if days > 90:
         raise ValueError("days must be between 1 and 90")
     days = max(1, days)
-    now = _utc(as_of or datetime.now(UTC))
+    now = _utc(as_of or _now())
     end_day = now.date()
     start_day = end_day - timedelta(days=days - 1)
     first_window_start = datetime.combine(start_day, datetime.min.time(), tzinfo=UTC) - timedelta(days=1)
@@ -256,7 +260,7 @@ def market_topic_distribution(
     else:
         raise ValueError("period must use Nd format, for example 7d or 30d")
     window_days = max(1, min(window_days, 365))
-    now = _utc(as_of or datetime.now(UTC))
+    now = _utc(as_of or _now())
     start = now - timedelta(days=window_days)
     rows = session.execute(
         select(Channel.id, Channel.name, Video.topic, Observation.video_id, func.max(Observation.observed_at))
