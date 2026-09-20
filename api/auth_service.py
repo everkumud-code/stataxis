@@ -7,23 +7,23 @@ import re
 from sqlalchemy.orm import Session
 
 from api.access import VideoAccessPolicy, plan_video_access_policy
-from api.auth import AuthIdentity, hash_password, issue_token, verify_password, verify_token
+from api.auth import AuthIdentity, hash_password, issue_token, verify_password
+from api.auth import verify_token
 from api.errors import AuthenticationError
 from api.plans import SXPlan, get_plan
 from collector.storage import User
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-# Consumer/free mailbox domains are not accepted for StatAxis workspace applications.
 _PUBLIC_EMAIL_DOMAINS = frozenset({
     "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "hotmail.com",
     "outlook.com", "live.com", "icloud.com", "proton.me", "protonmail.com",
     "aol.com", "rediffmail.com", "mail.com", "gmx.com", "zoho.com",
 })
+_DUMMY_PASSWORD_HASH = "pbkdf2_sha256$600000$AQEBAQEBAQEBAQEBAQEBAQ$qVMnbrzFRpnP-Sb4fsnYsDWHHcJSbJktHlJ96uK82i0"
 
 
 def register(session: Session, email: str, password: str, full_name: str, mobile: str,
              organization: str, purpose_of_use: str, requested_plan: str) -> dict:
-    """Submit a profile for admin approval; it receives no workspace access."""
     normalized = email.strip().lower()
     if not _EMAIL_RE.fullmatch(normalized):
         raise ValueError("valid organization email is required")
@@ -39,7 +39,7 @@ def register(session: Session, email: str, password: str, full_name: str, mobile
         if not isinstance(value, str) or not value.strip() or len(value.strip()) > limit:
             raise ValueError(f"{label} is required")
     if session.query(User).filter_by(email=normalized).one_or_none() is not None:
-        raise ValueError("email already registered")
+        return {"already_exists": True}
     user = User(email=normalized, password_hash=hash_password(password), plan=SXPlan.FREE.value,
                 approval_status="pending", full_name=full_name.strip(), mobile=mobile.strip(),
                 organization=organization.strip(), purpose_of_use=purpose_of_use.strip(), requested_plan=plan)
@@ -51,7 +51,10 @@ def register(session: Session, email: str, password: str, full_name: str, mobile
 def login(session: Session, email: str, password: str) -> dict:
     normalized = email.strip().lower()
     user = session.query(User).filter_by(email=normalized, active=True).one_or_none()
-    if user is None or not verify_password(password, user.password_hash):
+    if user is None:
+        verify_password(password, _DUMMY_PASSWORD_HASH)
+        raise PermissionError("invalid email or password")
+    if not verify_password(password, user.password_hash):
         raise PermissionError("invalid email or password")
     if not user.is_admin and user.approval_status != "approved":
         raise PermissionError("profile pending admin approval")
