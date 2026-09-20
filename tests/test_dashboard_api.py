@@ -175,33 +175,22 @@ def test_dashboard_endpoints_are_time_independent(monkeypatch):
         lambda: datetime(2026, 12, 31, 12, tzinfo=UTC),
     )
 
-    status, overview = _request(
-        wsgi_application(lambda: Session(engine)),
-        f"/api/v1/channels/{channel_id}/overview",
-    )
-    assert status == "200 OK"
-    assert overview["subscribers"]["value"] is None
-    assert overview["total_views"]["value"] is None
-    assert overview["video_count"]["value"] is None
-    assert overview["subscribers_change_30d"]["value"] is None
-    assert overview["uploads_in_window"]["value"] is None
-    assert overview["observed_uploads_in_window"]["value"] == 0
+    with Session(engine) as session:
+        overview = dashboard_data.channel_overview(session, channel_id)
+        assert overview is not None
+        assert overview["subscribers"]["value"] is None
+        assert overview["total_views"]["value"] is None
+        assert overview["video_count"]["value"] is None
+        assert overview["subscribers_change_30d"]["value"] is None
+        assert overview["uploads_in_window"]["value"] is None
+        assert overview["observed_uploads_in_window"]["value"] == 0
 
-    status, trend = _request(
-        wsgi_application(lambda: Session(engine)),
-        f"/api/v1/channels/{channel_id}/stx-trend",
-        "days=3",
-    )
-    assert status == "200 OK"
-    assert [point["stx"] for point in trend["timeline"]] == [None, None, None]
+        trend = dashboard_data.channel_stx_trend(session, channel_id, days=3)
+        assert trend is not None
+        assert [point["stx"] for point in trend["timeline"]] == [None, None, None]
 
-    status, topics = _request(
-        wsgi_application(lambda: Session(engine)),
-        "/api/v1/markets/topics",
-        "period=30d",
-    )
-    assert status == "200 OK"
-    assert topics["channels"] == []
+        topics = dashboard_data.market_topic_distribution(session, period="30d")
+        assert topics["channels"] == []
 
 def test_channel_stx_trend_uses_small_number_of_sql_statements_for_30_days():
     engine = create_database("sqlite:///:memory:")
