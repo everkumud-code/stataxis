@@ -40,7 +40,7 @@ def test_latest_video_intelligence_returns_newest_explainable_snapshot():
         result = latest_video_intelligence(session, video.id)
         assert result["score"] == 55.0
         assert result["youtube_video_id"] == "video-api"
-        assert result["stx_index"] == {"score": 55.0, "confidence": 80.0, "available_signals": 3}
+        assert result["stx_index"] == {"score": 55.0, "confidence": 80.0, "available_signals": 3, "display_score": 54.0, "preliminary": False, "display_method": "50 + (score - 50) * confidence / 100"}
         assert result["data"] == ["Observed audience movement."]
         assert result["analysis"] == ["Momentum is positive."]
         assert result["view"] == "The available evidence supports a positive directional signal."
