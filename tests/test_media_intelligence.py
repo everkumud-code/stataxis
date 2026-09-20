@@ -94,3 +94,70 @@ def test_channel_media_intelligence_stx_includes_display_fields():
     assert "display_score" in payload["stx"]
     assert "preliminary" in payload["stx"]
     assert payload["stx"]["display_method"] == "50 + (score - 50) * confidence / 100"
+
+
+def test_media_intelligence_handles_shared_observation_timestamp():
+    session = _session()
+    channel = Channel(
+        youtube_channel_id="shared-time",
+        name="Shared Time",
+        language="Hindi",
+        region="India",
+    )
+    session.add(channel)
+    session.flush()
+
+    observed_at = datetime(2026, 9, 16, 10, 0, tzinfo=UTC)
+    video_a = Video(
+        youtube_video_id="shared-a",
+        channel_id=channel.id,
+        title="Shared A",
+        published_at="2026-09-15T09:00:00+00:00",
+    )
+    video_b = Video(
+        youtube_video_id="shared-b",
+        channel_id=channel.id,
+        title="Shared B",
+        published_at="2026-09-15T09:00:00+00:00",
+    )
+    session.add_all([video_a, video_b])
+    session.flush()
+    session.add_all([
+        Observation(
+            video_id=video_a.id,
+            channel_id=channel.id,
+            observed_at=observed_at,
+            view_count=1000,
+            like_count=10,
+            comment_count=2,
+            concurrent_viewers=100,
+            is_live=True,
+            classification="LIVE",
+        ),
+        Observation(
+            video_id=video_b.id,
+            channel_id=channel.id,
+            observed_at=observed_at,
+            view_count=2000,
+            like_count=20,
+            comment_count=4,
+            concurrent_viewers=200,
+            is_live=True,
+            classification="LIVE",
+        ),
+    ])
+    session.commit()
+
+    as_of = observed_at + timedelta(days=1)
+    market_payload = market_report(session, as_of=as_of, period="7d")
+    channel_payload = channel_media_intelligence(
+        session,
+        channel.id,
+        as_of=as_of,
+        period="7d",
+    )
+
+    assert market_payload["market"]["channel_count"] == 1
+    assert market_payload["channels"][0]["channel_id"] == channel.id
+    assert channel_payload is not None
+    assert channel_payload["channel"]["id"] == channel.id
