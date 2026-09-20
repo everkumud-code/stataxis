@@ -22,7 +22,7 @@ def _seed():
     channel = Channel(youtube_channel_id="c", name="News", network="n", language="Hindi", region="India", active=True)
     session.add(channel)
     session.flush()
-    main = Video(youtube_video_id="main", channel_id=channel.id, title="24x7", live_started_at=END - timedelta(days=30))
+    main = Video(youtube_video_id="main", channel_id=channel.id, title="24x7", live_started_at=END - timedelta(days=45))
     event = Video(youtube_video_id="event", channel_id=channel.id, title="Event", live_started_at=END - timedelta(hours=2))
     ended = Video(youtube_video_id="ended", channel_id=channel.id, title="Ended", live_started_at=END - timedelta(hours=3))
     session.add_all([main, event, ended])

@@ -9,7 +9,7 @@ Definitions (STAXIS product terms):
 
 Classification is done from YouTube's actual start time so it needs no manual tagging:
 among a channel's concurrently live streams, the one that has been live the longest
-(and at least ``min_primary_hours``) is the primary feed; every other live stream is a
+(and at least ``min_primary_hours``, default 30 days) is the primary feed; every other live stream is a
 secondary feed. If nothing has been live long enough there is no primary feed at that
 moment and all concurrent viewers are reported as secondary, so the All feed is never
 understated.
@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Sequence
 
-DEFAULT_MIN_PRIMARY_HOURS = 12.0
+DEFAULT_MIN_PRIMARY_HOURS = 30 * 24.0  # primary feed = live for 30 days or more
 
 
 def min_primary_hours() -> float:
