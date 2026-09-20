@@ -30,12 +30,12 @@ class EvaluationResult:
     observation_count: int
     stx_index: float | None
     confidence: float
-    display_stx_index: float | None
-    preliminary: bool
     available_signals: int
     data: list[str]
     analysis: list[str]
     view: str
+    display_stx_index: float | None = None
+    preliminary: bool = True
 
     def as_dict(self) -> dict[str, object]:
         return {
