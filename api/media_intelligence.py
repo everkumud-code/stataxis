@@ -293,8 +293,9 @@ def _scope_matches(row: dict[str, Any], stream_scope: str) -> bool:
     if scope == "all": return True
     if scope == "live": return bool(row["is_live"] or row["classification"] == "LIVE")
     if scope == "replay": return row["classification"] == "COMPLETED_LIVE"
-    if scope == "video": return row["classification"] in {"REGULAR_VIDEO", "SHORT", "PREMIERE", "UNKNOWN"}
-    raise ValueError("stream_scope must be one of: all, live, replay, video")
+    if scope == "video": return row["classification"] in {"REGULAR_VIDEO", "PREMIERE", "UNKNOWN"}
+    if scope == "shorts": return row["classification"] == "SHORT"
+    raise ValueError("stream_scope must be one of: all, live, replay, video, shorts")
 
 
 def _period_start(as_of: datetime, period: str) -> datetime:
