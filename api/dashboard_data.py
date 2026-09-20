@@ -12,6 +12,7 @@ from collector.storage import Channel, ChannelStats, Observation, Video
 from metrics.engine import ObservationPoint
 from metrics.pipeline import build_intelligence_snapshot
 from metrics.timeseries import compare_metric
+from metrics.stx_index import stx_display
 
 
 def _now() -> datetime:
