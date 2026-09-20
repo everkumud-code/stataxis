@@ -16,6 +16,8 @@ Application:
 - `LIVE_POLL_SECONDS` — live polling interval; default 30, minimum 30.
 - `PORT` — HTTP port supplied by the platform or used by Docker Compose.
 - `STAXIS_TRUSTED_PROXIES` — number of trusted reverse proxies in front of the web process (default `1`, correct for Render). Used to find the real client IP for login/registration rate limits. Set `0` if the app is exposed directly with no proxy, otherwise clients can forge `X-Forwarded-For`.
+- `STAXIS_COLLECT_SLICE_CHANNELS` — channels collected per slice (default `10`). A collection pass is cut into slices so live polling keeps running during long passes.
+- `STAXIS_YOUTUBE_DAILY_QUOTA_UNITS` — your project's YouTube Data API daily quota (default `10000`). The worker logs a warning at the start of every pass when the channel count and intervals would exceed it.
 - `STAXIS_PRIMARY_MIN_LIVE_HOURS` — how long a live stream must have been running before it counts as a channel's Primary feed (default `720`, i.e. 30 days). Other concurrent streams are Secondary feeds; All feed = Primary + Secondary.
 
 Existing collector settings:
@@ -123,3 +125,46 @@ docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES
 ```
 
 Store the resulting SQL dump outside the application container and test restores periodically.
+
+## Growing the channel universe
+
+STAXIS collects the channels listed in `config/channels.json`. Each entry has a `segment`
+(`news`, `business`, `print`, `party`, `leader`, `commentator`) and a `language`; together they decide the
+market a channel is reported in (Hindi News, English News, Business News, Print Media, Political Parties &
+Leaders, Political Commentators).
+
+`config/channel_candidates.json` lists channels to add, by name, with no IDs. To register them (needs `YOUTUBE_API_KEY`):
+
+```bash
+python -m collector.resolve_candidates --resolve --limit 20   # finds likely channels (100 quota units per search)
+python -m collector.resolve_candidates --list                 # review the suggestions
+python -m collector.resolve_candidates --approve "Zee News"   # accept the best match (or --pick 2)
+python -m collector.candidate_importer --add-verified         # re-verifies against the API and registers
+```
+
+A name search can return fan or re-upload channels, so nothing is registered without an approval. Commit
+`config/channels.json` and redeploy the worker to start collecting the new channels. One channel failing
+(deleted, renamed) is skipped and logged; it no longer stops the rest of the pass.
+
+### YouTube quota
+
+Each channel costs 3 quota units per collection pass, and live polling costs 1 unit per 50 live videos per poll.
+The default quota is 10,000 units/day.
+
+| Channels | `COLLECT_SECONDS` | Units/day | Fits 10,000? |
+|---|---|---|---|
+| 5 | 600 | about 5,000 | yes |
+| 60 | 600 | about 31,700 | no |
+| 60 | 5,676 | about 8,500 | yes, but a pass only every 95 minutes |
+
+For a large universe, request a higher quota from Google (Google Cloud console, YouTube Data API v3, Quotas),
+then set `STAXIS_YOUTUBE_DAILY_QUOTA_UNITS` and `STAXIS_YOUTUBE_REQUESTS_PER_DAY` to the new value.
+
+## Live feed statistics
+
+- `GET /api/v1/audience/live/snapshot?at=...` viewers at one instant, per channel and market: Primary / Secondary / All.
+- `GET /api/v1/audience/live/stats?start=...&end=...` average and peak concurrent viewers for Primary / Secondary / All
+  over a window of up to 24 hours, with share % and a ready-to-post headline per market.
+- `GET /api/v1/audience/live/stats/export?...` the same as an Excel file, with a Method sheet.
+
+Optional `language`, `segment` and `bucket_seconds` (minimum 30, default 60) parameters apply. Times are UTC.

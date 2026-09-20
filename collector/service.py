@@ -16,6 +16,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from collector.main import load_targets
+from collector.quota_estimate import quota_warning
 from collector.run import run_collection_pass
 from collector.run_once import _sanitize_error_message
 from collector.storage import Channel, Observation, Video, create_database, save_observations
@@ -177,10 +178,16 @@ def run_service(
     install_signal_handlers(stop)
     secrets = (database_url, os.getenv("YOUTUBE_API_KEY"))
 
+    slice_size = interval_seconds("STAXIS_COLLECT_SLICE_CHANNELS", 10, 1)
     next_collect = time.monotonic()
     next_live = next_collect
     collect_quota_attempt = 0
     live_quota_attempt = 0
+    # A collection pass over many channels is cut into slices so live polling is never
+    # starved for minutes while the pass runs (live stats need fresh samples).
+    pass_targets: list | None = None
+    pass_offset = 0
+    pass_started = next_collect
 
     with client_factory() as client:
         while not stop.is_set():
@@ -189,24 +196,42 @@ def run_service(
             if now >= next_collect:
                 try:
                     with Session(engine) as session:
-                        targets = load_targets(ROOT / "config/channels.json")
-                        result = run_collection_pass(session, client, targets)
+                        if pass_targets is None:
+                            pass_targets = load_targets(ROOT / "config/channels.json")
+                            pass_offset = 0
+                            pass_started = now
+                            warning = quota_warning(len(pass_targets), collect_seconds, live_poll_seconds)
+                            if warning:
+                                logger.warning(warning)
+                        chunk = pass_targets[pass_offset:pass_offset + slice_size]
+                        last_slice = pass_offset + slice_size >= len(pass_targets)
+                        if last_slice:
+                            result = run_collection_pass(session, client, chunk)
+                        else:
+                            result = run_collection_pass(session, client, chunk, intelligence=False)
                     logger.info(
                         "collection counts channels=%d videos=%d snapshots=%d errors=%d",
-                        len(targets),
+                        len(chunk),
                         result.videos_observed,
                         result.intelligence.snapshots_built,
-                        result.intelligence.errors,
+                        result.intelligence.errors + getattr(result, "channel_errors", 0),
                     )
                     collect_quota_attempt = 0
-                    next_collect = now + collect_seconds
+                    if last_slice:
+                        pass_targets = None
+                        next_collect = max(now, pass_started + collect_seconds)
+                    else:
+                        pass_offset += slice_size
+                        next_collect = now  # next slice right after the live check below
                 except YouTubeAPIError as exc:
+                    pass_targets = None
                     collect_quota_attempt += 1
                     delay = quota_backoff_seconds(collect_quota_attempt) if exc.status_code in {403, 429} else collect_seconds
                     _log_loop_error("collection", exc, secrets)
                     logger.info("collection counts channels=0 videos=0 snapshots=0 errors=1")
                     next_collect = now + delay
                 except Exception as exc:
+                    pass_targets = None
                     _log_loop_error("collection", exc, secrets)
                     logger.info("collection counts channels=0 videos=0 snapshots=0 errors=1")
                     next_collect = now + collect_seconds

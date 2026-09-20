@@ -18,6 +18,7 @@ class ChannelTarget:
     language: str = "unknown"
     network: str = "unknown"
     region: str | None = None
+    segment: str = "news"
 
 
 @dataclass(frozen=True)

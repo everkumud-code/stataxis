@@ -74,7 +74,7 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
     path = environ.get("PATH_INFO", "")
     if path.startswith("/api/v1/auth/"):
         return _auth_api(environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
-    if path in {"/api/v1/evaluate/youtube/live-sample", "/api/v1/audience/live", "/api/v1/audience/live/export"}:
+    if path in {"/api/v1/evaluate/youtube/live-sample", "/api/v1/audience/live", "/api/v1/audience/live/export", "/api/v1/audience/live/stats", "/api/v1/audience/live/stats/export", "/api/v1/audience/live/snapshot"}:
         return _live_api(environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
     if path.startswith("/api/v1/evaluate/youtube"):
         return _evaluate_api(environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))

@@ -27,6 +27,7 @@ class Channel(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     avatar_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     handle: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    segment: Mapped[str] = mapped_column(String(32), default="news", index=True)
 
 
 class ChannelLanguageOverride(Base):
@@ -161,8 +162,9 @@ def create_database(url: str):
             _add_column_if_missing(connection, "stx_users", name, definition, columns)
         connection.execute(text("UPDATE stx_users SET approval_status='approved' WHERE approval_status IS NULL"))
         channel_columns = {item["name"] for item in inspect(connection).get_columns("stx_channels")}
-        for name, definition in {"avatar_url": "VARCHAR(1000)", "handle": "VARCHAR(255)"}.items():
+        for name, definition in {"avatar_url": "VARCHAR(1000)", "handle": "VARCHAR(255)", "segment": "VARCHAR(32) DEFAULT 'news'"}.items():
             _add_column_if_missing(connection, "stx_channels", name, definition, channel_columns)
+        connection.execute(text("UPDATE stx_channels SET segment='news' WHERE segment IS NULL"))
         video_columns = {item["name"] for item in inspect(connection).get_columns("stx_videos")}
         for name, definition in {"thumbnail_url": "VARCHAR(1000)", "category_id": "VARCHAR(32)", "topic": "VARCHAR(64)", "live_started_at": "TIMESTAMP WITH TIME ZONE", "live_ended_at": "TIMESTAMP WITH TIME ZONE"}.items():
             _add_column_if_missing(connection, "stx_videos", name, definition, video_columns)
@@ -198,11 +200,12 @@ def save_observations(
     *,
     avatar_url: str | None = None,
     handle: str | None = None,
+    segment: str | None = None,
     channel_stats: tuple[datetime, int | None, int | None, int | None] | None = None,
 ) -> int:
     channel = session.query(Channel).filter_by(youtube_channel_id=channel_youtube_id).one_or_none()
     if channel is None:
-        channel = Channel(youtube_channel_id=channel_youtube_id, name=channel_name, network=network, language=language, region=region or "unknown")
+        channel = Channel(youtube_channel_id=channel_youtube_id, name=channel_name, network=network, language=language, region=region or "unknown", segment=segment or "news")
         session.add(channel)
         session.flush()
     else:
@@ -214,6 +217,8 @@ def save_observations(
         channel.avatar_url = avatar_url
     if handle is not None:
         channel.handle = handle
+    if segment is not None:
+        channel.segment = segment
     if channel_stats is not None:
         observed_at, subscribers, total_views, video_count = channel_stats
         session.add(ChannelStats(

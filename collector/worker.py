@@ -49,6 +49,7 @@ def load_targets(session: Session) -> list[ChannelTarget]:
             name=row.name if row else item["name"],
             language=row.language if row else item.get("language", "unknown"),
             network=row.network if row else item.get("network", "unknown"),
+            segment=(row.segment if row else item.get("segment", "news")) or "news",
         ))
     configured_ids = {item["channel_id"] for item in configured}
     for row in existing.values():
@@ -58,6 +59,7 @@ def load_targets(session: Session) -> list[ChannelTarget]:
                 name=row.name,
                 language=row.language,
                 network=row.network,
+                segment=row.segment or "news",
             ))
     logger.info(
         "monitoring universe: configured=%d persisted_active=%d total=%d",

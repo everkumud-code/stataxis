@@ -83,6 +83,38 @@ class YouTubeClient:
             raise YouTubeAPIError(f"Channel not found: {channel_id}")
         return items[0]
 
+    def get_channels(self, channel_ids: list[str]) -> list[dict[str, Any]]:
+        """Batch channel lookup (1 quota unit per call for up to 50 IDs)."""
+        if not channel_ids:
+            return []
+        if len(channel_ids) > 50:
+            raise ValueError("get_channels accepts at most 50 channel IDs")
+        data = self._get("channels", {"part": "snippet,statistics", "id": ",".join(channel_ids), "maxResults": 50})
+        return list(data.get("items", []))
+
+    def search_channels(self, query: str, max_results: int = 5) -> list[dict[str, Any]]:
+        """Find channels by name (costs 100 quota units). Returns id, title, handle and audience size."""
+        text = query.strip()
+        if not text:
+            raise ValueError("query is required")
+        data = self._get("search", {"part": "snippet", "q": text, "type": "channel", "maxResults": max(1, min(int(max_results), 10)), "regionCode": "IN"})
+        ids = []
+        for item in data.get("items", []):
+            channel_id = str(item.get("snippet", {}).get("channelId") or item.get("id", {}).get("channelId") or "")
+            if channel_id and channel_id not in ids:
+                ids.append(channel_id)
+        found = []
+        for item in self.get_channels(ids):
+            snippet, stats = item.get("snippet", {}), item.get("statistics", {})
+            found.append({
+                "channel_id": item.get("id"),
+                "title": snippet.get("title"),
+                "handle": snippet.get("customUrl"),
+                "subscriber_count": int(stats["subscriberCount"]) if str(stats.get("subscriberCount", "")).isdigit() else None,
+                "video_count": int(stats["videoCount"]) if str(stats.get("videoCount", "")).isdigit() else None,
+            })
+        return found
+
     def resolve_channel_url(self, url: str) -> dict[str, Any]:
         """Resolve a public channel URL to YouTube channel metadata."""
         candidate = url.strip()

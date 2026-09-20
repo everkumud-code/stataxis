@@ -9,8 +9,9 @@ from typing import Any, Callable
 from api.access import require_capability
 from api.auth_service import authenticate, policy_for_identity
 from api.errors import AuthenticationError, AuthorizationError
-from api.export import export_live_audience_xlsx
+from api.export import export_live_audience_xlsx, export_live_stats_xlsx
 from api.live_monitor import live_audience_window, sample_live_url
+from api.live_stats import live_snapshot, live_window_stats
 
 
 def live_application(session_factory: Callable[[], Any]):
@@ -63,6 +64,42 @@ def live_application(session_factory: Callable[[], Any]):
                 session = session_factory()
                 try:
                     payload = live_audience_window(session, start_at=start_at, end_at=end_at, language=query.get("language"))
+                finally:
+                    session.close()
+                return _json(start_response, 200, payload)
+            except AuthenticationError as exc:
+                return _json(start_response, 401, {"error": str(exc)})
+            except AuthorizationError as exc:
+                return _json(start_response, 403, {"error": str(exc)})
+            except ValueError as exc:
+                return _json(start_response, 400, {"error": str(exc)})
+
+        if path in {"/api/v1/audience/live/stats", "/api/v1/audience/live/stats/export", "/api/v1/audience/live/snapshot"}:
+            if method != "GET":
+                return _json(start_response, 405, {"error": "method not allowed"})
+            try:
+                identity = authenticate(environ.get("HTTP_AUTHORIZATION"))
+                is_export = path.endswith("/export")
+                require_capability(policy_for_identity(identity), "can_download_report" if is_export else "can_evaluate_url")
+                query = _query(environ.get("QUERY_STRING", ""))
+                language, segment = query.get("language"), query.get("segment")
+                session = session_factory()
+                try:
+                    if path.endswith("/snapshot"):
+                        at = _parse_datetime(query.get("at")) or datetime.now(UTC)
+                        return _json(start_response, 200, live_snapshot(session, at=at, language=language, segment=segment))
+                    end_at = _parse_datetime(query.get("end")) or datetime.now(UTC)
+                    start_at = _parse_datetime(query.get("start")) or end_at - timedelta(hours=1)
+                    bucket = int(query.get("bucket_seconds", "60"))
+                    if is_export:
+                        body = export_live_stats_xlsx(session, start_at=start_at, end_at=end_at, language=language, segment=segment, bucket_seconds=bucket)
+                        start_response("200 OK", [
+                            ("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                            ("Content-Disposition", "attachment; filename=stataxis-live-feed-stats.xlsx"),
+                            ("Content-Length", str(len(body))),
+                        ])
+                        return [body]
+                    payload = live_window_stats(session, start_at=start_at, end_at=end_at, language=language, segment=segment, bucket_seconds=bucket)
                 finally:
                     session.close()
                 return _json(start_response, 200, payload)

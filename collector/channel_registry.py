@@ -36,6 +36,7 @@ def add_channel(
     name: str,
     language: str,
     network: str,
+    segment: str = "news",
 ) -> None:
     channels = load_channels()
 
@@ -48,6 +49,7 @@ def add_channel(
             "name": name,
             "language": language,
             "network": network,
+            "segment": segment,
         }
     )
 
