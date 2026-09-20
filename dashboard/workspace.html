@@ -248,7 +248,7 @@ const friendly = e => e.status === 403 || /premium/i.test(e.message)
 
 /* ---------- state ---------- */
 const PERIODS = [["1h","Last hour"],["3h","Last 3 hours"],["6h","Last 6 hours"],["today","Today"],["7d","Last 7 days"],["3w","Last 3 weeks"],["month","Last month"],["quarter","Last quarter"],["year","Last year"]];
-const SCOPES = [["all","All streams"],["live","Live"],["replay","Live replays"],["video","Videos"]];
+const SCOPES = [["all","All streams"],["live","Live"],["replay","Live replays"],["video","Videos"],["shorts","Shorts"]];
 const F = Object.assign({language: "", period: "7d", stream: "all", channel: ""}, JSON.parse(sessionStorage.getItem("sx_ws_filters") || "{}"));
 let channels = [];
 const saveF = () => sessionStorage.setItem("sx_ws_filters", JSON.stringify(F));
@@ -544,7 +544,7 @@ add("channel", "Intelligence", "Channel", async el => {
 });
 
 add("stream", "Intelligence", "Streams", async el => {
-  el.innerHTML = head("Stream intelligence", "Live, replay and video audiences compared.") + filterBar({stream: false}) +
+  el.innerHTML = head("Stream intelligence", "Live, replay, video and Shorts audiences compared.") + filterBar({stream: false}) +
     `<div class="tabs" role="group" aria-label="Stream type">${SCOPES.map(([v, l]) => `<button class="tab" type="button" data-scope="${v}" aria-pressed="${v === F.stream}">${esc(l)}</button>`).join("")}</div><div id="st"><p class="muted">Loading…</p></div>`;
   el.querySelectorAll("[data-scope]").forEach(b => b.onclick = () => { F.stream = b.dataset.scope; saveF(); render(); });
   const rep = await marketReport(F.stream), rows = marketRows(rep);

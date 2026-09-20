@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from collector.storage import Channel, Observation, Video
 from metrics.persistence import IntelligenceSnapshotRecord
+from metrics.eligibility import analysis_observation_clause
 
 
 def channel_intelligence_overview(session: Session, channel_id: int) -> dict[str, Any] | None:
@@ -79,6 +80,7 @@ def channel_view_series(
             Observation.observed_at >= start_at,
             Observation.observed_at <= as_of,
             Observation.view_count.is_not(None),
+            analysis_observation_clause(),
         )
         .order_by(Observation.observed_at.asc(), Observation.id.asc())
     ).all()

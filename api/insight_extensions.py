@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from collector.storage import Channel, Observation, Video
+from metrics.eligibility import analysis_observation_clause
 
 POSITIVE = {
     "growth", "grow", "gain", "gains", "rise", "rises", "rising", "surge", "surges",
@@ -74,7 +75,7 @@ def _rows(session: Session, channel_ids: list[int], start: datetime, end: dateti
         select(Observation, Video, Channel)
         .join(Video, Video.id == Observation.video_id)
         .join(Channel, Channel.id == Observation.channel_id)
-        .where(Observation.channel_id.in_(channel_ids), Observation.observed_at >= start, Observation.observed_at <= end)
+        .where(Observation.channel_id.in_(channel_ids), Observation.observed_at >= start, Observation.observed_at <= end, analysis_observation_clause())
         .order_by(Observation.channel_id.asc(), Observation.video_id.asc(), Observation.observed_at.asc(), Observation.id.asc())
     )
     return list(session.execute(stmt))

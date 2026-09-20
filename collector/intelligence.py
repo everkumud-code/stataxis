@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from collector.storage import Observation
 from metrics.persistence import persist_video_intelligence
+from metrics.eligibility import analysis_observation_clause
 
 
 @dataclass(frozen=True)
@@ -23,7 +24,7 @@ def process_persisted_observations(
     limit_per_video: int = 25,
 ) -> IntelligenceRunResult:
     """Build and durably store STX intelligence for videos with a change window."""
-    video_ids = [row[0] for row in session.query(Observation.video_id).distinct().all()]
+    video_ids = [row[0] for row in session.query(Observation.video_id).filter(analysis_observation_clause()).distinct().all()]
     processed = snapshots = errors = 0
     for video_id in video_ids:
         processed += 1
