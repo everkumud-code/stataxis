@@ -182,7 +182,7 @@ def test_dashboard_endpoints_are_time_independent(monkeypatch):
         assert overview["total_views"]["value"] == 12000
         assert overview["video_count"]["value"] == 12
         assert overview["subscribers_change_30d"]["value"] is None
-        assert overview["uploads_in_window"]["value"] is None
+        assert overview["uploads_in_window"]["value"] == 0
         assert overview["observed_uploads_in_window"]["value"] == 0
 
         trend = dashboard_data.channel_stx_trend(session, channel_id, days=3)
