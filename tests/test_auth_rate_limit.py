@@ -31,9 +31,9 @@ def test_login_rate_limit_is_per_ip_and_email_with_retry_after(monkeypatch):
     app = auth_application(lambda: Session())
     payload = {"email": "user@example.com", "password": "correct horse battery"}
     for _ in range(10):
-        captured, _ = _request(app, "/api/v1/auth/login", payload, "203.0.113.10, 10.0.0.1")
+        captured, _ = _request(app, "/api/v1/auth/login", payload, "10.0.0.1, 203.0.113.10")
         assert captured["status"] == "200 OK"
-    captured, body = _request(app, "/api/v1/auth/login", payload, "203.0.113.10, 10.0.0.1")
+    captured, body = _request(app, "/api/v1/auth/login", payload, "10.0.0.1, 203.0.113.10")
     assert captured["status"] == "429 Too Many Requests"
     assert int(captured["headers"]["Retry-After"]) > 0
     assert body == {"error": "too many requests"}
@@ -83,4 +83,18 @@ def test_duplicate_registration_returns_generic_success(monkeypatch):
     captured, body = _request(app, "/api/v1/auth/register", payload, "203.0.113.30")
     assert captured["status"] == "201 Created"
     assert body == {"message": "Profile submitted for admin approval."}
+    limiter.reset()
+
+
+def test_login_limit_cannot_be_bypassed_by_forging_forwarded_for(monkeypatch):
+    limiter.reset()
+    monkeypatch.delenv("STAXIS_TRUSTED_PROXIES", raising=False)
+    monkeypatch.setattr("api.auth_http.login", lambda *args: {"ok": True})
+    app = auth_application(lambda: Session())
+    payload = {"email": "victim@example.com", "password": "wrong password"}
+    for index in range(10):
+        captured, _ = _request(app, "/api/v1/auth/login", payload, f"198.51.100.{index}, 203.0.113.99")
+        assert captured["status"] == "200 OK"
+    captured, _ = _request(app, "/api/v1/auth/login", payload, "198.51.100.200, 203.0.113.99")
+    assert captured["status"] == "429 Too Many Requests"
     limiter.reset()
