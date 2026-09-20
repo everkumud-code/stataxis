@@ -33,6 +33,6 @@ def test_security_headers_and_no_store():
     assert headers["X-Frame-Options"] == "DENY"
     assert headers["Cache-Control"] == "no-store"
     status, headers, _ = request("/index.html")
-    assert headers["Cache-Control"] if False else "ok"
+    assert "Cache-Control" not in headers
     for name in ("Strict-Transport-Security", "X-Content-Type-Options", "Referrer-Policy", "X-Frame-Options", "Content-Security-Policy"):
         assert name in headers
