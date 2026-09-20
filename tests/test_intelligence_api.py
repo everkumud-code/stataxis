@@ -79,3 +79,30 @@ def test_latest_video_intelligence_falls_back_for_legacy_view_payload():
         assert result["data"] == []
         assert result["analysis"] == []
         assert result["view"] == "No persisted StatAxis View available."
+
+
+def test_latest_video_intelligence_includes_display_stx_fields():
+    engine = create_database("sqlite:///:memory:")
+    with Session(engine) as session:
+        channel = Channel(youtube_channel_id="UC-display", name="Display")
+        session.add(channel)
+        session.flush()
+        video = Video(youtube_video_id="video-display", channel_id=channel.id, title="Display Story")
+        session.add(video)
+        session.flush()
+        session.add(IntelligenceSnapshotRecord(
+            video_id=video.id,
+            generated_at=datetime(2026, 9, 14, 15, tzinfo=UTC),
+            score=100.0,
+            confidence=10.0,
+            available_signals=1,
+            view_json=json.dumps({"signals": []}),
+            contributions_json=json.dumps([]),
+        ))
+        session.commit()
+
+        result = latest_video_intelligence(session, video.id)
+        assert result["stx_index"]["score"] == 100.0
+        assert result["stx_index"]["display_score"] == 55.0
+        assert result["stx_index"]["preliminary"] is True
+        assert result["stx_index"]["display_method"] == "50 + (score - 50) * confidence / 100"
