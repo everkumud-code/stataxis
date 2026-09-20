@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from api.errors import AuthenticationError, AuthorizationError
-
 import json
 from typing import Any, Callable
 
@@ -11,16 +10,18 @@ from sqlalchemy.orm import Session
 
 from api.auth_service import authenticate
 from api.evaluate import evaluate_youtube_url
+from api.rate_limit import client_ip, limiter
 
 
 def evaluate_application(session_factory: Callable[[], Session]):
-    """Expose POST /api/v1/evaluate/youtube with bearer authentication."""
-
     def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         if environ.get("REQUEST_METHOD") != "POST":
             return _json(start_response, 405, {"error": "method not allowed"})
         try:
             identity = authenticate(environ.get("HTTP_AUTHORIZATION"))
+            retry = limiter.check(f"evaluate-youtube:{identity.user_id}:{client_ip(environ)}", 30, 3600)
+            if retry:
+                return _json(start_response, 429, {"error": "too many requests"}, retry)
             payload = _read_json(environ)
             url = payload.get("url")
             display_name = payload.get("display_name")
@@ -63,11 +64,11 @@ def _read_json(environ: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def _json(start_response: Callable[..., Any], status: int, payload: dict[str, Any]):
-    reasons = {200: "OK", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 405: "Method Not Allowed"}
+def _json(start_response: Callable[..., Any], status: int, payload: dict[str, Any], retry_after: int | None = None):
+    reasons = {200: "OK", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 405: "Method Not Allowed", 429: "Too Many Requests"}
     body = json.dumps(payload).encode("utf-8")
-    start_response(
-        f"{status} {reasons[status]}",
-        [("Content-Type", "application/json"), ("Content-Length", str(len(body)))],
-    )
+    headers = [("Content-Type", "application/json"), ("Content-Length", str(len(body)))]
+    if retry_after is not None:
+        headers.append(("Retry-After", str(retry_after)))
+    start_response(f"{status} {reasons[status]}", headers)
     return [body]
