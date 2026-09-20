@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from collector.storage import Video
 from metrics.persistence import IntelligenceSnapshotRecord
+from metrics.stx_index import stx_display
 
 
 def latest_video_intelligence(session: Session, video_id: int) -> dict[str, Any] | None:
@@ -38,7 +39,7 @@ def latest_video_intelligence(session: Session, video_id: int) -> dict[str, Any]
         "score": record.score,
         "confidence": record.confidence,
         "available_signals": record.available_signals,
-        "stx_index": {"score": record.score, "confidence": record.confidence, "available_signals": record.available_signals},
+        "stx_index": {"score": record.score, "confidence": record.confidence, "available_signals": record.available_signals, **stx_display(record.score, record.confidence)},
         "signals": signals,
         "data": view_payload.get("data", []),
         "analysis": view_payload.get("analysis", []),
