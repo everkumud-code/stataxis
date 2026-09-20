@@ -71,6 +71,7 @@ def test_shorts_stream_scope_is_separate_from_long_form_videos():
     regular = {"classification": "REGULAR_VIDEO", "is_live": False}
     assert _scope_matches(short, "shorts") and not _scope_matches(regular, "shorts")
     assert _scope_matches(regular, "video") and not _scope_matches(short, "video")
-    assert _scope_matches(short, "all") and _scope_matches(regular, "all")
+    # "all" is the counted scope: Shorts are excluded from it.
+    assert _scope_matches(regular, "all") and not _scope_matches(short, "all")
     with pytest.raises(ValueError, match="shorts"):
         _scope_matches(short, "bogus")

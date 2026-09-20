@@ -54,7 +54,8 @@ def market_report(
     previous_rows = _observation_rows(session, channel_ids, previous_start, previous_query_end)
     current = _aggregate_by_channel(session, channels, current_rows, stream_scope)
     previous = _aggregate_by_channel(session, channels, previous_rows, stream_scope)
-    stx = build_market_stx(
+    shorts_scope = _is_shorts_scope(stream_scope)
+    stx = {} if shorts_scope else build_market_stx(
         [row for row in current_rows if _scope_matches(row, stream_scope)],
         [row for row in previous_rows if _scope_matches(row, stream_scope)],
         channel_ids=channel_ids,
@@ -74,7 +75,7 @@ def market_report(
         old = previous.get(item["channel_id"])
         item["previous_rank"] = _previous_rank(item["channel_id"], previous, old)
         item["rank_change"] = item["previous_rank"] - rank if item["previous_rank"] is not None else None
-        item["stx"] = stx.get(item["channel_id"], {"score": None, "confidence": 0.0, "available_signals": 0, "components": {}, "signals": {}})
+        item["stx"] = stx.get(item["channel_id"], _no_stx(shorts_scope))
 
     rows = ranked[: max(1, min(int(limit), 200))]
     view_total = _sum_metric(ranked, "view_delta")
@@ -88,6 +89,8 @@ def market_report(
         "previous_start_at": previous_start.isoformat(),
         "previous_end_at": previous_end.isoformat(),
         "filters": {"language": language, "region": region, "market": market, "stream_scope": stream_scope},
+        "counted_in_analysis": not shorts_scope,
+        "note": SHORTS_NOTE if shorts_scope else None,
         "market": {
             "channel_count": len(ranked),
             "view_delta_total": view_total,
@@ -124,7 +127,8 @@ def channel_media_intelligence(
     rows = _observation_rows(session, [channel_id], start_at, as_of)
     aggregate = _aggregate_channel(channel, [row for row in rows if _scope_matches(row, stream_scope)], stream_scope)
     videos = _video_performance([row for row in rows if _scope_matches(row, stream_scope)], top_videos)
-    stx = build_market_stx(
+    shorts_scope = _is_shorts_scope(stream_scope)
+    stx = _no_stx(True) if shorts_scope else build_market_stx(
         [row for row in rows if _scope_matches(row, stream_scope)],
         [],
         channel_ids=[channel_id],
@@ -161,6 +165,8 @@ def channel_media_intelligence(
             "top_videos": videos,
         },
         "stream_scope": stream_scope,
+        "counted_in_analysis": not shorts_scope,
+        "note": SHORTS_NOTE if shorts_scope else None,
         "provenance": {
             "observation_count": len(rows),
             "source_values": sorted({row["source"] for row in rows if row["source"]}),
@@ -288,9 +294,24 @@ def _video_performance(rows: list[dict[str, Any]], limit: int) -> list[dict[str,
     return result[: max(1, min(int(limit), 50))]
 
 
+SHORTS_NOTE = "Shorts are shown for reference only. They are not counted in STX, rankings or analysis."
+
+
+def _is_shorts_scope(stream_scope: str | None) -> bool:
+    return (stream_scope or "all").lower() == "shorts"
+
+
+def _no_stx(excluded: bool) -> dict[str, Any]:
+    stx: dict[str, Any] = {"score": None, "confidence": 0.0, "available_signals": 0, "components": {}, "signals": {}}
+    if excluded:
+        stx["excluded_reason"] = SHORTS_NOTE
+    return stx
+
+
 def _scope_matches(row: dict[str, Any], stream_scope: str) -> bool:
     scope = (stream_scope or "all").lower()
-    if scope == "all": return True
+    # Shorts are shown only in the "shorts" scope; every other scope (including "all") excludes them.
+    if scope == "all": return row["classification"] != "SHORT"
     if scope == "live": return bool(row["is_live"] or row["classification"] == "LIVE")
     if scope == "replay": return row["classification"] == "COMPLETED_LIVE"
     if scope == "video": return row["classification"] in {"REGULAR_VIDEO", "PREMIERE", "UNKNOWN"}
