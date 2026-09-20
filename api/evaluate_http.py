@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from api.auth_service import authenticate
 from api.evaluate import evaluate_youtube_url
-from api.rate_limit import client_ip, limiter
+from api.rate_limit import limiter
 
 
 def evaluate_application(session_factory: Callable[[], Session]):
