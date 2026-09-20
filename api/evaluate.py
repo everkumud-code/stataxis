@@ -14,6 +14,7 @@ from collector.storage import Channel, Observation, Video, save_observations
 from collector.youtube.client import YouTubeClient
 from collector.youtube.manual_live import ManualLiveTarget, fetch_manual_live
 from metrics.persistence import persist_video_intelligence
+from metrics.stx_index import stx_display
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,8 @@ class EvaluationResult:
     observation_count: int
     stx_index: float | None
     confidence: float
+    display_stx_index: float | None
+    preliminary: bool
     available_signals: int
     data: list[str]
     analysis: list[str]
@@ -45,6 +48,8 @@ class EvaluationResult:
             "observation_count": self.observation_count,
             "stx_index": self.stx_index,
             "confidence": self.confidence,
+            "display_stx_index": self.display_stx_index,
+            "preliminary": self.preliminary,
             "available_signals": self.available_signals,
             "data": self.data,
             "analysis": self.analysis,
@@ -94,6 +99,8 @@ def evaluate_youtube_url(
                 observation_count=observation_count,
                 stx_index=None,
                 confidence=0.0,
+                display_stx_index=None,
+                preliminary=True,
                 available_signals=0,
                 data=[observation.title],
                 analysis=["A baseline is not yet established. A second observation is required for change-based intelligence."],
@@ -111,6 +118,8 @@ def evaluate_youtube_url(
             observation_count=observation_count,
             stx_index=record.score,
             confidence=record.confidence,
+            display_stx_index=stx_display(record.score, record.confidence)["display_score"],
+            preliminary=bool(stx_display(record.score, record.confidence)["preliminary"]),
             available_signals=record.available_signals,
             data=list(payload.get("data", [])),
             analysis=list(payload.get("analysis", [])),
