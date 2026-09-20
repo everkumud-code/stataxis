@@ -1,5 +1,6 @@
 import json
 from datetime import UTC, datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import event
@@ -158,6 +159,32 @@ def test_stx_trend_wsgi_has_one_value_per_day_and_nulls_missing_days(seeded_dash
     assert payload["timeline"][0]["stx"] is None
     assert payload["timeline"][0]["reason"] == "insufficient stored observations for daily STX"
 
+
+
+def test_stx_trend_wsgi_exposes_display_score_without_changing_raw_score(seeded_dashboard_now, monkeypatch):
+    engine, channel_id = _seed_dashboard()
+
+    def fake_snapshot(**_kwargs):
+        return SimpleNamespace(
+            intelligence=SimpleNamespace(
+                index=SimpleNamespace(score=100.0, confidence=10.0),
+            ),
+        )
+
+    monkeypatch.setattr(dashboard_data, "build_intelligence_snapshot", fake_snapshot)
+    status, payload = _request(
+        wsgi_application(lambda: Session(engine)),
+        f"/api/v1/channels/{channel_id}/stx-trend",
+        "days=3",
+    )
+
+    assert status == "200 OK"
+    point = payload["timeline"][-1]
+    assert point["stx"] == 100.0
+    assert point["display_stx"] == 55.0
+    assert point["confidence"] == 10.0
+    assert point["preliminary"] is True
+    assert payload["display_method"] == "50 + (score - 50) * confidence / 100"
 
 def test_market_topics_wsgi_returns_distribution_shape(seeded_dashboard_now):
     engine, _channel_id = _seed_dashboard()

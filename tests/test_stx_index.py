@@ -53,3 +53,29 @@ def test_view_velocity_remains_a_supporting_signal_not_index_component():
     assert result.confidence == 0
     assert result.available_signals == 0
     assert result.component_scores == {}
+
+
+def test_stx_display_confidence_adjusts_without_changing_raw_score():
+    from metrics.stx_index import stx_display
+
+    assert stx_display(100, 10) == {
+        "display_score": 55.0,
+        "preliminary": True,
+        "display_method": "50 + (score - 50) * confidence / 100",
+    }
+    assert stx_display(100, 100)["display_score"] == 100.0
+    assert stx_display(80, 50)["display_score"] == 65.0
+    assert stx_display(80, 50)["preliminary"] is False
+    assert stx_display(80, 49.9)["preliminary"] is True
+
+
+def test_stx_display_handles_missing_score_and_clamps_confidence():
+    from metrics.stx_index import stx_display
+
+    assert stx_display(None, 80) == {
+        "display_score": None,
+        "preliminary": True,
+        "display_method": "50 + (score - 50) * confidence / 100",
+    }
+    assert stx_display(100, 150)["display_score"] == 100.0
+    assert stx_display(100, -20)["display_score"] == 50.0

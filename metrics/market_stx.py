@@ -9,7 +9,7 @@ from metrics.acceleration import latest_acceleration
 from metrics.competition import CompetitionPoint, build_competition
 from metrics.engine import ObservationPoint
 from metrics.signal_factory import build_stx_signals
-from metrics.stx_index import calculate_stx_index
+from metrics.stx_index import calculate_stx_index, stx_display
 from metrics.timeseries import compare_metric
 from metrics.velocity import latest_velocity
 
@@ -43,6 +43,7 @@ def build_market_stx(current_rows: list[dict[str, Any]], previous_rows: list[dic
         result[channel_id] = {
             "score": round(index.score, 2) if index.score is not None else None,
             "confidence": index.confidence,
+            **stx_display(index.score, index.confidence),
             "available_signals": index.available_signals,
             "components": {name: round(value, 2) for name, value in index.component_scores.items()},
             "signals": {name: getattr(signals, name) for name in ("audience", "growth", "momentum", "acceleration", "consistency", "competitive_position", "anomaly_event")},
@@ -93,4 +94,4 @@ def _channel_name(rows: list[dict[str, Any]]) -> str:
 
 
 def _empty() -> dict[str, Any]:
-    return {"score": None, "confidence": 0.0, "available_signals": 0, "components": {}, "signals": {}, "provenance": {"source": "persisted_stataxis_observations", "observation_count": 0, "previous_observation_count": 0, "missing_values_are_not_zero_filled": True}}
+    return {"score": None, "confidence": 0.0, "available_signals": 0, **stx_display(None, 0.0), "components": {}, "signals": {}, "provenance": {"source": "persisted_stataxis_observations", "observation_count": 0, "previous_observation_count": 0, "missing_values_are_not_zero_filled": True}}
