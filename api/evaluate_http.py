@@ -19,7 +19,7 @@ def evaluate_application(session_factory: Callable[[], Session]):
             return _json(start_response, 405, {"error": "method not allowed"})
         try:
             identity = authenticate(environ.get("HTTP_AUTHORIZATION"))
-            retry = limiter.check(f"evaluate-youtube:{identity.user_id}:{client_ip(environ)}", 30, 3600)
+            retry = limiter.check(f"evaluate-youtube:{getattr(identity, "user_id", "unknown")}:{client_ip(environ)}", 30, 3600)
             if retry:
                 return _json(start_response, 429, {"error": "too many requests"}, retry)
             payload = _read_json(environ)
