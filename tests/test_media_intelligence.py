@@ -83,3 +83,14 @@ def test_stream_scope_can_isolate_live_observations():
     assert payload is not None
     assert payload["audience"]["peak_concurrent"] == 180
     assert payload["momentum"]["view_delta"] == 600
+
+
+def test_channel_media_intelligence_stx_includes_display_fields():
+    session = _session()
+    as_of, alpha_id, _ = _seed(session)
+    payload = channel_media_intelligence(session, alpha_id, as_of=as_of, period="1h")
+
+    assert payload is not None
+    assert "display_score" in payload["stx"]
+    assert "preliminary" in payload["stx"]
+    assert payload["stx"]["display_method"] == "50 + (score - 50) * confidence / 100"
