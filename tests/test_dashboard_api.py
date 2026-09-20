@@ -178,9 +178,9 @@ def test_dashboard_endpoints_are_time_independent(monkeypatch):
     with Session(engine) as session:
         overview = dashboard_data.channel_overview(session, channel_id)
         assert overview is not None
-        assert overview["subscribers"]["value"] is None
-        assert overview["total_views"]["value"] is None
-        assert overview["video_count"]["value"] is None
+        assert overview["subscribers"]["value"] == 1000
+        assert overview["total_views"]["value"] == 12000
+        assert overview["video_count"]["value"] == 12
         assert overview["subscribers_change_30d"]["value"] is None
         assert overview["uploads_in_window"]["value"] is None
         assert overview["observed_uploads_in_window"]["value"] == 0
