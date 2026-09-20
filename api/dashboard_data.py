@@ -201,6 +201,8 @@ def channel_stx_trend(
         day_end = datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
         window_start = day_end - timedelta(days=1)
         scores = []
+        display_scores = []
+        confidences = []
         video_rows: dict[int, list[Observation]] = {}
         for (row_day, video_id), observations in grouped.items():
             if row_day == day or (day == start_day and row_day == window_start.date()):
@@ -234,17 +236,25 @@ def channel_stx_trend(
                 growth_change=compare_metric(first.view_count, last.view_count),
             )
             score = snapshot.intelligence.index.score
+            confidence = float(snapshot.intelligence.index.confidence)
             if score is not None:
                 scores.append(float(score))
+                display = stx_display(float(score), confidence)
+                display_scores.append(float(display["display_score"]))
+                confidences.append(confidence)
         timeline.append({
             "date": day.isoformat(),
             "stx": round(sum(scores) / len(scores), 4) if scores else None,
+            "display_stx": round(sum(display_scores) / len(display_scores), 4) if display_scores else None,
+            "confidence": round(sum(confidences) / len(confidences), 4) if confidences else None,
+            "preliminary": (sum(confidences) / len(confidences)) < 50 if confidences else None,
             "reason": None if scores else "insufficient stored observations for daily STX",
         })
     return {
         "channel_id": channel_id,
         "days": days,
         "definition": "Daily STX uses each day's trailing 24-hour window ending at day end; only videos with at least two stored observations in that window contribute, and days without usable data return null with a reason.",
+        "display_method": "50 + (score - 50) * confidence / 100",
         "timeline": timeline,
     }
 
