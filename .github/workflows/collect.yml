@@ -1,8 +1,9 @@
 name: StatAxis Scheduled Collection
 
+# Scheduled collection is disabled: the always-on worker (python -m collector.service)
+# runs collection and live polling. Running both would double-collect and burn YouTube quota.
+# Trigger manually only for one-off backfills.
 on:
-  schedule:
-    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 concurrency:
