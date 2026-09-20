@@ -1,9 +1,9 @@
 import json
 from datetime import UTC, datetime, timedelta, timezone
 
+import pytest
 from sqlalchemy import event
 from sqlalchemy.orm import Session
-import pytest
 
 import api.dashboard_data as dashboard_data
 
