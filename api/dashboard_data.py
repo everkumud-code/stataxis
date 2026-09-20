@@ -14,6 +14,10 @@ from metrics.pipeline import build_intelligence_snapshot
 from metrics.timeseries import compare_metric
 
 
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
 def _utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
@@ -53,7 +57,7 @@ def channel_overview(
     channel = session.get(Channel, channel_id)
     if channel is None:
         return None
-    now = _utc(as_of or datetime.now(UTC))
+    now = _utc(as_of or _now())
     window_start = now - timedelta(days=max(1, min(window_days, 365)))
     current = _latest_stats(session, channel_id, now)
     baseline = _latest_stats(session, channel_id, window_start)
