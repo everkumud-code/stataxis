@@ -125,6 +125,34 @@ input::placeholder{color:#59738a}
 .msg{padding:10px 12px;border-radius:8px;margin-top:12px;background:#0b2032}
 .msg.ok{color:var(--green)}.msg.bad{color:var(--red)}
 input[type=number],input[type=text]{min-width:0}
+
+.dh{display:grid;grid-template-columns:auto minmax(0,1.1fr) minmax(0,2.4fr);gap:18px;align-items:center;margin-bottom:14px}
+.av{width:74px;height:74px;border-radius:50%;background:#10304a;display:grid;place-items:center;font-size:30px;font-weight:800;color:var(--gold);overflow:hidden;border:2px solid #2b4a63}
+.av img{width:100%;height:100%;object-fit:cover;display:block}
+.dh h2{margin:0;font-size:24px;line-height:1.2}
+.dh .sub{color:var(--muted);margin:2px 0 8px}
+.dk{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.dk .card{padding:12px 14px}.dk .v{font-size:22px}
+.cmp{display:flex;flex-wrap:wrap;gap:8px 16px;margin:0 0 12px}
+.cmp label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.bars{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.bars h3{font-size:13px;color:var(--muted);margin:0 0 8px;font-weight:650}
+.hb{display:grid;grid-template-columns:96px 1fr auto;gap:8px;align-items:center;margin:6px 0;font-size:12.5px}
+.hb i{display:block;height:9px;border-radius:99px;background:#122a3f;overflow:hidden}.hb i b{display:block;height:100%;background:var(--blue)}
+.hb.c1 i b{background:var(--gold)}.hb.c2 i b{background:var(--green)}.hb.c3 i b{background:#b18cff}.hb.c4 i b{background:#ff8fa3}
+.hb span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vids{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.vids li{display:grid;grid-template-columns:120px minmax(0,1fr);gap:12px;align-items:center}
+.vids .th{width:120px;aspect-ratio:16/9;border-radius:8px;background:#10304a;overflow:hidden}
+.vids .th img{width:100%;height:100%;object-fit:cover;display:block}
+.vids b{display:block;overflow-wrap:anywhere}
+.stack{display:flex;height:16px;border-radius:99px;overflow:hidden;background:#122a3f;margin:6px 0 2px}
+.stack i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 0;font-size:12.5px;color:var(--muted)}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c);margin-right:6px}
+.g21{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:14px}
+.ins{margin:0;padding-left:18px}.ins li{margin:6px 0}
+@media(max-width:900px){.g21{grid-template-columns:minmax(0,1fr)}.dh{grid-template-columns:auto 1fr}.dh .dk{grid-column:1/-1}.vids li{grid-template-columns:96px 1fr}.vids .th{width:96px}}
 @media(max-width:900px){
   .chform{grid-template-columns:1fr 1fr}
   .chform>*:first-child{grid-column:1/-1}
@@ -320,6 +348,102 @@ const nameCell = r => `<strong>${esc(r.channel)}</strong>`;
 const VIEWS = {};
 const add = (id, group, title, render, extra = {}) => VIEWS[id] = {id, group, title, render, ...extra};
 
+const needChannel = () => { if (!F.channel || !channels.some(c => c.id === Number(F.channel))) { F.channel = channels[0] ? String(channels[0].id) : ""; saveF(); } return F.channel; };
+
+/* ---------- channel dashboard (one channel in depth, market beside it) ---------- */
+const DASH_DAYS = [["21", "Last 3 weeks"], ["30", "Last month"], ["60", "Last 2 months"], ["90", "Last 3 months"]];
+const TOPIC_COLORS = {"Politics": "#ff7180", "Current Affairs": "#159de8", "Entertainment": "#e1b94f", "Sports": "#35d399", "Business": "#b18cff", "Other": "#6b8299"};
+const safeImg = u => typeof u === "string" && /^https:\/\/[^\s"'<>]+$/.test(u) ? u : "";
+const dv = x => x && x.value != null ? x.value : null;
+const why = x => x && x.value == null && x.reason ? x.reason : "";
+const chg = n => n == null ? "" : (n > 0 ? "▲ " : n < 0 ? "▼ " : "") + compact(Math.abs(n));
+const chgCls = n => n > 0 ? "green" : n < 0 ? "red" : "muted";
+const dashPeriod = d => Number(d) <= 21 ? "3w" : Number(d) <= 30 ? "month" : "quarter";
+const lastStx = tr => { const pts = ((tr || {}).timeline || []).filter(t => t.stx != null); return pts.length ? pts[pts.length - 1].stx : null; };
+function hbars(title, rows, fmt) {
+  const vals = rows.map(r => r.v).filter(v => v != null), max = Math.max(...vals, 0) || 1;
+  return `<div class="card"><h3>${esc(title)}</h3>${rows.map((r, i) => `<div class="hb c${i % 5}"><span title="${esc(r.name)}">${esc(r.name)}</span><i><b style="width:${r.v == null ? 0 : Math.max(2, r.v / max * 100)}%"></b></i><span>${r.v == null ? "—" : esc(fmt(r.v))}</span></div>`).join("")}</div>`;
+}
+add("dashboard", "Intelligence", "Channel dashboard", async el => {
+  const days = Number(F.days) >= 21 ? Number(F.days) : 30;
+  el.innerHTML = head("Channel dashboard", "One channel in depth, with the rest of the market beside it.");
+  if (!channels.length) { el.insertAdjacentHTML("beforeend", noChannels()); return; }
+  const main = Number(needChannel());
+  let cmp = Array.isArray(F.cmp) ? F.cmp.map(Number).filter(id => channels.some(c => c.id === id)) : [];
+  if (!cmp.length) cmp = channels.slice(0, 3).map(c => c.id);
+  if (!cmp.includes(main)) cmp = [main, ...cmp].slice(0, 5);
+  el.insertAdjacentHTML("beforeend", `<form class="filters" data-filters><label>Channel<select name="channel">${opts(channels.map(c => [c.id, c.name]), F.channel)}</select></label>
+    <label>Period<select name="days">${opts(DASH_DAYS, String(days))}</select></label><button class="btn primary" type="submit">Apply</button></form><div id="dsh"><p class="muted">Loading…</p></div>`);
+  const ids = [...new Set([main, ...cmp])];
+  const [ovs, trs, media, topics] = await Promise.all([
+    Promise.allSettled(ids.map(id => api(`/api/v1/channels/${id}/overview`))),
+    Promise.allSettled(ids.map(id => api(`/api/v1/channels/${id}/stx-trend`, {days: Math.min(days, 90)}))),
+    api(`/api/v1/channels/${main}/media-intelligence`, {period: dashPeriod(days)}).catch(() => null),
+    api("/api/v1/markets/topics", {period: days + "d"}).catch(() => null)
+  ]);
+  const O = {}, T = {}; ids.forEach((id, i) => { if (ovs[i].status === "fulfilled") O[id] = ovs[i].value; if (trs[i].status === "fulfilled") T[id] = trs[i].value; });
+  const o = O[main], box = $("#dsh", el);
+  if (!o) { box.innerHTML = errCard(ovs[ids.indexOf(main)].reason || new Error("No data")); return; }
+  const name = id => (O[id] && O[id].name) || channelName(id);
+  const av = safeImg(o.avatar_url), initial = (o.name || "?").trim().slice(0, 1).toUpperCase();
+  const stxNow = lastStx(T[main]);
+  const kp = (l, v, sub, cls = "") => `<div class="card kpi"><div class="l">${esc(l)}</div><div class="v ${cls}">${esc(v)}</div><div class="s">${sub}</div></div>`;
+  const subChg = dv(o.subscribers_change_30d), viewChg = dv(o.total_views_change_30d);
+  const rank = dv(o.subscribers_rank_in_language);
+  const points = ((T[main] || {}).timeline || []).filter(t => t.stx != null).map(t => ({observed_at: t.date + "T12:00:00Z", value: t.stx}));
+  const rows = cmp.map(id => ({id, name: name(id), o: O[id], t: T[id]})).filter(r => r.o);
+  const insights = [];
+  const withSubs = rows.filter(r => dv(r.o.subscribers) != null).sort((a, b) => dv(b.o.subscribers) - dv(a.o.subscribers));
+  if (withSubs.length > 1) insights.push(`${withSubs[0].name} has the most subscribers among the channels compared (${compact(dv(withSubs[0].o.subscribers))}).`);
+  const withEng = rows.filter(r => dv(r.o.engagement_rate) != null).sort((a, b) => dv(b.o.engagement_rate) - dv(a.o.engagement_rate));
+  if (withEng.length > 1) insights.push(`${withEng[0].name} has the highest engagement rate on its tracked videos (${dec(dv(withEng[0].o.engagement_rate), 2)}%).`);
+  const withGain = rows.filter(r => dv(r.o.subscribers_change_30d) != null).sort((a, b) => dv(b.o.subscribers_change_30d) - dv(a.o.subscribers_change_30d));
+  if (withGain.length > 1) insights.push(`${withGain[0].name} gained the most subscribers over 30 days (${signed(dv(withGain[0].o.subscribers_change_30d))}).`);
+  if (points.length >= 2) insights.push(`${o.name}’s STX moved from ${dec(points[0].value)} to ${dec(points[points.length - 1].value)} across the ${points.length} days that have enough data.`);
+  const topVideos = media && media.content ? media.content.top_videos.slice(0, 5) : [];
+  const tp = topics ? (topics.channels || []).filter(c => ids.includes(c.channel_id)) : [];
+  const vLink = r => /^[\w-]{11}$/.test(r.youtube_video_id || "");
+  box.innerHTML = `
+    <div class="card"><div class="dh"><div class="av">${av ? `<img src="${esc(av)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : esc(initial)}</div>
+      <div><h2>${esc(o.name)}</h2><div class="sub">${esc(o.handle || "")} ${o.language && o.language !== "unknown" ? "· " + esc(o.language) : ""}</div>
+        <div class="muted">${rank == null ? esc(why(o.subscribers_rank_in_language) || "Rank not available yet") : `Rank #${rank} by subscribers in its language`}</div></div>
+      <div class="dk">
+        ${kp("Subscribers", compact(dv(o.subscribers)), subChg == null ? esc(why(o.subscribers_change_30d) || "") : `<span class="${chgCls(subChg)}">${chg(subChg)}</span> in 30 days`)}
+        ${kp("Total views", compact(dv(o.total_views)), viewChg == null ? esc(why(o.total_views_change_30d) || "") : `<span class="${chgCls(viewChg)}">${chg(viewChg)}</span> in 30 days`)}
+        ${kp("STX", stxNow == null ? "—" : dec(stxNow), stxNow == null ? "Not enough daily history yet" : "Latest day with data", "gold")}
+        ${kp("Engagement", dv(o.engagement_rate) == null ? "—" : dec(dv(o.engagement_rate), 2) + "%", "Likes + comments per view")}
+        ${kp("Uploads", dv(o.uploads_in_window) == null ? "—" : whole(dv(o.uploads_in_window)), dv(o.uploads_in_window) == null ? esc(why(o.uploads_in_window)) : "In 30 days (channel total)")}
+      </div></div></div>
+    <div class="g21" style="margin-top:14px">
+      <section class="card"><h2>STX trend</h2>${points.length >= 2 ? spark(points, "value", "STX (daily)") : `<p class="muted">STX needs at least two days with two or more observations per video. It fills in as collection runs.</p>`}<p class="muted" style="margin:8px 0 0">${esc(((T[main] || {}).definition) || "")}</p></section>
+      <section class="card"><h2>Key insights</h2>${insights.length ? `<ol class="ins">${insights.map(t => `<li>${esc(t)}</li>`).join("")}</ol>` : `<p class="muted">No insight is shown until there is enough stored history to support it.</p>`}</section></div>
+    <section class="card" style="margin-top:14px"><h2>Compare channels</h2>
+      <div class="cmp" role="group" aria-label="Channels to compare">${channels.map(c => `<label><input type="checkbox" data-cmp value="${esc(c.id)}"${cmp.includes(c.id) ? " checked" : ""}> ${esc(c.name)}</label>`).join("")}</div>
+      <div class="bars">
+        ${hbars("STX (latest day)", rows.map(r => ({name: r.name, v: lastStx(r.t)})), v => dec(v))}
+        ${hbars("Subscribers", rows.map(r => ({name: r.name, v: dv(r.o.subscribers)})), compact)}
+        ${hbars("Total views", rows.map(r => ({name: r.name, v: dv(r.o.total_views)})), compact)}
+        ${hbars("Engagement rate", rows.map(r => ({name: r.name, v: dv(r.o.engagement_rate)})), v => dec(v, 2) + "%")}
+        ${hbars("Uploads (30 days)", rows.map(r => ({name: r.name, v: dv(r.o.uploads_in_window)})), whole)}
+      </div>
+      <h3 style="margin:16px 0 6px;font-size:14px">Detailed comparison</h3>
+      ${table([{h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, {h: "STX", n: 1, v: r => lastStx(r.t) == null ? "—" : dec(lastStx(r.t))},
+        {h: "Subscribers", n: 1, v: r => compact(dv(r.o.subscribers))}, {h: "Δ 30 days", n: 1, html: 1, v: r => dv(r.o.subscribers_change_30d) == null ? "—" : `<span class="${chgCls(dv(r.o.subscribers_change_30d))}">${esc(chg(dv(r.o.subscribers_change_30d)))}</span>`},
+        {h: "Total views", n: 1, v: r => compact(dv(r.o.total_views))}, {h: "Δ 30 days", n: 1, html: 1, v: r => dv(r.o.total_views_change_30d) == null ? "—" : `<span class="${chgCls(dv(r.o.total_views_change_30d))}">${esc(chg(dv(r.o.total_views_change_30d)))}</span>`},
+        {h: "Engagement", n: 1, v: r => dv(r.o.engagement_rate) == null ? "—" : dec(dv(r.o.engagement_rate), 2) + "%"}, {h: "Rank (subscribers)", n: 1, v: r => dv(r.o.subscribers_rank_in_language) == null ? "—" : "#" + dv(r.o.subscribers_rank_in_language)}], rows)}
+      <p class="muted" style="margin:8px 0 0">Year-over-year comparison appears after a full year of stored data.</p></section>
+    <div class="grid cols" style="margin-top:14px">
+      <section class="card"><h2>Top content, ${esc(o.name)}</h2>${topVideos.length ? `<ul class="vids">${topVideos.map(v => `<li><div class="th">${vLink(v) ? `<img src="https://i.ytimg.com/vi/${esc(v.youtube_video_id)}/mqdefault.jpg" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}</div>
+        <div>${vLink(v) ? `<a href="https://www.youtube.com/watch?v=${esc(v.youtube_video_id)}" target="_blank" rel="noopener noreferrer"><b>${esc(v.title || "Untitled")}</b></a>` : `<b>${esc(v.title || "Untitled")}</b>`}<span class="muted">${v.view_delta == null ? "—" : signed(v.view_delta)} views in the window · ${esc((v.classification || "").replaceAll("_", " ").toLowerCase())}</span></div></li>`).join("")}</ul>` : `<p class="muted">No tracked videos for this channel in the window yet.</p>`}</section>
+      <section class="card"><h2>Content distribution</h2>${tp.length ? tp.map(c => { const t = c.topics || {}; return `<div><strong>${esc(c.name)}</strong><div class="stack" role="img" aria-label="${esc(Object.entries(t).map(([k, x]) => k + " " + x.share + "%").join(", "))}">${Object.entries(t).map(([k, x]) => `<i title="${esc(k)} ${esc(x.share)}%" style="width:${Number(x.share) || 0}%;background:${TOPIC_COLORS[k] || "#6b8299"}"></i>`).join("")}</div></div>`; }).join("") + `<div class="legend">${Object.entries(TOPIC_COLORS).map(([k, c]) => `<span style="--c:${c}">${esc(k)}</span>`).join("")}</div>` : `<p class="muted">Topics appear after the next collection run classifies stored titles.</p>`}
+        <p class="muted" style="margin:8px 0 0">Topics come from keywords in video titles, a rough guide.</p></section></div>
+    ${evidence(`Channel numbers come from YouTube’s public channel statistics stored at each collection run (as of ${when(o.as_of)}).`)}`;
+  box.querySelectorAll("[data-cmp]").forEach(cb => cb.onchange = () => {
+    const chosen = [...box.querySelectorAll("[data-cmp]:checked")].map(x => x.value).slice(0, 5);
+    F.cmp = chosen.length ? chosen : [String(main)]; saveF(); render();
+  });
+});
+
 add("overview", "Intelligence", "Overview", async el => {
   el.innerHTML = head("Market overview", "The state of the market you follow, from the first observation to the latest.") + filterBar({channel: false}) + `<div id="ov"><p class="muted">Loading…</p></div>`;
   const [m, r, w] = await Promise.allSettled([marketReport(), readiness(), api("/api/v1/insights/what-changed", {hours: 24})]);
@@ -378,7 +502,6 @@ add("market", "Intelligence", "Market", async el => {
 });
 
 const channelHead = (title, lede) => head(title, lede) + (channels.length ? filterBar({language: false, channel: true, stream: true}) : "");
-const needChannel = () => { if (!F.channel || !channels.some(c => c.id === Number(F.channel))) { F.channel = channels[0] ? String(channels[0].id) : ""; saveF(); } return F.channel; };
 const channelMedia = () => api(`/api/v1/channels/${Number(needChannel())}/media-intelligence`, {period: F.period, stream_scope: F.stream});
 
 add("channel", "Intelligence", "Channel", async el => {
@@ -638,7 +761,7 @@ function buildNav(current) {
 }
 let seq = 0;
 async function render() {
-  const id = (location.hash.match(/^#\/([a-z-]+)/) || [])[1]; let v = VIEWS[id] || VIEWS.overview; if (v.admin && !isAdmin) v = VIEWS.overview; const mine = ++seq;
+  const id = (location.hash.match(/^#\/([a-z-]+)/) || [])[1]; let v = VIEWS[id] || VIEWS.dashboard; if (v.admin && !isAdmin) v = VIEWS.dashboard; const mine = ++seq;
   CHARTS.clear();
   const host = $("#view"), el = document.createElement("div");
   buildNav(v.id); document.title = v.title + " — StatAxis workspace"; el.innerHTML = `<p class="muted">Loading…</p>`; host.replaceChildren(el);
