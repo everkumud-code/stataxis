@@ -91,7 +91,7 @@ def export_observations_xlsx(session: Session, filters: ObservationExportFilters
 
     intelligence = workbook.create_sheet("StatAxis Intelligence")
     intelligence.append([
-        "Video ID", "YouTube Video ID", "Title", "STX Index", "Confidence",
+        "Video ID", "YouTube Video ID", "Title", "STX Index — Generated independently by StatAxis; not sourced from YouTube", "Confidence",
         "Available Signals", "Generated At", "StatAxis View", "Signal Contributions",
     ])
     intelligence.append(["", "", DERIVED_METRIC_NOTICE, "", "", "", "", "", ""])
