@@ -12,6 +12,8 @@ from collector.storage import Video
 from metrics.persistence import IntelligenceSnapshotRecord
 from metrics.stx_index import stx_display
 
+DERIVED_METRIC_NOTICE = "Generated independently by StatAxis; not sourced from YouTube"
+
 
 def latest_video_intelligence(session: Session, video_id: int) -> dict[str, Any] | None:
     """Return the newest explainable intelligence snapshot for a video."""
@@ -48,6 +50,7 @@ def latest_video_intelligence(session: Session, video_id: int) -> dict[str, Any]
         "signal_contributions": contributions,
         "contributions": contributions,
         "measurement_provenance": view_payload.get("measurement_provenance", {}),
+        "derived_metric_notice": DERIVED_METRIC_NOTICE,
     }
 
 
