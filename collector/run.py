@@ -34,8 +34,9 @@ def run_collection_pass(
     if max_videos <= 0:
         raise ValueError("max_videos must be positive")
 
+    pass_started_at = datetime.now(UTC)
     run = CollectionRun(
-        started_at=datetime.now(UTC),
+        started_at=pass_started_at,
         status="running",
         channels_attempted=len(targets),
         videos_observed=0,
@@ -70,7 +71,7 @@ def run_collection_pass(
             if saved < 0:  # pragma: no cover - defensive invariant guard
                 raise RuntimeError("collector returned a negative save count")
 
-        intelligence = process_persisted_observations(session)
+        intelligence = process_persisted_observations(session, since=pass_started_at)
         run = session.get(CollectionRun, run.id)
         if run is None:  # pragma: no cover - impossible while session is active
             raise RuntimeError("collection run disappeared during processing")
