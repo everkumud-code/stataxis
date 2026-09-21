@@ -64,8 +64,17 @@ def _measurement_provenance(
     }
 
 
-def persist_video_intelligence(session: Session, video_id: int, *, limit: int = 25) -> IntelligenceSnapshotRecord:
-    """Build and persist one deterministic, traceable intelligence snapshot."""
+def persist_video_intelligence(
+    session: Session,
+    video_id: int,
+    *,
+    limit: int = 25,
+    commit: bool = True,
+) -> IntelligenceSnapshotRecord:
+    """Build and persist one deterministic, traceable intelligence snapshot.
+
+    ``commit=False`` leaves the record pending so callers can commit many snapshots at once.
+    """
     snapshot = build_persisted_video_snapshot(session, video_id, limit=limit)
     intelligence = snapshot.intelligence
     rows = session.query(Observation.observed_at).filter(Observation.video_id == video_id).order_by(Observation.observed_at.desc()).limit(limit).all()
@@ -92,7 +101,8 @@ def persist_video_intelligence(session: Session, video_id: int, *, limit: int = 
         contributions_json=json.dumps([{"name": item.name, "value": item.value, "contribution": item.weighted_contribution, "share_of_score": item.share_of_score} for item in snapshot.contributions], sort_keys=True),
     )
     session.add(record)
-    session.commit()
+    if commit:
+        session.commit()
     return record
 
 

@@ -93,9 +93,34 @@ def test_duplicate_targets_are_fetched_once() -> None:
     assert list(result) == ["UC0"]
 
 
-def test_missing_channel_raises_like_one_at_a_time_collection() -> None:
-    with pytest.raises(YouTubeAPIError, match="Channel not found: UC1"):
-        collect_channels_batched(CountingClient(missing={"UC1"}), _targets(2), max_videos=1)
+def test_missing_channel_is_skipped_and_reported_without_stopping_the_others() -> None:
+    skipped: dict[str, str] = {}
+    result = collect_channels_batched(CountingClient(missing={"UC1"}), _targets(3), max_videos=1, skipped=skipped)
+    assert sorted(result) == ["UC0", "UC2"]
+    assert skipped == {"UC1": "channel not found"}
+
+
+def test_uploads_playlist_404_skips_only_that_channel() -> None:
+    class Client(CountingClient):
+        def list_uploads(self, uploads_id: str, max_results: int = 25):
+            if uploads_id == "uploads-UC1":
+                raise YouTubeAPIError("not found", status_code=404)
+            return super().list_uploads(uploads_id, max_results)
+
+    skipped: dict[str, str] = {}
+    result = collect_channels_batched(Client(), _targets(3), max_videos=1, skipped=skipped)
+    assert sorted(result) == ["UC0", "UC2"]
+    assert skipped == {"UC1": "uploads playlist not found"}
+
+
+@pytest.mark.parametrize("status", [403, 429, 500])
+def test_quota_and_server_errors_still_abort_the_pass(status: int) -> None:
+    class Client(CountingClient):
+        def list_uploads(self, uploads_id: str, max_results: int = 25):
+            raise YouTubeAPIError("boom", status_code=status)
+
+    with pytest.raises(YouTubeAPIError):
+        collect_channels_batched(Client(), _targets(2), max_videos=1)
 
 
 def test_no_targets_makes_no_calls() -> None:

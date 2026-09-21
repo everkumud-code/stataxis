@@ -23,6 +23,10 @@ class CollectionPassResult:
     intelligence: IntelligenceRunResult
 
 
+def _describe_skipped(skipped: dict[str, str]) -> str:
+    return ", ".join(f"{channel_id} ({reason})" for channel_id, reason in sorted(skipped.items()))[:1500]
+
+
 def run_collection_pass(
     session: Session,
     client: YouTubeClient,
@@ -46,9 +50,14 @@ def run_collection_pass(
 
     videos_observed = 0
     try:
-        collections = collect_channels_batched(client, targets, max_videos)
+        skipped: dict[str, str] = {}
+        collections = collect_channels_batched(client, targets, max_videos, skipped=skipped)
+        if targets and not collections:
+            raise RuntimeError(f"no channel could be collected: {_describe_skipped(skipped)}")
         for target in targets:
-            collection = collections[target.channel_id]
+            collection = collections.get(target.channel_id)
+            if collection is None:
+                continue
             observations = collection.observations
             saved = save_observations(
                 session=session,
@@ -77,12 +86,13 @@ def run_collection_pass(
             raise RuntimeError("collection run disappeared during processing")
         run.finished_at = datetime.now(UTC)
         run.videos_observed = videos_observed
-        run.status = "partial" if intelligence.errors else "success"
-        run.error_message = (
-            f"intelligence errors: {intelligence.errors}"
-            if intelligence.errors
-            else None
-        )
+        problems = []
+        if skipped:
+            problems.append(f"channels skipped: {_describe_skipped(skipped)}")
+        if intelligence.errors:
+            problems.append(f"intelligence errors: {intelligence.errors}")
+        run.status = "partial" if problems else "success"
+        run.error_message = "; ".join(problems)[:2000] if problems else None
         session.commit()
         run_id = run.id
         # Enforce YouTube API data retention. Never raises and never fails a collection pass.

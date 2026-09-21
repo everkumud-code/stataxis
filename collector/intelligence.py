@@ -12,6 +12,9 @@ from collector.storage import Observation
 from metrics.persistence import persist_video_intelligence
 
 
+COMMIT_BATCH_SIZE = 100
+
+
 @dataclass(frozen=True)
 class IntelligenceRunResult:
     videos_processed: int
@@ -47,17 +50,23 @@ def process_persisted_observations(
             .all()
         )
 
-    processed = snapshots = errors = 0
+    processed = snapshots = errors = pending = 0
     for video_id in video_ids:
         processed += 1
         if counts.get(video_id, 0) < 2:
             continue
         try:
-            persist_video_intelligence(session, video_id, limit=limit_per_video)
+            # Snapshot maths fails before anything is written, so a failure leaves the
+            # session clean and earlier pending snapshots in the batch are kept.
+            persist_video_intelligence(session, video_id, limit=limit_per_video, commit=False)
             snapshots += 1
+            pending += 1
         except (ValueError, RuntimeError):
-            session.rollback()
             errors += 1
+        if pending >= COMMIT_BATCH_SIZE:
+            session.commit()
+            pending = 0
+    session.commit()
     return IntelligenceRunResult(processed, snapshots, errors)
 
 

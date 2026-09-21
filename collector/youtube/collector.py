@@ -156,6 +156,7 @@ def collect_channels_batched(
     client: YouTubeClient,
     targets: list[ChannelTarget],
     max_videos: int = 25,
+    skipped: dict[str, str] | None = None,
 ) -> dict[str, ChannelCollection]:
     """Collect many channels using far fewer API units than one channel at a time.
 
@@ -165,22 +166,33 @@ def collect_channels_batched(
       * videos.list     - 1 call per 50 videos across all channels (was 1 per channel)
 
     For 200 channels with 25 videos each that is about 304 units per pass instead of 600.
-    Results are keyed by YouTube channel ID. A channel YouTube does not return raises
-    ``YouTubeAPIError``, matching the one-at-a-time behaviour.
+    Results are keyed by YouTube channel ID. One bad channel must not stop the others:
+    a channel YouTube does not return, or whose uploads playlist is not found (404),
+    is left out of the result and reported in ``skipped`` (channel ID -> reason).
+    Quota and server errors still raise, because retrying every channel would not help.
     """
+    skipped = skipped if skipped is not None else {}
     channel_ids = list(dict.fromkeys(target.channel_id for target in targets))
     channels: dict[str, dict[str, Any]] = {}
     for batch in _batches(channel_ids):
         for item in client.get_channels(batch):
             channels[str(item.get("id", ""))] = item
-    for channel_id in channel_ids:
-        if channel_id not in channels:
-            raise YouTubeAPIError(f"Channel not found: {channel_id}")
-
     video_ids_by_channel: dict[str, list[str]] = {}
     for channel_id in channel_ids:
-        uploads_id = channels[channel_id]["contentDetails"]["relatedPlaylists"]["uploads"]
-        uploads = client.list_uploads(uploads_id, max_results=max_videos)
+        if channel_id not in channels:
+            skipped[channel_id] = "channel not found"
+            continue
+        uploads_id = channels[channel_id].get("contentDetails", {}).get("relatedPlaylists", {}).get("uploads")
+        if not uploads_id:
+            skipped[channel_id] = "no uploads playlist"
+            continue
+        try:
+            uploads = client.list_uploads(uploads_id, max_results=max_videos)
+        except YouTubeAPIError as exc:
+            if exc.status_code != 404:
+                raise
+            skipped[channel_id] = "uploads playlist not found"
+            continue
         ids = [item.get("contentDetails", {}).get("videoId") for item in uploads.get("items", [])]
         video_ids_by_channel[channel_id] = [video_id for video_id in ids if video_id]
 
@@ -192,7 +204,7 @@ def collect_channels_batched(
 
     observed_at = datetime.now(UTC)
     collections: dict[str, ChannelCollection] = {}
-    for channel_id in channel_ids:
+    for channel_id in video_ids_by_channel:
         channel = channels[channel_id]
         snippet = channel.get("snippet", {})
         statistics = channel.get("statistics", {})
