@@ -17,9 +17,9 @@ def _db():
     return engine
 
 
-def _seed(session: Session, observed_at: datetime, *, active: bool = True, metadata_at: datetime | None = None):
+def _seed(session: Session, observed_at: datetime, *, active: bool = True, metadata_at: datetime | None = None, suffix: str = ""):
     channel = Channel(
-        youtube_channel_id="UC-test",
+        youtube_channel_id="UC-test" + suffix,
         name="Test Channel",
         active=active,
         avatar_url="https://img/avatar.jpg",
@@ -29,7 +29,7 @@ def _seed(session: Session, observed_at: datetime, *, active: bool = True, metad
     session.add(channel)
     session.flush()
     video = Video(
-        youtube_video_id="video-test",
+        youtube_video_id="video-test" + suffix,
         channel_id=channel.id,
         title="Test title",
         published_at="2026-01-01T00:00:00Z",
@@ -105,13 +105,11 @@ def test_30_day_metadata_is_cleared_and_refreshed_data_survives(monkeypatch):
     engine = _db()
     with Session(engine) as session:
         _, stale_video_id = _seed(session, NOW - timedelta(days=40), metadata_at=NOW - timedelta(days=31))
-        fresh_channel_id, fresh_video_id = _seed(session, NOW - timedelta(days=40), metadata_at=NOW - timedelta(days=29))
+        fresh_channel_id, fresh_video_id = _seed(session, NOW - timedelta(days=40), metadata_at=NOW - timedelta(days=29), suffix="-fresh")
         # Separate the unique IDs for the second seed.
         fresh_channel = session.get(Channel, fresh_channel_id)
         fresh_video = session.get(Video, fresh_video_id)
         assert fresh_channel and fresh_video
-        fresh_channel.youtube_channel_id = "UC-fresh"
-        fresh_video.youtube_video_id = "video-fresh"
         session.commit()
 
         result = run_retention(session, now=NOW)
