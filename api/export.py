@@ -19,6 +19,7 @@ from metrics.persistence import IntelligenceSnapshotRecord
 
 
 MAX_EXPORT_ROWS = 50_000
+DERIVED_METRIC_NOTICE = "Generated independently by StatAxis; not sourced from YouTube"
 
 
 @dataclass(frozen=True)
@@ -93,6 +94,7 @@ def export_observations_xlsx(session: Session, filters: ObservationExportFilters
         "Video ID", "YouTube Video ID", "Title", "STX Index", "Confidence",
         "Available Signals", "Generated At", "StatAxis View", "Signal Contributions",
     ])
+    intelligence.append(["", "", DERIVED_METRIC_NOTICE, "", "", "", "", "", ""])
     if video_ids:
         stmt = (
             select(IntelligenceSnapshotRecord, Video)
