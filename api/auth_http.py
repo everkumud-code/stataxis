@@ -1,4 +1,4 @@
-"""Account application and login HTTP endpoints for StatAxis."""
+"""Account registration and login HTTP endpoints for StatAxis."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from typing import Any, Callable
 from sqlalchemy.orm import Session
 
 from api.auth_service import login, register
+from api.rate_limit import client_ip, limiter
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -27,13 +28,23 @@ def auth_application(session_factory: Callable[[], Session]):
             password = payload.get("password")
             if not isinstance(password, str):
                 raise ValueError("password is required")
+            ip = client_ip(environ)
+            if path.endswith("/register"):
+                retry = limiter.check(f"register:{ip}", 5, 3600)
+            else:
+                retry = limiter.check(f"login:{ip}:{email}", 10, 900)
+            if retry:
+                return _json(start_response, 429, {"error": "too many requests"}, retry)
             session = session_factory()
             try:
                 if path.endswith("/register"):
                     result = register(session, email, password, payload.get("name", ""), payload.get("mobile", ""),
                                       payload.get("organization", ""), payload.get("purpose_of_use", ""),
                                       payload.get("requested_plan", ""))
-                    result = {"account": result, "message": "Profile submitted for admin approval."}
+                    if result.get("already_exists"):
+                        result = {"message": "Profile submitted for admin approval."}
+                    else:
+                        result = {"account": result, "message": "Profile submitted for admin approval."}
                     status = 201
                 else:
                     result = login(session, email, password)
@@ -75,8 +86,11 @@ def _email(value: Any) -> str:
     return email
 
 
-def _json(start_response: Callable[..., Any], status: int, payload: dict[str, Any]):
-    reasons = {200: "OK", 201: "Created", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed"}
+def _json(start_response: Callable[..., Any], status: int, payload: dict[str, Any], retry_after: int | None = None):
+    reasons = {200: "OK", 201: "Created", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed", 429: "Too Many Requests"}
     body = json.dumps(payload).encode("utf-8")
-    start_response(f"{status} {reasons[status]}", [("Content-Type", "application/json"), ("Content-Length", str(len(body)))])
+    headers = [("Content-Type", "application/json"), ("Content-Length", str(len(body)))]
+    if retry_after is not None:
+        headers.append(("Retry-After", str(retry_after)))
+    start_response(f"{status} {reasons[status]}", headers)
     return [body]

@@ -9,7 +9,8 @@
       "verification_status": "registered",
       "verified_title": "IndiaTV",
       "verified_channel_id": "UCttspZesZIDEwwpVIgoZtWQ",
-      "uploads_playlist_id": "UUttspZesZIDEwwpVIgoZtWQ"
+      "uploads_playlist_id": "UUttspZesZIDEwwpVIgoZtWQ",
+      "segment": "news"
     },
     {
       "name": "Zee News",
@@ -17,7 +18,8 @@
       "network": "Zee Media",
       "channel_id": "",
       "discovery_source": "secondary_research",
-      "verification_status": "pending"
+      "verification_status": "pending",
+      "segment": "news"
     },
     {
       "name": "News18 India",
@@ -25,7 +27,8 @@
       "network": "Network18",
       "channel_id": "",
       "discovery_source": "secondary_research",
-      "verification_status": "pending"
+      "verification_status": "pending",
+      "segment": "news"
     },
     {
       "name": "The Lallantop",
@@ -36,7 +39,8 @@
       "verification_status": "registered",
       "verified_title": "The Lallantop",
       "verified_channel_id": "UCx8Z14PpntdaxCt2hakbQLQ",
-      "uploads_playlist_id": "UUx8Z14PpntdaxCt2hakbQLQ"
+      "uploads_playlist_id": "UUx8Z14PpntdaxCt2hakbQLQ",
+      "segment": "news"
     },
     {
       "name": "Republic Bharat",
@@ -44,7 +48,8 @@
       "network": "Republic Media Network",
       "channel_id": "",
       "discovery_source": "secondary_research",
-      "verification_status": "pending"
+      "verification_status": "pending",
+      "segment": "news"
     },
     {
       "name": "ABP LIVE",
@@ -52,7 +57,8 @@
       "network": "ABP Network",
       "channel_id": "",
       "discovery_source": "secondary_research",
-      "verification_status": "pending"
+      "verification_status": "pending",
+      "segment": "news"
     },
     {
       "name": "Oneindia Hindi",
@@ -60,7 +66,8 @@
       "network": "Oneindia",
       "channel_id": "",
       "discovery_source": "secondary_research",
-      "verification_status": "pending"
+      "verification_status": "pending",
+      "segment": "news"
     },
     {
       "name": "BBC News Hindi",
@@ -68,7 +75,8 @@
       "network": "BBC",
       "channel_id": "",
       "discovery_source": "secondary_research",
-      "verification_status": "pending"
+      "verification_status": "pending",
+      "segment": "news"
     },
     {
       "name": "NDTV",
@@ -79,7 +87,8 @@
       "verification_status": "registered",
       "verified_title": "NDTV",
       "verified_channel_id": "UCZFMm1mMw0F81Z37aaEzTUA",
-      "uploads_playlist_id": "UUZFMm1mMw0F81Z37aaEzTUA"
+      "uploads_playlist_id": "UUZFMm1mMw0F81Z37aaEzTUA",
+      "segment": "news"
     },
     {
       "name": "ABP Ananda",
@@ -87,7 +96,8 @@
       "network": "ABP Network",
       "channel_id": "",
       "discovery_source": "secondary_research",
-      "verification_status": "pending"
+      "verification_status": "pending",
+      "segment": "news"
     },
     {
       "name": "ABP Majha",
@@ -95,7 +105,8 @@
       "network": "ABP Network",
       "channel_id": "",
       "discovery_source": "secondary_research",
-      "verification_status": "pending"
+      "verification_status": "pending",
+      "segment": "news"
     },
     {
       "name": "TV9 Marathi",
@@ -103,7 +114,8 @@
       "network": "TV9 Network",
       "channel_id": "",
       "discovery_source": "secondary_research",
-      "verification_status": "pending"
+      "verification_status": "pending",
+      "segment": "news"
     },
     {
       "name": "Polimer News",
@@ -111,7 +123,8 @@
       "network": "Polimer Media",
       "channel_id": "",
       "discovery_source": "secondary_research",
-      "verification_status": "pending"
+      "verification_status": "pending",
+      "segment": "news"
     },
     {
       "name": "Thanthi TV",
@@ -122,7 +135,8 @@
       "verification_status": "registered",
       "verified_title": "Thanthi TV",
       "verified_channel_id": "UC-JFyL0zDFOsPMpuWu39rPA",
-      "uploads_playlist_id": "UU-JFyL0zDFOsPMpuWu39rPA"
+      "uploads_playlist_id": "UU-JFyL0zDFOsPMpuWu39rPA",
+      "segment": "news"
     },
     {
       "name": "TV9 Kannada",
@@ -130,7 +144,8 @@
       "network": "TV9 Network",
       "channel_id": "",
       "discovery_source": "secondary_research",
-      "verification_status": "pending"
+      "verification_status": "pending",
+      "segment": "news"
     },
     {
       "name": "Manorama News",
@@ -138,7 +153,620 @@
       "network": "Malayala Manorama",
       "channel_id": "",
       "discovery_source": "secondary_research",
-      "verification_status": "pending"
+      "verification_status": "pending",
+      "segment": "news"
+    },
+    {
+      "name": "News24",
+      "language": "Hindi",
+      "network": "News24 Broadcast India",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "TV9 Bharatvarsh",
+      "language": "Hindi",
+      "network": "TV9 Network",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "NDTV India",
+      "language": "Hindi",
+      "network": "NDTV",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "India Today",
+      "language": "Hindi",
+      "network": "India Today Group",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Times Now",
+      "language": "English",
+      "network": "Times Network",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "CNN-News18",
+      "language": "English",
+      "network": "Network18",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "WION",
+      "language": "English",
+      "network": "Zee Media",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Republic World",
+      "language": "English",
+      "network": "Republic Media Network",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "India Today English",
+      "language": "English",
+      "network": "India Today Group",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Firstpost",
+      "language": "English",
+      "network": "Network18",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "ANI",
+      "language": "English",
+      "network": "Asian News International",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Mirror Now",
+      "language": "English",
+      "network": "Times Network",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "NewsX",
+      "language": "English",
+      "network": "ITV Network",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "The Hindu",
+      "language": "English",
+      "network": "The Hindu Group",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "CNBC-TV18",
+      "language": "English",
+      "network": "Network18",
+      "segment": "business",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Zee Business",
+      "language": "Hindi",
+      "network": "Zee Media",
+      "segment": "business",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "CNBC Awaaz",
+      "language": "Hindi",
+      "network": "Network18",
+      "segment": "business",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "ET Now",
+      "language": "English",
+      "network": "Times Network",
+      "segment": "business",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Puthiya Thalaimurai",
+      "language": "Tamil",
+      "network": "New Generation Media",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "News7 Tamil",
+      "language": "Tamil",
+      "network": "Sun Group",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Sun News",
+      "language": "Tamil",
+      "network": "Sun Group",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "News Tamil 24x7",
+      "language": "Tamil",
+      "network": "News Tamil",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Asianet News",
+      "language": "Malayalam",
+      "network": "Asianet",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "MediaOne",
+      "language": "Malayalam",
+      "network": "Madhyamam",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "24 News",
+      "language": "Malayalam",
+      "network": "Sreekandan Nair Foundation",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Reporter TV",
+      "language": "Malayalam",
+      "network": "Reporter Broadcasting",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "News18 Lokmat",
+      "language": "Marathi",
+      "network": "Network18",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Saam TV",
+      "language": "Marathi",
+      "network": "Sakal Media",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "TV9 Bangla",
+      "language": "Bengali",
+      "network": "TV9 Network",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "News18 Bangla",
+      "language": "Bengali",
+      "network": "Network18",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Asianet Suvarna News",
+      "language": "Kannada",
+      "network": "Asianet",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Public TV",
+      "language": "Kannada",
+      "network": "Public Media",
+      "segment": "news",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Dainik Bhaskar",
+      "language": "Hindi",
+      "network": "DB Corp",
+      "segment": "print",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Live Hindustan",
+      "language": "Hindi",
+      "network": "HT Media",
+      "segment": "print",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Lokmat",
+      "language": "Marathi",
+      "network": "Lokmat Media",
+      "segment": "print",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "The Times of India",
+      "language": "English",
+      "network": "Times Group",
+      "segment": "print",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Hindustan Times",
+      "language": "English",
+      "network": "HT Media",
+      "segment": "print",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Dainik Jagran",
+      "language": "Hindi",
+      "network": "Jagran Prakashan",
+      "segment": "print",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Amar Ujala",
+      "language": "Hindi",
+      "network": "Amar Ujala Publications",
+      "segment": "print",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Indian National Congress",
+      "language": "Hindi",
+      "network": "INC",
+      "segment": "party",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Bharatiya Janata Party",
+      "language": "Hindi",
+      "network": "BJP",
+      "segment": "party",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "All India Trinamool Congress",
+      "language": "Hindi",
+      "network": "AITC",
+      "segment": "party",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Aam Aadmi Party",
+      "language": "Hindi",
+      "network": "AAP",
+      "segment": "party",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Indian Youth Congress",
+      "language": "Hindi",
+      "network": "INC",
+      "segment": "party",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Narendra Modi",
+      "language": "Hindi",
+      "network": "Narendra Modi",
+      "segment": "leader",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Rahul Gandhi",
+      "language": "Hindi",
+      "network": "Rahul Gandhi",
+      "segment": "leader",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Dhruv Rathee",
+      "language": "Hindi",
+      "network": "Dhruv Rathee",
+      "segment": "commentator",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Abhisar Sharma",
+      "language": "Hindi",
+      "network": "Abhisar Sharma",
+      "segment": "commentator",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "Ravish Kumar",
+      "language": "Hindi",
+      "network": "Ravish Kumar",
+      "segment": "commentator",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "DB Live",
+      "language": "Hindi",
+      "network": "DB Live",
+      "segment": "commentator",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
+    },
+    {
+      "name": "4PM News",
+      "language": "Hindi",
+      "network": "4PM",
+      "segment": "commentator",
+      "discovery_source": "public_market_coverage",
+      "channel_id": "",
+      "uploads_playlist_id": "",
+      "verification_status": "pending",
+      "verified_channel_id": "",
+      "verified_title": ""
     }
   ]
 }

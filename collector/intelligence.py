@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from collector.storage import Observation
 from metrics.persistence import persist_video_intelligence
+from metrics.eligibility import analysis_observation_clause
 
 
 COMMIT_BATCH_SIZE = 100
@@ -30,11 +31,13 @@ def process_persisted_observations(
 ) -> IntelligenceRunResult:
     """Build and durably store STX intelligence for videos with a change window.
 
-    With ``since`` only videos observed at or after that moment are processed. A video
-    with no new observation would produce an identical snapshot, so re-processing every
-    video on every pass only wastes database round trips and grows the snapshot table.
+    Shorts are displayed but never counted in analysis, so only observations that pass
+    ``analysis_observation_clause`` select a video. With ``since`` only videos observed
+    at or after that moment are processed: a video with no new observation would produce
+    an identical snapshot, so re-processing every video on every pass only wastes database
+    round trips and grows the snapshot table.
     """
-    query = session.query(Observation.video_id)
+    query = session.query(Observation.video_id).filter(analysis_observation_clause())
     if since is not None:
         query = query.filter(Observation.observed_at >= since)
     video_ids = [row[0] for row in query.distinct().all()]

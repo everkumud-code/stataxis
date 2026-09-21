@@ -90,7 +90,7 @@ def test_pass_with_one_missing_channel_is_partial_not_failed():
         )
         run = session.query(CollectionRun).one()
         assert run.status == "partial"
-        assert "UC-gone (channel not found)" in run.error_message
+        assert "Deleted [UC-gone: channel not found]" in run.error_message
         assert result.videos_observed == 1
 
 

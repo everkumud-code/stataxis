@@ -42,8 +42,8 @@ def test_duplicate_registration_rejected(tmp_path, monkeypatch):
     monkeypatch.setenv("STAXIS_AUTH_SECRET", "test-secret")
     session = make_session(tmp_path)
     register_test_user(session)
-    with pytest.raises(ValueError, match="already registered"):
-        register(session, "TEST@example.com", "correct horse battery", "Test User", "+91-9000000000", "Example Media Pvt Ltd", "Media intelligence evaluation", "sx_free")
+    result = register(session, "TEST@example.com", "correct horse battery", "Test User", "+91-9000000000", "Example Media Pvt Ltd", "Media intelligence evaluation", "sx_free")
+    assert result == {"already_exists": True}
     session.close()
 
 

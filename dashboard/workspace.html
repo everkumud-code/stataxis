@@ -248,7 +248,7 @@ const friendly = e => e.status === 403 || /premium/i.test(e.message)
 
 /* ---------- state ---------- */
 const PERIODS = [["1h","Last hour"],["3h","Last 3 hours"],["6h","Last 6 hours"],["today","Today"],["7d","Last 7 days"],["3w","Last 3 weeks"],["month","Last month"],["quarter","Last quarter"],["year","Last year"]];
-const SCOPES = [["all","All streams"],["live","Live"],["replay","Live replays"],["video","Videos"]];
+const SCOPES = [["all","All streams"],["live","Live"],["replay","Live replays"],["video","Videos"],["shorts","Shorts"]];
 const F = Object.assign({language: "", period: "7d", stream: "all", channel: ""}, JSON.parse(sessionStorage.getItem("sx_ws_filters") || "{}"));
 let channels = [];
 const saveF = () => sessionStorage.setItem("sx_ws_filters", JSON.stringify(F));
@@ -544,11 +544,12 @@ add("channel", "Intelligence", "Channel", async el => {
 });
 
 add("stream", "Intelligence", "Streams", async el => {
-  el.innerHTML = head("Stream intelligence", "Live, replay and video audiences compared.") + filterBar({stream: false}) +
+  el.innerHTML = head("Stream intelligence", "Live, replay, video and Shorts audiences compared.") + filterBar({stream: false}) +
     `<div class="tabs" role="group" aria-label="Stream type">${SCOPES.map(([v, l]) => `<button class="tab" type="button" data-scope="${v}" aria-pressed="${v === F.stream}">${esc(l)}</button>`).join("")}</div><div id="st"><p class="muted">Loading…</p></div>`;
   el.querySelectorAll("[data-scope]").forEach(b => b.onclick = () => { F.stream = b.dataset.scope; saveF(); render(); });
   const rep = await marketReport(F.stream), rows = marketRows(rep);
-  $("#st", el).innerHTML = (channels.length ? marketTable(rows, F.stream) : noChannels()) + evidence(provText(rep.provenance.observation_count, rep.start_at, rep.end_at));
+  const lines = (rep.markets || []).map(m => m.headline ? `<p class="muted">${esc(m.headline)}.</p>` : "").join("");
+  $("#st", el).innerHTML = lines + (channels.length ? marketTable(rows, F.stream) : noChannels()) + evidence(provText(rep.provenance.observation_count, rep.start_at, rep.end_at));
 });
 
 add("content", "Intelligence", "Content", async el => {
@@ -608,11 +609,25 @@ add("live", "Intelligence", "Live audience", async el => {
   let d; try { d = await api("/api/v1/audience/live", {start: start.toISOString(), end: end.toISOString(), language: F.language}); }
   catch (e) { if (e.status === 403 || /premium/i.test(e.message)) { $("#lv", el).innerHTML = state("Live audience is a paid feature", "Your plan does not include live audience windows. Ask your admin to change your plan.", ""); return; } throw e; }
   const langs = Object.entries(d.languages || {});
-  $("#lv", el).innerHTML = `<div class="grid kpis">${kpi("Current concurrent", whole(d.overall.current_concurrent), "Sum of each channel’s latest sample")}${kpi("Peak concurrent", whole(d.overall.peak_concurrent))}${kpi("Live channels", whole(d.overall.channel_count))}</div>
+  $("#lv", el).innerHTML = `<div class="grid kpis">${kpi("All feed now", whole(d.overall.current_concurrent), "Primary + secondary streams")}${kpi("Primary feed", whole((d.overall.feeds || {}).primary), "Long-running live streams")}${kpi("Secondary feeds", whole((d.overall.feeds || {}).secondary), "Event / parallel streams")}${kpi("Peak concurrent", whole(d.overall.peak_concurrent))}${kpi("Live channels", whole(d.overall.channel_count))}</div>
     <section class="card"><h2>Total concurrent viewers</h2>${spark(d.timeline || [], "total_concurrent", "Total concurrent viewers", {breakdown: true})}</section>
     <div class="grid cols" style="margin-top:14px"><section class="card"><h2>By language</h2>${table([{h: "Language", v: r => r[0]}, {h: "Channels", n: 1, v: r => whole(r[1].channel_count)}, {h: "Now", n: 1, v: r => whole(r[1].current_concurrent)}, {h: "Peak", n: 1, v: r => whole(r[1].peak_concurrent)}], langs, "No live samples in this window.")}</section>
-    <section class="card"><h2>By channel</h2>${table([{h: "Channel", v: r => r.name}, {h: "Now", n: 1, v: r => whole(r.current_concurrent)}, {h: "Peak", n: 1, v: r => whole(r.peak_concurrent)}, {h: "Last sample", v: r => when(r.observed_at)}], d.channels || [], "No live channels in this window.")}</section></div>
+    <section class="card"><h2>By channel</h2>${table([{h: "Channel", v: r => r.name}, {h: "Primary", n: 1, v: r => whole((r.feeds || {}).primary)}, {h: "Secondary", n: 1, v: r => whole((r.feeds || {}).secondary)}, {h: "All feed", n: 1, v: r => whole(r.current_concurrent)}, {h: "Peak", n: 1, v: r => whole(r.peak_concurrent)}, {h: "Last sample", v: r => when(r.observed_at)}], d.channels || [], "No live channels in this window.")}</section></div>
+    <div id="lvstats"></div>
     ${evidence(`Samples run from ${when(d.overall.earliest_observed_at)} to ${when(d.overall.latest_observed_at)}. Values are not interpolated.`)}`;
+  // Average and peak concurrent viewers by feed over this window (time-aligned across streams).
+  try {
+    const st = await api("/api/v1/audience/live/stats", {start: start.toISOString(), end: end.toISOString(), language: F.language});
+    const one = (r, k, f) => ((r.feeds || {})[k] || {})[f];
+    $("#lvstats", el).innerHTML = `<section class="card" style="margin-top:14px"><h2>Average and peak by feed</h2>
+      ${(st.markets || []).map(m => m.headline ? `<p class="muted">${esc(m.headline)}.</p>` : "").join("")}
+      ${table([{h: "Market", v: r => r.market_label}, {h: "Channel", v: r => r.name},
+        {h: "All avg", n: 1, v: r => whole(one(r, "all", "average"))}, {h: "All peak", n: 1, v: r => whole(one(r, "all", "peak"))},
+        {h: "Primary avg", n: 1, v: r => whole(one(r, "primary", "average"))}, {h: "Primary peak", n: 1, v: r => whole(one(r, "primary", "peak"))},
+        {h: "Secondary avg", n: 1, v: r => whole(one(r, "secondary", "average"))}, {h: "Secondary peak", n: 1, v: r => whole(one(r, "secondary", "peak"))},
+        {h: "Share %", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}], st.channels || [], "No live channels in this window.")}
+      <p class="muted" style="margin-top:8px">${esc(st.method || "")}</p></section>`;
+  } catch (e) { /* the feed table is optional; the rest of the live view is already shown */ }
 });
 
 const STX = [["audience","Audience",30],["growth","Growth",20],["momentum","Momentum",15],["acceleration","Acceleration",10],["consistency","Consistency",10],["competitive_position","Competition",10],["anomaly_event","Anomaly or event",5]]; // mirrors metrics/stx_index.py WEIGHTS

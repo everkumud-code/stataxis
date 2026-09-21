@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from api.access import UserRole, plan_video_access_policy, require_capability, video_access_policy
 from api.plans import SXPlan, get_plan
 from api.live_monitor import live_audience_window
+from api.live_stats import live_window_stats
 from collector.storage import Channel, Observation, Video
 from metrics.persistence import IntelligenceSnapshotRecord
 
@@ -117,6 +118,49 @@ def export_observations_xlsx(session: Session, filters: ObservationExportFilters
     _format_sheet(intelligence)
 
     _add_notice_sheet(workbook)
+    output = BytesIO()
+    workbook.save(output)
+    return output.getvalue()
+
+
+def export_live_stats_xlsx(
+    session: Session,
+    *,
+    start_at: datetime,
+    end_at: datetime,
+    language: str | None = None,
+    segment: str | None = None,
+    bucket_seconds: int = 60,
+) -> bytes:
+    """Excel export of average / peak concurrent viewers by Primary, Secondary and All feed."""
+    payload = live_window_stats(session, start_at=start_at, end_at=end_at, language=language, segment=segment, bucket_seconds=bucket_seconds)
+    workbook = Workbook()
+    channels = workbook.active
+    channels.title = "Channels"
+    channels.append([
+        "Rank", "Market", "Channel", "Language", "All Avg", "All Peak", "Primary Avg", "Primary Peak",
+        "Secondary Avg", "Secondary Peak", "Share % (All Avg)", "Streams Seen", "Coverage %", "Peak At (UTC)",
+    ])
+    for item in payload["channels"]:
+        feeds = item["feeds"]
+        channels.append([
+            item["rank"], item["market_label"], item["name"], item["language"],
+            feeds["all"]["average"], feeds["all"]["peak"], feeds["primary"]["average"], feeds["primary"]["peak"],
+            feeds["secondary"]["average"], feeds["secondary"]["peak"], item.get("share_percent"),
+            item["streams_seen"], item["coverage_percent"], item["peak_at"],
+        ])
+    _format_sheet(channels)
+    markets = workbook.create_sheet("Markets")
+    markets.append(["Market", "Channels", "Average Concurrent", "Peak Concurrent", "Headline"])
+    for item in payload["markets"]:
+        markets.append([item["label"], item["channel_count"], item["average"], item["peak"], item["headline"]])
+    _format_sheet(markets)
+    notes = workbook.create_sheet("Method")
+    notes.append(["Window start (UTC)", payload["start_at"]])
+    notes.append(["Window end (UTC)", payload["end_at"]])
+    notes.append(["Grid seconds", payload["bucket_seconds"]])
+    notes.append(["Primary threshold (hours live)", payload["primary_min_live_hours"]])
+    notes.append(["Method", payload["method"]])
     output = BytesIO()
     workbook.save(output)
     return output.getvalue()

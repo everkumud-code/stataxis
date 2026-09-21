@@ -16,6 +16,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from collector.main import load_targets
+from collector.quota_estimate import quota_warning
 from collector.run import run_collection_pass
 from collector.run_once import _sanitize_error_message
 from collector.storage import Channel, Observation, Video, create_database, save_observations
@@ -170,6 +171,7 @@ def _collection_loop(
     stop: Event,
     collect_seconds: int,
     secrets: tuple[str | None, ...],
+    live_poll_seconds: int = 30,
 ) -> None:
     """Full collection on its own schedule. Never raises."""
     next_collect = time.monotonic()
@@ -180,6 +182,9 @@ def _collection_loop(
             try:
                 with Session(engine) as session:
                     targets = load_targets(ROOT / "config/channels.json")
+                    warning = quota_warning(len(targets), collect_seconds, live_poll_seconds)
+                    if warning:
+                        logger.warning(warning)
                     result = run_collection_pass(session, client, targets)
                 logger.info(
                     "collection counts channels=%d videos=%d snapshots=%d errors=%d",
@@ -267,7 +272,7 @@ def run_service(
         collect_client.reserve_per_minute = live_reserve
         collector = Thread(
             target=_collection_loop,
-            args=(engine, collect_client, stop, collect_seconds, secrets),
+            args=(engine, collect_client, stop, collect_seconds, secrets, live_poll_seconds),
             name="collection-loop",
             daemon=True,
         )

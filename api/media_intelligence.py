@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from collector.storage import Channel, Observation, Video, effective_channel_language
 from metrics.market_stx import build_market_stx
+from metrics.markets import market_label, normalize_segment
 
 PERIOD_DAYS = {
     "1h": 1 / 24,
@@ -38,6 +39,7 @@ def market_report(
     language: str | None = None,
     region: str | None = None,
     market: str | None = None,
+    segment: str | None = None,
     stream_scope: str = "all",
     limit: int = 50,
 ) -> dict[str, Any]:
@@ -46,7 +48,7 @@ def market_report(
     start_at = _period_start(as_of, period)
     previous_end = start_at
     previous_start = _period_start(previous_end, period)
-    channels = _eligible_channels(session, language=language, region=region, market=market)
+    channels = _eligible_channels(session, language=language, region=region, market=market, segment=segment)
     channel_ids = [channel.id for channel in channels]
 
     current_rows = _observation_rows(session, channel_ids, start_at, as_of)
@@ -54,7 +56,8 @@ def market_report(
     previous_rows = _observation_rows(session, channel_ids, previous_start, previous_query_end)
     current = _aggregate_by_channel(session, channels, current_rows, stream_scope)
     previous = _aggregate_by_channel(session, channels, previous_rows, stream_scope)
-    stx = build_market_stx(
+    shorts_scope = _is_shorts_scope(stream_scope)
+    stx = {} if shorts_scope else build_market_stx(
         [row for row in current_rows if _scope_matches(row, stream_scope)],
         [row for row in previous_rows if _scope_matches(row, stream_scope)],
         channel_ids=channel_ids,
@@ -74,8 +77,9 @@ def market_report(
         old = previous.get(item["channel_id"])
         item["previous_rank"] = _previous_rank(item["channel_id"], previous, old)
         item["rank_change"] = item["previous_rank"] - rank if item["previous_rank"] is not None else None
-        item["stx"] = stx.get(item["channel_id"], {"score": None, "confidence": 0.0, "available_signals": 0, "components": {}, "signals": {}})
+        item["stx"] = stx.get(item["channel_id"], _no_stx(shorts_scope))
 
+    market_summaries = _market_summaries(ranked, period)
     rows = ranked[: max(1, min(int(limit), 200))]
     view_total = _sum_metric(ranked, "view_delta")
     concurrent_total = _sum_metric(ranked, "average_concurrent")
@@ -87,7 +91,10 @@ def market_report(
         "end_at": as_of.isoformat(),
         "previous_start_at": previous_start.isoformat(),
         "previous_end_at": previous_end.isoformat(),
-        "filters": {"language": language, "region": region, "market": market, "stream_scope": stream_scope},
+        "filters": {"language": language, "region": region, "market": market, "segment": segment, "stream_scope": stream_scope},
+        "counted_in_analysis": not shorts_scope,
+        "note": SHORTS_NOTE if shorts_scope else None,
+        "markets": market_summaries,
         "market": {
             "channel_count": len(ranked),
             "view_delta_total": view_total,
@@ -124,7 +131,8 @@ def channel_media_intelligence(
     rows = _observation_rows(session, [channel_id], start_at, as_of)
     aggregate = _aggregate_channel(channel, [row for row in rows if _scope_matches(row, stream_scope)], stream_scope)
     videos = _video_performance([row for row in rows if _scope_matches(row, stream_scope)], top_videos)
-    stx = build_market_stx(
+    shorts_scope = _is_shorts_scope(stream_scope)
+    stx = _no_stx(True) if shorts_scope else build_market_stx(
         [row for row in rows if _scope_matches(row, stream_scope)],
         [],
         channel_ids=[channel_id],
@@ -161,6 +169,8 @@ def channel_media_intelligence(
             "top_videos": videos,
         },
         "stream_scope": stream_scope,
+        "counted_in_analysis": not shorts_scope,
+        "note": SHORTS_NOTE if shorts_scope else None,
         "provenance": {
             "observation_count": len(rows),
             "source_values": sorted({row["source"] for row in rows if row["source"]}),
@@ -172,14 +182,16 @@ def channel_media_intelligence(
     }
 
 
-def _eligible_channels(session: Session, *, language: str | None, region: str | None, market: str | None) -> list[Channel]:
+def _eligible_channels(session: Session, *, language: str | None, region: str | None, market: str | None, segment: str | None = None) -> list[Channel]:
+    segment_key = normalize_segment(segment) if segment else None
     channels = list(session.execute(select(Channel).where(Channel.active.is_(True)).order_by(Channel.name.asc())).scalars())
     result = []
     for channel in channels:
         channel_language = effective_channel_language(session, channel)
         if language and channel_language.lower() != language.lower(): continue
         if region and (channel.region or "unknown").lower() != region.lower(): continue
-        if market and _market_name(channel).lower() != market.lower(): continue
+        if market and market.lower() not in {_market_name(channel).lower(), _channel_market_label(channel).lower()}: continue
+        if segment_key and (channel.segment or "news") != segment_key: continue
         result.append(channel)
     return result
 
@@ -250,6 +262,8 @@ def _aggregate_channel(channel: Channel, rows: list[dict[str, Any]], stream_scop
         "channel_id": channel.id,
         "channel": channel.name,
         "market": _market_name(channel),
+        "segment": channel.segment or "news",
+        "market_label": _channel_market_label(channel),
         "view_delta": view_delta if view_seen else None,
         "average_concurrent": round(sum(concurrent) / len(concurrent), 2) if concurrent else None,
         "peak_concurrent": max(concurrent) if concurrent else None,
@@ -288,13 +302,29 @@ def _video_performance(rows: list[dict[str, Any]], limit: int) -> list[dict[str,
     return result[: max(1, min(int(limit), 50))]
 
 
+SHORTS_NOTE = "Shorts are shown for reference only. They are not counted in STX, rankings or analysis."
+
+
+def _is_shorts_scope(stream_scope: str | None) -> bool:
+    return (stream_scope or "all").lower() == "shorts"
+
+
+def _no_stx(excluded: bool) -> dict[str, Any]:
+    stx: dict[str, Any] = {"score": None, "confidence": 0.0, "available_signals": 0, "components": {}, "signals": {}}
+    if excluded:
+        stx["excluded_reason"] = SHORTS_NOTE
+    return stx
+
+
 def _scope_matches(row: dict[str, Any], stream_scope: str) -> bool:
     scope = (stream_scope or "all").lower()
-    if scope == "all": return True
+    # Shorts are shown only in the "shorts" scope; every other scope (including "all") excludes them.
+    if scope == "all": return row["classification"] != "SHORT"
     if scope == "live": return bool(row["is_live"] or row["classification"] == "LIVE")
     if scope == "replay": return row["classification"] == "COMPLETED_LIVE"
-    if scope == "video": return row["classification"] in {"REGULAR_VIDEO", "SHORT", "PREMIERE", "UNKNOWN"}
-    raise ValueError("stream_scope must be one of: all, live, replay, video")
+    if scope == "video": return row["classification"] in {"REGULAR_VIDEO", "PREMIERE", "UNKNOWN"}
+    if scope == "shorts": return row["classification"] == "SHORT"
+    raise ValueError("stream_scope must be one of: all, live, replay, video, shorts")
 
 
 def _period_start(as_of: datetime, period: str) -> datetime:
@@ -315,6 +345,52 @@ def _previous_rank(channel_id: int, previous: dict[int, dict[str, Any]], old: di
 def _sum_metric(items: Iterable[dict[str, Any]], key: str) -> float | int | None:
     values = [item[key] for item in items if item.get(key) is not None]
     return sum(values) if values else None
+
+
+def _channel_market_label(channel: Channel) -> str:
+    return market_label(channel.segment, channel.language)
+
+
+def _market_summaries(ranked: list[dict[str, Any]], period: str) -> list[dict[str, Any]]:
+    """Per-market share of the audience metric, leaderboard and a publishable headline.
+
+    Sets share_percent / share_basis on every channel row: the channel's share of its own
+    market, measured on view gain when the market has view data, otherwise on average
+    concurrent viewers. Channels with no measurable value get no share (never zero-filled).
+    """
+    groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for item in ranked:
+        groups[item["market_label"]].append(item)
+    summaries = []
+    for label, items in groups.items():
+        basis = "view_delta" if any(item["view_delta"] is not None for item in items) else "average_concurrent"
+        values = {item["channel_id"]: item[basis] for item in items if item[basis] is not None}
+        total = sum(values.values())
+        for item in items:
+            value = values.get(item["channel_id"])
+            item["share_basis"] = basis
+            item["share_percent"] = round(value / total * 100, 1) if value is not None and total > 0 else None
+        ordered = sorted((item for item in items if item["share_percent"] is not None), key=lambda item: item["share_percent"], reverse=True)
+        summaries.append({
+            "label": label,
+            "channel_count": len(items),
+            "share_basis": basis,
+            "total": total if values else None,
+            "leaders": [{"channel_id": item["channel_id"], "channel": item["channel"], "share_percent": item["share_percent"]} for item in ordered[:5]],
+            "headline": _headline(label, period, ordered),
+        })
+    summaries.sort(key=lambda summary: (summary["total"] is not None, summary["total"] or 0), reverse=True)
+    return summaries
+
+
+def _headline(label: str, period: str, ordered: list[dict[str, Any]]) -> str | None:
+    if not ordered:
+        return None
+    text = f"{label} viewership ({period}): {ordered[0]['channel']} led with {ordered[0]['share_percent']:g}% share"
+    followers = [item["channel"] for item in ordered[1:3]]
+    if followers:
+        text += " followed by " + " & ".join(followers)
+    return text
 
 
 def _market_name(channel: Channel) -> str:
