@@ -27,6 +27,8 @@ class Channel(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     avatar_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     handle: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # When YouTube API-sourced fields (avatar, handle) were last refreshed from the API.
+    api_refreshed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=lambda: datetime.now(UTC))
 
 
 class ChannelLanguageOverride(Base):
@@ -48,6 +50,8 @@ class Video(Base):
     thumbnail_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     category_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     topic: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # When YouTube API-sourced non-statistic fields (title, thumbnail, category) were last refreshed.
+    api_refreshed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=lambda: datetime.now(UTC))
 
 
 class ChannelStats(Base):
@@ -164,6 +168,14 @@ def create_database(url: str):
         video_columns = {item["name"] for item in inspect(connection).get_columns("stx_videos")}
         for name, definition in {"thumbnail_url": "VARCHAR(1000)", "category_id": "VARCHAR(32)", "topic": "VARCHAR(64)"}.items():
             _add_column_if_missing(connection, "stx_videos", name, definition, video_columns)
+        # api_refreshed_at powers the 30-day refresh-or-delete rule. Existing rows are
+        # stamped "now" once, when the column is first added, so nothing is scrubbed
+        # before it has had a full retention window to be refreshed.
+        timestamp_type = "TIMESTAMPTZ" if connection.dialect.name == "postgresql" else "DATETIME"
+        for table, known in (("stx_channels", channel_columns), ("stx_videos", video_columns)):
+            if "api_refreshed_at" not in known:
+                _add_column_if_missing(connection, table, "api_refreshed_at", timestamp_type, known)
+                connection.execute(text(f"UPDATE {table} SET api_refreshed_at = CURRENT_TIMESTAMP WHERE api_refreshed_at IS NULL"))
     return engine
 
 
@@ -199,8 +211,10 @@ def save_observations(
             channel.region = region
     if avatar_url is not None:
         channel.avatar_url = avatar_url
+        channel.api_refreshed_at = datetime.now(UTC)
     if handle is not None:
         channel.handle = handle
+        channel.api_refreshed_at = datetime.now(UTC)
     if channel_stats is not None:
         observed_at, subscribers, total_views, video_count = channel_stats
         session.add(ChannelStats(
@@ -229,6 +243,7 @@ def save_observations(
         else:
             video.title = item.title
             video.published_at = item.published_at
+            video.api_refreshed_at = datetime.now(UTC)
             if item.thumbnail_url is not None:
                 video.thumbnail_url = item.thumbnail_url
             if item.category_id is not None:

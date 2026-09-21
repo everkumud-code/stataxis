@@ -52,7 +52,7 @@ def test_export_contains_two_sheets_and_latest_intelligence() -> None:
 
     payload = export_observations_xlsx(session, ObservationExportFilters(language="English"))
     workbook = load_workbook(BytesIO(payload), read_only=True)
-    assert workbook.sheetnames == ["StatAxis Data", "StatAxis Intelligence"]
+    assert workbook.sheetnames == ["StatAxis Data", "StatAxis Intelligence", "Notes"]
     assert workbook["StatAxis Data"].max_row == 2
     assert workbook["StatAxis Intelligence"].cell(2, 4).value == 72.5
     assert workbook["StatAxis Intelligence"].cell(2, 8).value == "Positive evidence"

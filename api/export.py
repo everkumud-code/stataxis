@@ -116,6 +116,7 @@ def export_observations_xlsx(session: Session, filters: ObservationExportFilters
             ])
     _format_sheet(intelligence)
 
+    _add_notice_sheet(workbook)
     output = BytesIO()
     workbook.save(output)
     return output.getvalue()
@@ -173,6 +174,7 @@ def export_live_audience_xlsx(
     summary.append(["Sampling Definition", payload["sample_resolution"]])
     _format_sheet(summary)
 
+    _add_notice_sheet(workbook)
     output = BytesIO()
     workbook.save(output)
     return output.getvalue()
@@ -201,6 +203,20 @@ def export_response(session: Session, role: UserRole | SXPlan | str, filters: Ob
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": "attachment; filename=stataxis-report.xlsx",
     }, payload
+
+
+DERIVED_METRICS_NOTICE = (
+    "STX Index, STAX9 and other scores in this workbook are metrics generated independently by StatAxis. "
+    "They are not sourced from, provided by or endorsed by YouTube. Underlying statistics come from public "
+    "YouTube API data."
+)
+
+
+def _add_notice_sheet(workbook: Workbook) -> None:
+    notes = workbook.create_sheet("Notes")
+    notes.append(["Data notice"])
+    notes.append([DERIVED_METRICS_NOTICE])
+    notes.column_dimensions["A"].width = 120
 
 
 def _format_sheet(sheet) -> None:
