@@ -34,6 +34,13 @@
       "language": "Tamil",
       "network": "Daily Thanthi",
       "region": "India"
+    },
+    {
+      "channel_id": "UCRWFSbif-RFENbBrSiez1DA",
+      "name": "ABP NEWS",
+      "language": "Hindi",
+      "network": "ABP Network",
+      "region": "India"
     }
   ]
 }
