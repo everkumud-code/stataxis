@@ -33,6 +33,8 @@ class YouTubeClient:
         if not self.api_key:
             raise ValueError("YOUTUBE_API_KEY is not configured")
         self.client = httpx.Client(timeout=timeout)
+        # Requests per minute this client must leave free for higher-priority callers.
+        self.reserve_per_minute = 0
 
     def close(self) -> None:
         self.client.close()
@@ -45,7 +47,10 @@ class YouTubeClient:
 
     def _get(self, resource: str, params: dict[str, Any]) -> dict[str, Any]:
         try:
-            DEFAULT_BUDGET.acquire()
+            if self.reserve_per_minute:
+                DEFAULT_BUDGET.acquire(reserve=self.reserve_per_minute)
+            else:
+                DEFAULT_BUDGET.acquire()
         except QuotaGuardError:
             raise
         response = self.client.get(

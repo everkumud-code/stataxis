@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from threading import Event
+from threading import Event, Thread
 from typing import Callable
 
 from sqlalchemy import and_, func, select
@@ -21,6 +21,7 @@ from collector.run_once import _sanitize_error_message
 from collector.storage import Channel, Observation, Video, create_database, save_observations
 from collector.youtube.client import YouTubeAPIError, YouTubeClient
 from collector.youtube.collector import normalize_video
+from collector.youtube.quota import env_non_negative_int
 
 ROOT = Path(__file__).resolve().parents[1]
 LIVE_WINDOW = timedelta(minutes=20)
@@ -163,81 +164,119 @@ def _log_loop_error(loop: str, exc: Exception, secrets: tuple[str | None, ...]) 
     logger.error("%s loop failed: %s: %s", loop, type(exc).__name__, message)
 
 
+def _collection_loop(
+    engine,
+    client: YouTubeClient,
+    stop: Event,
+    collect_seconds: int,
+    secrets: tuple[str | None, ...],
+) -> None:
+    """Full collection on its own schedule. Never raises."""
+    next_collect = time.monotonic()
+    quota_attempt = 0
+    while not stop.is_set():
+        now = time.monotonic()
+        if now >= next_collect:
+            try:
+                with Session(engine) as session:
+                    targets = load_targets(ROOT / "config/channels.json")
+                    result = run_collection_pass(session, client, targets)
+                logger.info(
+                    "collection counts channels=%d videos=%d snapshots=%d errors=%d",
+                    len(targets),
+                    result.videos_observed,
+                    result.intelligence.snapshots_built,
+                    result.intelligence.errors,
+                )
+                quota_attempt = 0
+                next_collect = now + collect_seconds
+            except YouTubeAPIError as exc:
+                quota_attempt += 1
+                delay = quota_backoff_seconds(quota_attempt) if exc.status_code in {403, 429} else collect_seconds
+                _log_loop_error("collection", exc, secrets)
+                logger.info("collection counts channels=0 videos=0 snapshots=0 errors=1")
+                next_collect = now + delay
+            except Exception as exc:
+                _log_loop_error("collection", exc, secrets)
+                logger.info("collection counts channels=0 videos=0 snapshots=0 errors=1")
+                next_collect = now + collect_seconds
+        stop.wait(min(max(0.0, next_collect - time.monotonic()), 1.0))
+
+
+def _live_loop(
+    engine,
+    client: YouTubeClient,
+    stop: Event,
+    live_poll_seconds: int,
+    secrets: tuple[str | None, ...],
+) -> None:
+    """Live viewer polling on its own schedule. Never raises."""
+    next_live = time.monotonic()
+    quota_attempt = 0
+    while not stop.is_set():
+        now = time.monotonic()
+        if now >= next_live:
+            try:
+                with Session(engine) as session:
+                    result = poll_live_once(session, client, now=datetime.now(UTC))
+                logger.info(
+                    "live poll counts candidates=%d batches=%d saved=%d ended=%d errors=%d",
+                    result.candidates,
+                    result.batches,
+                    result.observations_saved,
+                    result.ended,
+                    result.errors,
+                )
+                quota_attempt = 0
+                next_live = now + live_poll_seconds
+            except YouTubeAPIError as exc:
+                quota_attempt += 1
+                delay = quota_backoff_seconds(quota_attempt) if exc.status_code in {403, 429} else live_poll_seconds
+                _log_loop_error("live", exc, secrets)
+                logger.info("live poll counts candidates=0 batches=0 saved=0 ended=0 errors=1")
+                next_live = now + delay
+            except Exception as exc:
+                _log_loop_error("live", exc, secrets)
+                logger.info("live poll counts candidates=0 batches=0 saved=0 ended=0 errors=1")
+                next_live = now + live_poll_seconds
+        stop.wait(min(max(0.0, next_live - time.monotonic()), 1.0))
+
+
 def run_service(
     database_url: str,
     *,
     client_factory: Callable[[], YouTubeClient] = YouTubeClient,
     stop_event: Event | None = None,
 ) -> None:
-    """Run full collection and live polling loops in one process."""
+    """Run full collection and live polling as two independent loops.
+
+    Collection runs in its own thread so a long pass (many channels) never delays
+    live polling. Each loop has its own HTTP client. They share one process-wide
+    request budget, and STAXIS_YOUTUBE_LIVE_RESERVE_PER_MINUTE keeps part of the
+    per-minute budget free for live polling.
+    """
     collect_seconds = interval_seconds("COLLECT_SECONDS", 600, 60)
     live_poll_seconds = interval_seconds("LIVE_POLL_SECONDS", 30, 5)
+    live_reserve = env_non_negative_int("STAXIS_YOUTUBE_LIVE_RESERVE_PER_MINUTE", 0)
     engine = create_database(database_url)
     stop = stop_event or Event()
     install_signal_handlers(stop)
     secrets = (database_url, os.getenv("YOUTUBE_API_KEY"))
 
-    next_collect = time.monotonic()
-    next_live = next_collect
-    collect_quota_attempt = 0
-    live_quota_attempt = 0
-
-    with client_factory() as client:
-        while not stop.is_set():
-            now = time.monotonic()
-
-            if now >= next_collect:
-                try:
-                    with Session(engine) as session:
-                        targets = load_targets(ROOT / "config/channels.json")
-                        result = run_collection_pass(session, client, targets)
-                    logger.info(
-                        "collection counts channels=%d videos=%d snapshots=%d errors=%d",
-                        len(targets),
-                        result.videos_observed,
-                        result.intelligence.snapshots_built,
-                        result.intelligence.errors,
-                    )
-                    collect_quota_attempt = 0
-                    next_collect = now + collect_seconds
-                except YouTubeAPIError as exc:
-                    collect_quota_attempt += 1
-                    delay = quota_backoff_seconds(collect_quota_attempt) if exc.status_code in {403, 429} else collect_seconds
-                    _log_loop_error("collection", exc, secrets)
-                    logger.info("collection counts channels=0 videos=0 snapshots=0 errors=1")
-                    next_collect = now + delay
-                except Exception as exc:
-                    _log_loop_error("collection", exc, secrets)
-                    logger.info("collection counts channels=0 videos=0 snapshots=0 errors=1")
-                    next_collect = now + collect_seconds
-
-            if now >= next_live and not stop.is_set():
-                try:
-                    with Session(engine) as session:
-                        result = poll_live_once(session, client, now=datetime.now(UTC))
-                    logger.info(
-                        "live poll counts candidates=%d batches=%d saved=%d ended=%d errors=%d",
-                        result.candidates,
-                        result.batches,
-                        result.observations_saved,
-                        result.ended,
-                        result.errors,
-                    )
-                    live_quota_attempt = 0
-                    next_live = now + live_poll_seconds
-                except YouTubeAPIError as exc:
-                    live_quota_attempt += 1
-                    delay = quota_backoff_seconds(live_quota_attempt) if exc.status_code in {403, 429} else live_poll_seconds
-                    _log_loop_error("live", exc, secrets)
-                    logger.info("live poll counts candidates=0 batches=0 saved=0 ended=0 errors=1")
-                    next_live = now + delay
-                except Exception as exc:
-                    _log_loop_error("live", exc, secrets)
-                    logger.info("live poll counts candidates=0 batches=0 saved=0 ended=0 errors=1")
-                    next_live = now + live_poll_seconds
-
-            wait_for = min(max(0.0, next_collect - time.monotonic()), max(0.0, next_live - time.monotonic()), 1.0)
-            stop.wait(wait_for)
+    with client_factory() as collect_client, client_factory() as live_client:
+        collect_client.reserve_per_minute = live_reserve
+        collector = Thread(
+            target=_collection_loop,
+            args=(engine, collect_client, stop, collect_seconds, secrets),
+            name="collection-loop",
+            daemon=True,
+        )
+        collector.start()
+        try:
+            _live_loop(engine, live_client, stop, live_poll_seconds, secrets)
+        finally:
+            stop.set()
+            collector.join(timeout=30)
 
     logger.info("service stopped counts collection=1 live_poll=1")
 
