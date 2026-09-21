@@ -13,7 +13,7 @@ Application:
 - `STAXIS_ADMIN_EMAIL` — first-admin email.
 - `STAXIS_ADMIN_PASSWORD` — first-admin password.
 - `COLLECT_SECONDS` — full collection interval; default 600, minimum 60.
-- `LIVE_POLL_SECONDS` — live polling interval; default 30, minimum 30.
+- `LIVE_POLL_SECONDS` — live polling interval; default 30, minimum 5. Live polling shares the YouTube request budget below and runs in the same loop as full collection, so a long collection pass delays live polls.
 - `PORT` — HTTP port supplied by the platform or used by Docker Compose.
 
 Existing collector settings:

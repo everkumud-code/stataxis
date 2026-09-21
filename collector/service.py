@@ -171,7 +171,7 @@ def run_service(
 ) -> None:
     """Run full collection and live polling loops in one process."""
     collect_seconds = interval_seconds("COLLECT_SECONDS", 600, 60)
-    live_poll_seconds = interval_seconds("LIVE_POLL_SECONDS", 30, 30)
+    live_poll_seconds = interval_seconds("LIVE_POLL_SECONDS", 30, 5)
     engine = create_database(database_url)
     stop = stop_event or Event()
     install_signal_handlers(stop)

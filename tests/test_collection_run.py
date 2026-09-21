@@ -11,10 +11,13 @@ class FakeClient:
     def __init__(self, fail_channel_id: str | None = None):
         self.fail_channel_id = fail_channel_id
 
-    def get_channel(self, channel_id: str):
-        if channel_id == self.fail_channel_id:
+    def get_channels(self, channel_ids: list[str]):
+        if self.fail_channel_id in channel_ids:
             raise RuntimeError("upstream unavailable")
-        return {"contentDetails": {"relatedPlaylists": {"uploads": f"uploads-{channel_id}"}}}
+        return [
+            {"id": channel_id, "contentDetails": {"relatedPlaylists": {"uploads": f"uploads-{channel_id}"}}}
+            for channel_id in channel_ids
+        ]
 
     def list_uploads(self, uploads_id: str, max_results: int):
         channel_id = uploads_id.removeprefix("uploads-")

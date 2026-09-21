@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from collector.intelligence import IntelligenceRunResult, process_persisted_observations
 from collector.retention import run_retention_if_due
 from collector.storage import CollectionRun, save_observations
-from collector.youtube.collector import ChannelTarget, collect_channel_with_stats
+from collector.youtube.collector import ChannelTarget, collect_channels_batched
 from collector.youtube.client import YouTubeClient
 
 
@@ -45,8 +45,9 @@ def run_collection_pass(
 
     videos_observed = 0
     try:
+        collections = collect_channels_batched(client, targets, max_videos)
         for target in targets:
-            collection = collect_channel_with_stats(client, target, max_videos)
+            collection = collections[target.channel_id]
             observations = collection.observations
             saved = save_observations(
                 session=session,
