@@ -25,6 +25,7 @@ class Channel(Base):
     language: Mapped[str] = mapped_column(String(100), default="unknown")
     region: Mapped[str] = mapped_column(String(100), default="unknown", index=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    youtube_refreshed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     avatar_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     handle: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
@@ -159,11 +160,13 @@ def create_database(url: str):
             _add_column_if_missing(connection, "stx_users", name, definition, columns)
         connection.execute(text("UPDATE stx_users SET approval_status='approved' WHERE approval_status IS NULL"))
         channel_columns = {item["name"] for item in inspect(connection).get_columns("stx_channels")}
-        for name, definition in {"avatar_url": "VARCHAR(1000)", "handle": "VARCHAR(255)"}.items():
+        for name, definition in {"youtube_refreshed_at": "TIMESTAMP WITH TIME ZONE", "avatar_url": "VARCHAR(1000)", "handle": "VARCHAR(255)"}.items():
             _add_column_if_missing(connection, "stx_channels", name, definition, channel_columns)
+        connection.execute(text("UPDATE stx_channels SET youtube_refreshed_at = (SELECT MAX(observed_at) FROM stx_channel_stats WHERE stx_channel_stats.channel_id = stx_channels.id) WHERE youtube_refreshed_at IS NULL"))
         video_columns = {item["name"] for item in inspect(connection).get_columns("stx_videos")}
-        for name, definition in {"thumbnail_url": "VARCHAR(1000)", "category_id": "VARCHAR(32)", "topic": "VARCHAR(64)"}.items():
+        for name, definition in {"youtube_refreshed_at": "TIMESTAMP WITH TIME ZONE", "thumbnail_url": "VARCHAR(1000)", "category_id": "VARCHAR(32)", "topic": "VARCHAR(64)"}.items():
             _add_column_if_missing(connection, "stx_videos", name, definition, video_columns)
+        connection.execute(text("UPDATE stx_videos SET youtube_refreshed_at = (SELECT MAX(observed_at) FROM stx_observations WHERE stx_observations.video_id = stx_videos.id) WHERE youtube_refreshed_at IS NULL"))
     return engine
 
 
@@ -197,10 +200,13 @@ def save_observations(
         channel.language = override.language if override is not None else (language if language and language.strip().lower() != "unknown" else channel.language)
         if region is not None:
             channel.region = region
+    metadata_refresh_at = max([item.observed_at for item in observations] + ([channel_stats[0]] if channel_stats is not None else []) or [datetime.now(UTC)])
     if avatar_url is not None:
         channel.avatar_url = avatar_url
+        channel.youtube_refreshed_at = metadata_refresh_at
     if handle is not None:
         channel.handle = handle
+        channel.youtube_refreshed_at = metadata_refresh_at
     if channel_stats is not None:
         observed_at, subscribers, total_views, video_count = channel_stats
         session.add(ChannelStats(
@@ -223,6 +229,7 @@ def save_observations(
                 youtube_video_id=item.video_id, channel_id=channel.id, title=item.title,
                 published_at=item.published_at, thumbnail_url=item.thumbnail_url,
                 category_id=item.category_id, topic=item.topic or assign_topic(item.title),
+                youtube_refreshed_at=item.observed_at,
             )
             session.add(video)
             session.flush()
@@ -237,6 +244,7 @@ def save_observations(
                 video.topic = item.topic
             elif video.topic is None:
                 video.topic = assign_topic(video.title)
+            video.youtube_refreshed_at = item.observed_at
         if session.query(Observation.id).filter_by(video_id=video.id, observed_at=item.observed_at).first() is not None:
             continue
         session.add(Observation(video_id=video.id, channel_id=channel.id, observed_at=item.observed_at, view_count=item.view_count, like_count=item.like_count, comment_count=item.comment_count, concurrent_viewers=item.concurrent_viewers, is_live=item.is_live, classification=item.classification))
