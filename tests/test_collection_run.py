@@ -8,8 +8,9 @@ from collector.youtube.collector import ChannelTarget
 
 
 class FakeClient:
-    def __init__(self, fail_channel_id: str | None = None):
+    def __init__(self, fail_channel_id: str | None = None, missing_ids: set[str] | None = None):
         self.fail_channel_id = fail_channel_id
+        self.missing_ids = missing_ids or set()
 
     def get_channels(self, channel_ids: list[str]):
         if self.fail_channel_id in channel_ids:
@@ -17,6 +18,7 @@ class FakeClient:
         return [
             {"id": channel_id, "contentDetails": {"relatedPlaylists": {"uploads": f"uploads-{channel_id}"}}}
             for channel_id in channel_ids
+            if channel_id not in self.missing_ids
         ]
 
     def list_uploads(self, uploads_id: str, max_results: int):
@@ -75,3 +77,30 @@ def test_collection_pass_records_failure_without_erasing_run():
         assert run.error_message == "upstream unavailable"
         assert run.channels_attempted == 1
         assert run.videos_observed == 0
+
+
+def test_pass_with_one_missing_channel_is_partial_not_failed():
+    engine = create_database("sqlite:///:memory:")
+    with Session(engine) as session:
+        result = run_collection_pass(
+            session,
+            FakeClient(missing_ids={"UC-gone"}),
+            [ChannelTarget("UC-ok", "Working"), ChannelTarget("UC-gone", "Deleted")],
+            max_videos=1,
+        )
+        run = session.query(CollectionRun).one()
+        assert run.status == "partial"
+        assert "UC-gone (channel not found)" in run.error_message
+        assert result.videos_observed == 1
+
+
+def test_pass_where_no_channel_can_be_collected_fails():
+    engine = create_database("sqlite:///:memory:")
+    with Session(engine) as session:
+        try:
+            run_collection_pass(session, FakeClient(missing_ids={"UC-gone"}), [ChannelTarget("UC-gone", "Deleted")], max_videos=1)
+        except RuntimeError as exc:
+            assert "no channel could be collected" in str(exc)
+        else:
+            raise AssertionError("expected failure")
+        assert session.query(CollectionRun).one().status == "failed"

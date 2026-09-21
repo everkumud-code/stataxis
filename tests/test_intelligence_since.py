@@ -26,7 +26,7 @@ def _video(session: Session, key: str, observed: list[datetime]) -> Video:
 
 def _spy(monkeypatch) -> list[int]:
     processed: list[int] = []
-    monkeypatch.setattr(intelligence, "persist_video_intelligence", lambda session, video_id, limit=25: processed.append(video_id))
+    monkeypatch.setattr(intelligence, "persist_video_intelligence", lambda session, video_id, limit=25, commit=True: processed.append(video_id))
     return processed
 
 
@@ -74,3 +74,29 @@ def test_counts_use_grouped_queries_not_one_per_video(monkeypatch) -> None:
         process_persisted_observations(session, since=NOW - timedelta(minutes=5))
         count_queries = [s for s in statements if "count(" in s.lower()]
         assert len(count_queries) == 1
+
+
+def test_snapshots_are_committed_in_batches_and_a_failing_video_keeps_the_rest(monkeypatch) -> None:
+    commits: list[int] = []
+    saved: list[int] = []
+
+    def fake_persist(session, video_id, limit=25, commit=True):
+        assert commit is False
+        if video_id == failing_id:
+            raise ValueError("bad video")
+        saved.append(video_id)
+
+    monkeypatch.setattr(intelligence, "persist_video_intelligence", fake_persist)
+    monkeypatch.setattr(intelligence, "COMMIT_BATCH_SIZE", 10)
+    with Session(create_database("sqlite:///:memory:")) as session:
+        videos = [_video(session, f"v{i}", [NOW - timedelta(hours=1), NOW]) for i in range(25)]
+        failing_id = videos[3].id
+        session.commit()
+        real_commit = session.commit
+        monkeypatch.setattr(session, "commit", lambda: commits.append(1) or real_commit())
+
+        result = process_persisted_observations(session, since=NOW - timedelta(minutes=5))
+
+        assert result.snapshots_built == 24 and result.errors == 1
+        assert len(saved) == 24 and failing_id not in saved
+        assert len(commits) == 3  # 24 snapshots -> batches at 10 and 20, plus the final commit
