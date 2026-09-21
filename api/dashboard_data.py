@@ -14,6 +14,10 @@ from metrics.pipeline import build_intelligence_snapshot
 from metrics.timeseries import compare_metric
 from metrics.stx_index import stx_display
 
+DERIVED_METRIC_NOTICE = "Generated independently by StatAxis; not sourced from YouTube"
+
+DERIVED_METRIC_NOTICE = "Generated independently by StatAxis; not sourced from YouTube"
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -256,6 +260,7 @@ def channel_stx_trend(
         "days": days,
         "definition": "Daily STX uses each day's trailing 24-hour window ending at day end; only videos with at least two stored observations in that window contribute, and days without usable data return null with a reason.",
         "display_method": "50 + (score - 50) * confidence / 100",
+        "derived_metric_notice": DERIVED_METRIC_NOTICE,
         "timeline": timeline,
     }
 
