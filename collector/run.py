@@ -8,7 +8,8 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from collector.intelligence import IntelligenceRunResult, process_persisted_observations
-from collector.storage import CollectionRun, save_observations
+from collector.storage import Channel, CollectionRun, save_observations
+from collector.retention import run_retention
 from collector.youtube.collector import ChannelTarget, collect_channel_with_stats
 from collector.youtube.client import YouTubeClient
 
@@ -69,6 +70,21 @@ def run_collection_pass(
                 raise RuntimeError("collector returned a negative save count")
 
         intelligence = process_persisted_observations(session)
+        covered_ids = {target.channel_id for target in targets}
+        for channel in session.query(Channel).filter(Channel.active.is_(True)).all():
+            if channel.youtube_channel_id not in covered_ids:
+                channel.active = False
+        retention = run_retention(session, covered_channel_ids=covered_ids)
+        logger.info(
+            "retention enabled=%s dry_run=%s statistics_deleted=%d snapshots_deleted=%d metadata_cleared=%d removed_channel_metadata=%d reason=%s",
+            retention.enabled,
+            retention.dry_run,
+            retention.statistics_deleted,
+            retention.snapshots_deleted,
+            retention.metadata_cleared,
+            retention.removed_channel_metadata_cleared,
+            retention.reason,
+        )
         run = session.get(CollectionRun, run.id)
         if run is None:  # pragma: no cover - impossible while session is active
             raise RuntimeError("collection run disappeared during processing")
