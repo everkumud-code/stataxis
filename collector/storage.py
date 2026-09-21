@@ -160,11 +160,11 @@ def create_database(url: str):
             _add_column_if_missing(connection, "stx_users", name, definition, columns)
         connection.execute(text("UPDATE stx_users SET approval_status='approved' WHERE approval_status IS NULL"))
         channel_columns = {item["name"] for item in inspect(connection).get_columns("stx_channels")}
-        for name, definition in {"youtube_refreshed_at": "TIMESTAMP WITH TIME ZONE", "avatar_url": "VARCHAR(1000)", "handle": "VARCHAR(255)"}.items():
+        for name, definition in {"youtube_refreshed_at": "TIMESTAMP", "avatar_url": "VARCHAR(1000)", "handle": "VARCHAR(255)"}.items():
             _add_column_if_missing(connection, "stx_channels", name, definition, channel_columns)
         connection.execute(text("UPDATE stx_channels SET youtube_refreshed_at = (SELECT MAX(observed_at) FROM stx_channel_stats WHERE stx_channel_stats.channel_id = stx_channels.id) WHERE youtube_refreshed_at IS NULL"))
         video_columns = {item["name"] for item in inspect(connection).get_columns("stx_videos")}
-        for name, definition in {"youtube_refreshed_at": "TIMESTAMP WITH TIME ZONE", "thumbnail_url": "VARCHAR(1000)", "category_id": "VARCHAR(32)", "topic": "VARCHAR(64)"}.items():
+        for name, definition in {"youtube_refreshed_at": "TIMESTAMP", "thumbnail_url": "VARCHAR(1000)", "category_id": "VARCHAR(32)", "topic": "VARCHAR(64)"}.items():
             _add_column_if_missing(connection, "stx_videos", name, definition, video_columns)
         connection.execute(text("UPDATE stx_videos SET youtube_refreshed_at = (SELECT MAX(observed_at) FROM stx_observations WHERE stx_observations.video_id = stx_videos.id) WHERE youtube_refreshed_at IS NULL"))
     return engine
