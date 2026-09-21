@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from collector.storage import Channel, Observation
 from metrics.engine import ObservationPoint, audience_momentum, view_velocity
+from metrics.eligibility import analysis_observation_clause
 
 
 def channel_signals(
@@ -41,6 +42,7 @@ def channel_signals(
             Observation.channel_id == channel_id,
             Observation.observed_at >= start,
             Observation.observed_at <= now,
+            analysis_observation_clause(),
         )
         .order_by(Observation.observed_at.asc(), Observation.id.asc())
     ).all()

@@ -29,6 +29,7 @@ class Channel(Base):
     handle: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # When YouTube API-sourced fields (avatar, handle) were last refreshed from the API.
     api_refreshed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=lambda: datetime.now(UTC))
+    segment: Mapped[str] = mapped_column(String(32), default="news", index=True)
 
 
 class ChannelLanguageOverride(Base):
@@ -52,6 +53,8 @@ class Video(Base):
     topic: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # When YouTube API-sourced non-statistic fields (title, thumbnail, category) were last refreshed.
     api_refreshed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=lambda: datetime.now(UTC))
+    live_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    live_ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ChannelStats(Base):
@@ -163,10 +166,11 @@ def create_database(url: str):
             _add_column_if_missing(connection, "stx_users", name, definition, columns)
         connection.execute(text("UPDATE stx_users SET approval_status='approved' WHERE approval_status IS NULL"))
         channel_columns = {item["name"] for item in inspect(connection).get_columns("stx_channels")}
-        for name, definition in {"avatar_url": "VARCHAR(1000)", "handle": "VARCHAR(255)"}.items():
+        for name, definition in {"avatar_url": "VARCHAR(1000)", "handle": "VARCHAR(255)", "segment": "VARCHAR(32) DEFAULT 'news'"}.items():
             _add_column_if_missing(connection, "stx_channels", name, definition, channel_columns)
+        connection.execute(text("UPDATE stx_channels SET segment='news' WHERE segment IS NULL"))
         video_columns = {item["name"] for item in inspect(connection).get_columns("stx_videos")}
-        for name, definition in {"thumbnail_url": "VARCHAR(1000)", "category_id": "VARCHAR(32)", "topic": "VARCHAR(64)"}.items():
+        for name, definition in {"thumbnail_url": "VARCHAR(1000)", "category_id": "VARCHAR(32)", "topic": "VARCHAR(64)", "live_started_at": "TIMESTAMP WITH TIME ZONE", "live_ended_at": "TIMESTAMP WITH TIME ZONE"}.items():
             _add_column_if_missing(connection, "stx_videos", name, definition, video_columns)
         # api_refreshed_at powers the 30-day refresh-or-delete rule. Existing rows are
         # stamped "now" once, when the column is first added, so nothing is scrubbed
@@ -186,6 +190,17 @@ def effective_channel_language(session: Session, channel: Channel, fallback: str
     return channel.language or fallback
 
 
+def _parse_rfc3339(value: str | None) -> datetime | None:
+    """Parse a YouTube RFC 3339 timestamp; return None when absent or malformed."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+
 def save_observations(
     session: Session,
     channel_name: str,
@@ -197,11 +212,12 @@ def save_observations(
     *,
     avatar_url: str | None = None,
     handle: str | None = None,
+    segment: str | None = None,
     channel_stats: tuple[datetime, int | None, int | None, int | None] | None = None,
 ) -> int:
     channel = session.query(Channel).filter_by(youtube_channel_id=channel_youtube_id).one_or_none()
     if channel is None:
-        channel = Channel(youtube_channel_id=channel_youtube_id, name=channel_name, network=network, language=language, region=region or "unknown")
+        channel = Channel(youtube_channel_id=channel_youtube_id, name=channel_name, network=network, language=language, region=region or "unknown", segment=segment or "news")
         session.add(channel)
         session.flush()
     else:
@@ -215,6 +231,8 @@ def save_observations(
     if handle is not None:
         channel.handle = handle
         channel.api_refreshed_at = datetime.now(UTC)
+    if segment is not None:
+        channel.segment = segment
     if channel_stats is not None:
         observed_at, subscribers, total_views, video_count = channel_stats
         session.add(ChannelStats(
@@ -237,10 +255,19 @@ def save_observations(
                 youtube_video_id=item.video_id, channel_id=channel.id, title=item.title,
                 published_at=item.published_at, thumbnail_url=item.thumbnail_url,
                 category_id=item.category_id, topic=item.topic or assign_topic(item.title),
+                live_started_at=_parse_rfc3339(getattr(item, "live_started_at", None)),
+                live_ended_at=_parse_rfc3339(getattr(item, "live_ended_at", None)),
             )
             session.add(video)
             session.flush()
         else:
+            # Start/end are set once YouTube reports them; never overwritten with a missing value.
+            started = _parse_rfc3339(getattr(item, "live_started_at", None))
+            ended = _parse_rfc3339(getattr(item, "live_ended_at", None))
+            if started is not None:
+                video.live_started_at = started
+            if ended is not None:
+                video.live_ended_at = ended
             video.title = item.title
             video.published_at = item.published_at
             video.api_refreshed_at = datetime.now(UTC)

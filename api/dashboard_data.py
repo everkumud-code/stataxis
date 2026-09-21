@@ -13,6 +13,7 @@ from metrics.engine import ObservationPoint
 from metrics.pipeline import build_intelligence_snapshot
 from metrics.timeseries import compare_metric
 from metrics.stx_index import stx_display
+from metrics.eligibility import analysis_observation_clause
 
 
 def _now() -> datetime:
@@ -35,7 +36,7 @@ def _latest_stats(session: Session, channel_id: int, at: datetime | None = None)
 def _latest_observations(session: Session, channel_id: int) -> list[Observation]:
     rows = session.scalars(
         select(Observation)
-        .where(Observation.channel_id == channel_id)
+        .where(Observation.channel_id == channel_id, analysis_observation_clause())
         .order_by(Observation.observed_at.desc(), Observation.id.desc())
     ).all()
     latest: dict[int, Observation] = {}
@@ -180,6 +181,7 @@ def channel_stx_trend(
             Observation.channel_id == channel_id,
             Observation.observed_at >= first_window_start,
             Observation.observed_at < query_end,
+            analysis_observation_clause(),
         )
         .order_by(Observation.observed_at, Observation.id)
     ).all()
@@ -277,7 +279,7 @@ def market_topic_distribution(
         select(Channel.id, Channel.name, Video.topic, Observation.video_id, func.max(Observation.observed_at))
         .join(Video, Video.channel_id == Channel.id)
         .join(Observation, Observation.video_id == Video.id)
-        .where(Observation.observed_at >= start, Observation.observed_at <= now)
+        .where(Observation.observed_at >= start, Observation.observed_at <= now, analysis_observation_clause())
         .group_by(Channel.id, Channel.name, Video.topic, Observation.video_id)
     ).all()
     channels: dict[int, dict[str, Any]] = {}

@@ -81,6 +81,7 @@ def process_candidates(add_verified: bool = False) -> None:
                     name=name,
                     language=candidate["language"],
                     network=candidate["network"],
+                    segment=candidate.get("segment", "news"),
                 )
 
                 candidate["verification_status"] = "registered"

@@ -113,8 +113,8 @@ def test_uploads_playlist_404_skips_only_that_channel() -> None:
     assert skipped == {"UC1": "uploads playlist not found"}
 
 
-@pytest.mark.parametrize("status", [403, 429, 500])
-def test_quota_and_server_errors_still_abort_the_pass(status: int) -> None:
+@pytest.mark.parametrize("status", [403, 429])
+def test_quota_errors_still_abort_the_pass(status: int) -> None:
     class Client(CountingClient):
         def list_uploads(self, uploads_id: str, max_results: int = 25):
             raise YouTubeAPIError("boom", status_code=status)
@@ -127,3 +127,28 @@ def test_no_targets_makes_no_calls() -> None:
     client = CountingClient()
     assert collect_channels_batched(client, [], max_videos=5) == {}
     assert (client.channel_calls, client.upload_calls, client.video_calls) == ([], 0, [])
+
+
+@pytest.mark.parametrize("error", [YouTubeAPIError("server error", status_code=500), ValueError("bad payload")])
+def test_other_per_channel_failures_are_skipped(error: Exception) -> None:
+    class Client(CountingClient):
+        def list_uploads(self, uploads_id: str, max_results: int = 25):
+            if uploads_id == "uploads-UC1":
+                raise error
+            return super().list_uploads(uploads_id, max_results)
+
+    skipped: dict[str, str] = {}
+    result = collect_channels_batched(Client(), _targets(3), max_videos=1, skipped=skipped)
+    assert sorted(result) == ["UC0", "UC2"]
+    assert list(skipped) == ["UC1"] and skipped["UC1"].startswith("uploads request failed")
+
+
+def test_local_request_budget_exhaustion_aborts_the_pass() -> None:
+    from collector.youtube.quota import QuotaGuardError
+
+    class Client(CountingClient):
+        def list_uploads(self, uploads_id: str, max_results: int = 25):
+            raise QuotaGuardError("collector daily request budget reached")
+
+    with pytest.raises(QuotaGuardError):
+        collect_channels_batched(Client(), _targets(2), max_videos=1)

@@ -122,9 +122,9 @@ def get_channel_media_intelligence(session: Session, channel_id: int, *, as_of: 
     return 200, payload
 
 
-def get_market_report(session: Session, *, as_of: datetime | None = None, period: str = "7d", language: str | None = None, region: str | None = None, market: str | None = None, stream_scope: str = "all", limit: int = 50) -> tuple[int, dict[str, Any]]:
+def get_market_report(session: Session, *, as_of: datetime | None = None, period: str = "7d", language: str | None = None, region: str | None = None, market: str | None = None, stream_scope: str = "all", limit: int = 50, segment: str | None = None) -> tuple[int, dict[str, Any]]:
     try:
-        payload = market_report(session, as_of=as_of, period=period, language=language, region=region, market=market, stream_scope=stream_scope, limit=limit)
+        payload = market_report(session, as_of=as_of, period=period, language=language, region=region, market=market, segment=segment, stream_scope=stream_scope, limit=limit)
     except ValueError as exc:
         return 400, {"error": str(exc)}
     return 200, payload
@@ -208,7 +208,7 @@ def wsgi_application(session_factory: Callable[[], Session]):
             except ValueError as exc: return _json_response(start_response, 400, {"error": str(exc)})
             session = session_factory()
             try:
-                status, payload = get_market_report(session, as_of=as_of, period=query.get("period", ["7d"])[0], language=_optional_query(query, "language"), region=_optional_query(query, "region"), market=_optional_query(query, "market"), stream_scope=query.get("stream_scope", ["all"])[0], limit=query.get("limit", ["50"])[0])
+                status, payload = get_market_report(session, as_of=as_of, period=query.get("period", ["7d"])[0], language=_optional_query(query, "language"), region=_optional_query(query, "region"), market=_optional_query(query, "market"), segment=_optional_query(query, "segment"), stream_scope=query.get("stream_scope", ["all"])[0], limit=query.get("limit", ["50"])[0])
             finally: session.close()
             return _json_response(start_response, status, payload)
         if path == "/api/v1/channels/compare":

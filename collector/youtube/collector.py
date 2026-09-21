@@ -9,6 +9,7 @@ from typing import Any
 from collector.classification import classify_video
 from collector.topics import assign_topic
 from collector.youtube.client import YouTubeAPIError, YouTubeClient
+from collector.youtube.quota import QuotaGuardError
 
 
 @dataclass(frozen=True)
@@ -18,6 +19,7 @@ class ChannelTarget:
     language: str = "unknown"
     network: str = "unknown"
     region: str | None = None
+    segment: str = "news"
 
 
 @dataclass(frozen=True)
@@ -145,6 +147,8 @@ def collect_channel_with_stats(
 
 
 _BATCH_SIZE = 50
+# Quota / rate-limit errors affect every channel, so they abort the whole pass.
+_FATAL_STATUS = {403, 429}
 
 
 def _batches(items: list[str], size: int = _BATCH_SIZE):
@@ -167,9 +171,9 @@ def collect_channels_batched(
 
     For 200 channels with 25 videos each that is about 304 units per pass instead of 600.
     Results are keyed by YouTube channel ID. One bad channel must not stop the others:
-    a channel YouTube does not return, or whose uploads playlist is not found (404),
-    is left out of the result and reported in ``skipped`` (channel ID -> reason).
-    Quota and server errors still raise, because retrying every channel would not help.
+    a channel YouTube does not return, or whose uploads request fails for a channel-specific
+    reason, is left out of the result and reported in ``skipped`` (channel ID -> reason).
+    Quota errors (403/429) still raise, because retrying every channel would not help.
     """
     skipped = skipped if skipped is not None else {}
     channel_ids = list(dict.fromkeys(target.channel_id for target in targets))
@@ -188,10 +192,15 @@ def collect_channels_batched(
             continue
         try:
             uploads = client.list_uploads(uploads_id, max_results=max_videos)
+        except QuotaGuardError:
+            raise
         except YouTubeAPIError as exc:
-            if exc.status_code != 404:
+            if exc.status_code in _FATAL_STATUS:
                 raise
-            skipped[channel_id] = "uploads playlist not found"
+            skipped[channel_id] = "uploads playlist not found" if exc.status_code == 404 else f"uploads request failed ({exc.status_code})"
+            continue
+        except Exception as exc:  # one bad channel must not stop the rest of the universe
+            skipped[channel_id] = f"uploads request failed ({type(exc).__name__})"
             continue
         ids = [item.get("contentDetails", {}).get("videoId") for item in uploads.get("items", [])]
         video_ids_by_channel[channel_id] = [video_id for video_id in ids if video_id]
