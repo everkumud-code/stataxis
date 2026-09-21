@@ -615,9 +615,10 @@ add("live", "Intelligence", "Live audience", async el => {
     ${evidence(`Samples run from ${when(d.overall.earliest_observed_at)} to ${when(d.overall.latest_observed_at)}. Values are not interpolated.`)}`;
 });
 
+const DERIVED_METRIC_NOTICE = "Generated independently by StatAxis; not sourced from YouTube";
 const STX = [["audience","Audience",30],["growth","Growth",20],["momentum","Momentum",15],["acceleration","Acceleration",10],["consistency","Consistency",10],["competitive_position","Competition",10],["anomaly_event","Anomaly or event",5]]; // mirrors metrics/stx_index.py WEIGHTS
 add("stx", "Intelligence", "STX Index", async el => {
-  el.innerHTML = channelHead("STX Index", "One transparent score, split into the signals behind it.");
+  el.innerHTML = channelHead("STX Index", "One transparent score, split into the signals behind it.") + `<p class="muted"><strong>${DERIVED_METRIC_NOTICE}</strong></p>`;
   if (!channels.length) { el.insertAdjacentHTML("beforeend", noChannels()); return; }
   el.insertAdjacentHTML("beforeend", `<div id="sx"><p class="muted">Loading…</p></div>`);
   const d = await channelMedia(), s = d.stx || {}, hasScore = s.score != null;
@@ -664,7 +665,7 @@ add("evaluate", "Research & output", "Evaluate & reports", async el => {
     try {
       const r = await api("/api/v1/evaluate/youtube", {}, {method: "POST", body: {url: fd.get("url"), display_name: fd.get("name")}});
       out.innerHTML = `<dl class="kv"><dt>Video</dt><dd>${esc(r.display_name)}</dd><dt>Channel</dt><dd>${esc(r.channel_name)}</dd><dt>Observations stored</dt><dd>${whole(r.observation_count)}</dd>
-        <dt>STX Index</dt><dd>${r.stx_index == null ? "Withheld" : dec(r.stx_index)}</dd><dt>Confidence</dt><dd>${r.stx_index == null ? "—" : pct(r.confidence)}</dd></dl>
+        <dt>STX Index</dt><dd>${r.stx_index == null ? "Withheld" : dec(r.stx_index)}<br><span class="muted">${DERIVED_METRIC_NOTICE}</span></dd><dt>Confidence</dt><dd>${r.stx_index == null ? "—" : pct(r.confidence)}</dd></dl>
         <p>${esc(r.view)}</p>${(r.analysis || []).map(a => `<p class="muted">${esc(a)}</p>`).join("")}`;
     } catch (e) { out.innerHTML = state("Could not evaluate this link", friendly(e), "", "err"); }
     btn.disabled = free;
@@ -760,7 +761,7 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-adm]
 /* ---------- csv ---------- */
 function downloadCsv(rows, name) {
   const cell = v => { let s = v == null ? "" : String(v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n]/.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s; };
-  const head = ["Rank", "Channel", "Views gained", "Average concurrent", "Peak concurrent", "Views per minute", "STX (confidence-adjusted)", "STX raw", "STX confidence (0-100)", "Preliminary"];
+  const head = ["Rank", "Channel", "Views gained", "Average concurrent", "Peak concurrent", "Views per minute", "STX (confidence-adjusted) — Generated independently by StatAxis; not sourced from YouTube", "STX raw", "STX confidence (0-100)", "Preliminary"];
   const body = rows.map(r => [r.rank, r.channel, r.view_delta, r.average_concurrent, r.peak_concurrent, r.view_velocity_per_minute, r.stx && r.stx.score != null ? stxShown(r.stx) : "", r.stx && r.stx.score, r.stx && r.stx.score != null ? Math.round(r.stx.confidence <= 1 ? r.stx.confidence * 100 : r.stx.confidence) : "", r.stx && r.stx.score != null ? (prelim(r.stx) ? "yes" : "no") : ""]);
   const blob = new Blob(["\ufeff" + [head, ...body].map(r => r.map(cell).join(",")).join("\r\n")], {type: "text/csv;charset=utf-8"});
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
