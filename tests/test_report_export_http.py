@@ -110,7 +110,7 @@ def test_report_export_returns_xlsx_for_premium_plan(monkeypatch):
     assert headers["Content-Type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     assert headers["Content-Disposition"] == "attachment; filename=stataxis-report.xlsx"
     workbook = load_workbook(BytesIO(body), read_only=True)
-    assert workbook.sheetnames == ["StatAxis Data", "StatAxis Intelligence"]
+    assert workbook.sheetnames == ["StatAxis Data", "StatAxis Intelligence", "Notes"]
     assert workbook["StatAxis Data"].max_row == 2
 
 
