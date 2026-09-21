@@ -166,14 +166,18 @@ def test_run_service_one_iteration_runs_collection_and_live_poll(monkeypatch):
         def __exit__(self, *_):
             return None
 
+    collection_done = Event()
+
     def fake_collection(session, client, targets):
         calls.append("collection")
+        collection_done.set()
         return SimpleNamespace(
             videos_observed=0,
             intelligence=SimpleNamespace(snapshots_built=0, errors=0),
         )
 
     def fake_live(session, client, now=None):
+        collection_done.wait(5)
         calls.append("live")
         stop_event.set()
         return service.LivePollResult(0, 0, 0, 0, 0)
@@ -203,16 +207,24 @@ def test_service_logs_sanitized_exception(monkeypatch, caplog):
         def __exit__(self, *_):
             return None
 
+    collection_started = Event()
+
     def failing_collection(session, client, targets):
+        collection_started.set()
         raise RuntimeError(
             f"connect {database_url} key={api_key}"
         )
+
+    def live_after_collection(*args, **kwargs):
+        collection_started.wait(5)
+        stop_event.set()
+        return service.LivePollResult(0, 0, 0, 0, 0)
 
     monkeypatch.setenv("YOUTUBE_API_KEY", api_key)
     monkeypatch.setattr(service, "create_database", lambda url: create_database("sqlite:///:memory:"))
     monkeypatch.setattr(service, "load_targets", lambda path: [])
     monkeypatch.setattr(service, "run_collection_pass", failing_collection)
-    monkeypatch.setattr(service, "poll_live_once", lambda *args, **kwargs: stop_event.set() or service.LivePollResult(0, 0, 0, 0, 0))
+    monkeypatch.setattr(service, "poll_live_once", live_after_collection)
     monkeypatch.setattr(service, "install_signal_handlers", lambda event: None)
 
     with caplog.at_level("ERROR", logger="stataxis-service"):
@@ -231,3 +243,67 @@ def test_live_poll_interval_allows_five_seconds_but_not_less(monkeypatch):
     monkeypatch.setenv("LIVE_POLL_SECONDS", "4")
     with pytest.raises(ValueError, match="at least 5 seconds"):
         service.interval_seconds("LIVE_POLL_SECONDS", 30, 5)
+
+
+def test_slow_collection_does_not_block_live_polling(monkeypatch):
+    """A long collection pass must not delay live polls (they run in separate threads)."""
+    monkeypatch.setenv("COLLECT_SECONDS", "600")
+    monkeypatch.setenv("LIVE_POLL_SECONDS", "5")
+    stop_event = Event()
+    release_collection = Event()
+    live_polls = []
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+    def blocked_collection(session, client, targets):
+        release_collection.wait(10)  # simulates a pass that takes a long time
+        return SimpleNamespace(videos_observed=0, intelligence=SimpleNamespace(snapshots_built=0, errors=0))
+
+    def fake_live(session, client, now=None):
+        live_polls.append(1)
+        release_collection.set()  # live worked while collection was still blocked
+        stop_event.set()
+        return service.LivePollResult(0, 0, 0, 0, 0)
+
+    monkeypatch.setattr(service, "create_database", lambda url: create_database("sqlite:///:memory:"))
+    monkeypatch.setattr(service, "load_targets", lambda path: [])
+    monkeypatch.setattr(service, "run_collection_pass", blocked_collection)
+    monkeypatch.setattr(service, "poll_live_once", fake_live)
+    monkeypatch.setattr(service, "install_signal_handlers", lambda event: None)
+
+    service.run_service("sqlite:///:memory:", client_factory=FakeClient, stop_event=stop_event)
+
+    assert live_polls == [1]
+
+
+def test_collection_client_gets_live_reserve_and_live_client_does_not(monkeypatch):
+    monkeypatch.setenv("STAXIS_YOUTUBE_LIVE_RESERVE_PER_MINUTE", "40")
+    stop_event = Event()
+    clients = []
+
+    class FakeClient:
+        reserve_per_minute = 0
+
+        def __init__(self):
+            clients.append(self)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+    monkeypatch.setattr(service, "create_database", lambda url: create_database("sqlite:///:memory:"))
+    monkeypatch.setattr(service, "load_targets", lambda path: [])
+    monkeypatch.setattr(service, "run_collection_pass", lambda *a, **k: SimpleNamespace(videos_observed=0, intelligence=SimpleNamespace(snapshots_built=0, errors=0)))
+    monkeypatch.setattr(service, "poll_live_once", lambda *a, **k: stop_event.set() or service.LivePollResult(0, 0, 0, 0, 0))
+    monkeypatch.setattr(service, "install_signal_handlers", lambda event: None)
+
+    service.run_service("sqlite:///:memory:", client_factory=FakeClient, stop_event=stop_event)
+
+    assert [c.reserve_per_minute for c in clients] == [40, 0]
