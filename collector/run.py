@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from collector.intelligence import IntelligenceRunResult, process_persisted_observations
+from collector.retention import run_retention_if_due
 from collector.storage import CollectionRun, save_observations
 from collector.youtube.collector import ChannelTarget, collect_channel_with_stats
 from collector.youtube.client import YouTubeClient
@@ -81,7 +82,10 @@ def run_collection_pass(
             else None
         )
         session.commit()
-        return CollectionPassResult(run.id, videos_observed, intelligence)
+        run_id = run.id
+        # Enforce YouTube API data retention. Never raises and never fails a collection pass.
+        run_retention_if_due(session)
+        return CollectionPassResult(run_id, videos_observed, intelligence)
     except Exception as exc:
         session.rollback()
         failed = session.get(CollectionRun, run.id)
