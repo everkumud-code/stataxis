@@ -83,6 +83,22 @@ class YouTubeClient:
             raise YouTubeAPIError(f"Channel not found: {channel_id}")
         return items[0]
 
+    def get_channels(self, channel_ids: list[str]) -> list[dict[str, Any]]:
+        """Fetch up to 50 channels in one channels.list call (1 quota unit).
+
+        YouTube does not support ``maxResults`` together with ``id``, so it is omitted.
+        Channels that do not exist are simply absent from the result.
+        """
+        if not channel_ids:
+            return []
+        if len(channel_ids) > 50:
+            raise ValueError("get_channels accepts at most 50 channel IDs")
+        data = self._get(
+            "channels",
+            {"part": "snippet,contentDetails,statistics", "id": ",".join(channel_ids)},
+        )
+        return data.get("items", [])
+
     def resolve_channel_url(self, url: str) -> dict[str, Any]:
         """Resolve a public channel URL to YouTube channel metadata."""
         candidate = url.strip()

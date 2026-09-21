@@ -4,6 +4,8 @@ from threading import Event
 
 from sqlalchemy.orm import Session
 
+import pytest
+
 from collector import service
 from collector.storage import Channel, Observation, Video, create_database
 from collector.youtube.client import YouTubeAPIError
@@ -221,3 +223,11 @@ def test_service_logs_sanitized_exception(monkeypatch, caplog):
     assert "postgresql+psycopg://[REDACTED]@db.example/stataxis" in message
     assert database_url not in message
     assert api_key not in message
+
+
+def test_live_poll_interval_allows_five_seconds_but_not_less(monkeypatch):
+    monkeypatch.setenv("LIVE_POLL_SECONDS", "5")
+    assert service.interval_seconds("LIVE_POLL_SECONDS", 30, 5) == 5
+    monkeypatch.setenv("LIVE_POLL_SECONDS", "4")
+    with pytest.raises(ValueError, match="at least 5 seconds"):
+        service.interval_seconds("LIVE_POLL_SECONDS", 30, 5)

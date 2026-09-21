@@ -8,7 +8,7 @@ from typing import Any
 
 from collector.classification import classify_video
 from collector.topics import assign_topic
-from collector.youtube.client import YouTubeClient
+from collector.youtube.client import YouTubeAPIError, YouTubeClient
 
 
 @dataclass(frozen=True)
@@ -142,3 +142,72 @@ def collect_channel_with_stats(
         handle=str(snippet.get("customUrl")) if snippet.get("customUrl") else None,
         observed_at=observed_at,
     )
+
+
+_BATCH_SIZE = 50
+
+
+def _batches(items: list[str], size: int = _BATCH_SIZE):
+    for start in range(0, len(items), size):
+        yield items[start:start + size]
+
+
+def collect_channels_batched(
+    client: YouTubeClient,
+    targets: list[ChannelTarget],
+    max_videos: int = 25,
+) -> dict[str, ChannelCollection]:
+    """Collect many channels using far fewer API units than one channel at a time.
+
+    Every call below costs 1 quota unit:
+      * channels.list   - 1 call per 50 channels (was 1 per channel)
+      * playlistItems   - 1 call per channel (uploads playlist)
+      * videos.list     - 1 call per 50 videos across all channels (was 1 per channel)
+
+    For 200 channels with 25 videos each that is about 304 units per pass instead of 600.
+    Results are keyed by YouTube channel ID. A channel YouTube does not return raises
+    ``YouTubeAPIError``, matching the one-at-a-time behaviour.
+    """
+    channel_ids = list(dict.fromkeys(target.channel_id for target in targets))
+    channels: dict[str, dict[str, Any]] = {}
+    for batch in _batches(channel_ids):
+        for item in client.get_channels(batch):
+            channels[str(item.get("id", ""))] = item
+    for channel_id in channel_ids:
+        if channel_id not in channels:
+            raise YouTubeAPIError(f"Channel not found: {channel_id}")
+
+    video_ids_by_channel: dict[str, list[str]] = {}
+    for channel_id in channel_ids:
+        uploads_id = channels[channel_id]["contentDetails"]["relatedPlaylists"]["uploads"]
+        uploads = client.list_uploads(uploads_id, max_results=max_videos)
+        ids = [item.get("contentDetails", {}).get("videoId") for item in uploads.get("items", [])]
+        video_ids_by_channel[channel_id] = [video_id for video_id in ids if video_id]
+
+    all_video_ids = list(dict.fromkeys(vid for ids in video_ids_by_channel.values() for vid in ids))
+    videos_by_id: dict[str, dict[str, Any]] = {}
+    for batch in _batches(all_video_ids):
+        for video in client.get_videos(batch):
+            videos_by_id[str(video.get("id", ""))] = video
+
+    observed_at = datetime.now(UTC)
+    collections: dict[str, ChannelCollection] = {}
+    for channel_id in channel_ids:
+        channel = channels[channel_id]
+        snippet = channel.get("snippet", {})
+        statistics = channel.get("statistics", {})
+        thumbnails = snippet.get("thumbnails", {})
+        collections[channel_id] = ChannelCollection(
+            observations=[
+                normalize_video(videos_by_id[vid], channel_id, observed_at)
+                for vid in video_ids_by_channel[channel_id]
+                if vid in videos_by_id
+            ],
+            subscribers=_integer(statistics.get("subscriberCount")),
+            total_views=_integer(statistics.get("viewCount")),
+            video_count=_integer(statistics.get("videoCount")),
+            avatar_url=thumbnails.get("high", {}).get("url") or thumbnails.get("default", {}).get("url"),
+            handle=str(snippet.get("customUrl")) if snippet.get("customUrl") else None,
+            observed_at=observed_at,
+        )
+    return collections
