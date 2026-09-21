@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 from collector.storage import Channel, Observation, Video
 from metrics.persistence import IntelligenceSnapshotRecord
 
+DERIVED_METRIC_NOTICE = "Generated independently by StatAxis; not sourced from YouTube"
+
 
 def channel_intelligence_overview(session: Session, channel_id: int) -> dict[str, Any] | None:
     """Return latest explainable intelligence for each video in a channel."""
@@ -50,6 +52,7 @@ def channel_intelligence_overview(session: Session, channel_id: int) -> dict[str
         "youtube_channel_id": channel.youtube_channel_id,
         "name": channel.name,
         "videos": items,
+        "derived_metric_notice": DERIVED_METRIC_NOTICE,
     }
 
 
