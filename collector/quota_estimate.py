@@ -1,7 +1,9 @@
 """Estimate daily YouTube Data API quota use so a bigger channel universe is planned, not guessed.
 
-Costs (YouTube Data API v3 quota units):
-  * one collection pass, per channel:  channels.list (1) + playlistItems.list (1) + videos.list (1) = 3
+Costs (YouTube Data API v3 quota units), reflecting batched collection (collect_channels_batched):
+  * one collection pass:  playlistItems.list (1 per channel, not batchable)
+                         + channels.list  (1 per 50 channels)
+                         + videos.list    (1 per 50 videos, across all channels combined)
   * one live poll, per batch of 50 live videos: videos.list (1)
 The default project quota is 10,000 units per day.
 """
@@ -11,7 +13,8 @@ from __future__ import annotations
 import math
 import os
 
-UNITS_PER_CHANNEL_PASS = 3
+BATCH_SIZE = 50
+DEFAULT_MAX_VIDEOS_PER_CHANNEL = 25
 LIVE_BATCH_SIZE = 50
 DEFAULT_DAILY_QUOTA_UNITS = 10_000
 SECONDS_PER_DAY = 86_400
@@ -26,11 +29,19 @@ def daily_quota_units() -> int:
     return value if value > 0 else DEFAULT_DAILY_QUOTA_UNITS
 
 
+def units_per_pass(channels: int, max_videos: int = DEFAULT_MAX_VIDEOS_PER_CHANNEL) -> int:
+    """Quota units for one batched collection pass over ``channels`` channels."""
+    if channels <= 0:
+        return 0
+    return channels + math.ceil(channels / BATCH_SIZE) + math.ceil(channels * max_videos / BATCH_SIZE)
+
+
 def estimate_daily_units(
     channels: int,
     collect_seconds: int,
     live_poll_seconds: int,
     live_streams: int | None = None,
+    max_videos: int = DEFAULT_MAX_VIDEOS_PER_CHANNEL,
 ) -> dict[str, int]:
     """Units per day for collection passes plus live polling.
 
@@ -40,7 +51,7 @@ def estimate_daily_units(
     if channels < 0 or collect_seconds <= 0 or live_poll_seconds <= 0:
         raise ValueError("channels must be >= 0 and intervals must be positive")
     streams = math.ceil(channels * 1.5) if live_streams is None else live_streams
-    collection = math.ceil(channels * UNITS_PER_CHANNEL_PASS * SECONDS_PER_DAY / collect_seconds)
+    collection = math.ceil(units_per_pass(channels, max_videos) * SECONDS_PER_DAY / collect_seconds)
     live = math.ceil(math.ceil(streams / LIVE_BATCH_SIZE) * SECONDS_PER_DAY / live_poll_seconds) if streams else 0
     return {"collection": collection, "live": live, "total": collection + live}
 
@@ -51,14 +62,15 @@ def affordable_collect_seconds(
     quota: int | None = None,
     headroom: float = 0.85,
     live_streams: int | None = None,
+    max_videos: int = DEFAULT_MAX_VIDEOS_PER_CHANNEL,
 ) -> int | None:
     """Shortest collection interval that keeps use under ``headroom`` of the quota (None if impossible)."""
     budget = (quota or daily_quota_units()) * headroom
-    live = estimate_daily_units(channels, SECONDS_PER_DAY, live_poll_seconds, live_streams)["live"]
+    live = estimate_daily_units(channels, SECONDS_PER_DAY, live_poll_seconds, live_streams, max_videos)["live"]
     remaining = budget - live
     if remaining <= 0 or channels == 0:
         return None if remaining <= 0 else 60
-    seconds = math.ceil(channels * UNITS_PER_CHANNEL_PASS * SECONDS_PER_DAY / remaining)
+    seconds = math.ceil(units_per_pass(channels, max_videos) * SECONDS_PER_DAY / remaining)
     return max(60, seconds)
 
 

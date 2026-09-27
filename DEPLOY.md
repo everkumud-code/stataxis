@@ -149,7 +149,7 @@ A name search can return fan or re-upload channels, so nothing is registered wit
 
 ### YouTube quota
 
-Each channel costs 3 quota units per collection pass, and live polling costs 1 unit per 50 live videos per poll.
+Collection is batched, so cost per pass is: 1 playlistItems.list per channel + 1 channels.list per 50 channels + 1 videos.list per 50 videos (across all channels). At 25 videos/channel that is about 1.5 units per channel for a large universe (e.g. 200 channels ~= 304 units/pass), well under the naive 3/channel. Live polling costs 1 unit per 50 live videos per poll.
 The default quota is 10,000 units/day.
 
 | Channels | `COLLECT_SECONDS` | Units/day | Fits 10,000? |
