@@ -64,19 +64,35 @@ def test_large_universe_is_one_pass_and_live_polling_runs_on_its_own_thread(monk
     assert live_calls
 
 
+def test_quota_estimates_reflect_batched_collection() -> None:
+    """5 channels, 25 videos each, batched: playlistItems 5 + channels.list 1 + videos.list 3 = 9/pass."""
+    from collector.quota_estimate import units_per_pass
+
+    assert units_per_pass(5) == 9
+    assert units_per_pass(60) == 60 + 2 + 30  # channels.list ceil(60/50)=2, videos.list ceil(1500/50)=30
+    assert units_per_pass(200) == 200 + 4 + 100
+    assert units_per_pass(0) == 0
+
+
 def test_quota_estimates_and_warning():
     small = estimate_daily_units(5, 600, 30)
-    assert small == {"collection": 2160, "live": 2880, "total": 5040}
+    assert small == {"collection": 1296, "live": 2880, "total": 4176}
     assert quota_warning(5, 600, 30) is None
     big = estimate_daily_units(60, 600, 30)
-    assert big["collection"] == 25_920 and big["live"] == 5_760
-    assert affordable_collect_seconds(60, 30, quota=10_000) == 5676
+    assert big["collection"] == 13_248 and big["live"] == 5_760
+    assert affordable_collect_seconds(60, 30, quota=10_000) == 2902
     warning = quota_warning(60, 600, 30)
-    assert "COLLECT_SECONDS to 5676" in warning and "31680" in warning
+    assert "COLLECT_SECONDS to 2902" in warning and "19008" in warning
     assert affordable_collect_seconds(500, 30, quota=10_000) is None
     assert "live polling alone exceeds" in quota_warning(500, 600, 30)
     with pytest.raises(ValueError):
         estimate_daily_units(5, 0, 30)
+
+
+def test_200_channels_fit_the_150000_unit_extended_quota_at_10s_live_polling() -> None:
+    """This is the target scale the YouTube quota extension form was written for."""
+    use = estimate_daily_units(200, 600, 10)
+    assert use["total"] < 150_000
 
 
 def test_quota_can_be_configured(monkeypatch):
