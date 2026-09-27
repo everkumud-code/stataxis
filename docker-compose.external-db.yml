@@ -1,0 +1,11 @@
+# Use this alongside docker-compose.yml when the database is external (e.g. Neon)
+# instead of the local `postgres` container:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.external-db.yml up -d --build web worker
+#
+# Set DATABASE_URL in .env to the external connection string first.
+services:
+  web:
+    depends_on: []
+  worker:
+    depends_on: []
