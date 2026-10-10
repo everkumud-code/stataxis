@@ -165,3 +165,10 @@ def test_stax9_is_the_owners_artwork_only_and_the_helper_uses_it():
     assert (folder / "stax9-figure.webp").stat().st_size < 300_000 and (folder / "stax9-head.webp").exists()
     assert "stax9-figure.webp" in text(DASH / "stax9.html") and "stax9-figure.webp" in text(DASH / "media-intelligence.js")
     assert not (DASH / "stax9-explorer.svg").exists()
+
+
+@pytest.mark.parametrize("name,kind", [("stax9-figure.webp", "image/webp"), ("stax9-head.webp", "image/webp"), ("STAX9.png", "image/png"), ("STAX9.svg", "image/svg+xml")])
+def test_the_server_serves_the_stax9_artwork_with_the_right_type(name, kind):
+    out = {}
+    body = web.application({"REQUEST_METHOD": "GET", "PATH_INFO": "/assets/stax9/" + name, "QUERY_STRING": "", "REMOTE_ADDR": "127.0.0.1"}, lambda status, headers: out.update(status=status, headers=dict(headers)))
+    assert out["status"].startswith("200") and out["headers"]["Content-Type"].startswith(kind) and len(b"".join(body)) > 10_000

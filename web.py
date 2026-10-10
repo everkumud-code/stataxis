@@ -24,7 +24,7 @@ from collector.storage import create_database
 ROOT = Path(__file__).resolve().parent
 DASHBOARD = ROOT / "dashboard"
 
-STATIC_EXTENSIONS = frozenset({".html", ".css", ".js", ".svg", ".png", ".jpg", ".ico", ".csv", ".json", ".txt", ".woff2"})
+STATIC_EXTENSIONS = frozenset({".html", ".css", ".js", ".svg", ".png", ".jpg", ".webp", ".ico", ".csv", ".json", ".txt", ".woff2"})
 SECURITY_HEADERS = (
     ("Strict-Transport-Security", "max-age=31536000"),
     ("X-Content-Type-Options", "nosniff"),
