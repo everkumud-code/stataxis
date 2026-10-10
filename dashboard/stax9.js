@@ -21,8 +21,8 @@
   const root = document.createElement("div"); root.className = "s9";
   root.innerHTML =
     '<div class="s9-panel" role="dialog" aria-label="STAX9, the StatAxis helper" hidden><button class="s9-x" type="button" aria-label="Close">×</button>' +
-    '<div class="s9-fig"><div class="s9-stage"><img src="' + A + 'stax9-figure.webp" alt="STAX9, the StatAxis explorer: a winged insect-like figure in black and white armour with a glowing blue 9 on the chest, holding the Axis staff" width="720" height="1080" loading="lazy">' +
-    '<i class="s9-g s9-eyeL"></i><i class="s9-g s9-eyeR"></i><i class="s9-g s9-nine"></i><i class="s9-g s9-hub"></i><i class="s9-g s9-tip"></i><i class="s9-scan"></i></div></div>' +
+    '<div class="s9-fig"><span class="s9-shadow"></span><div class="s9-stage"><img src="' + A + 'stax9-figure.webp" alt="STAX9, the StatAxis explorer: a winged insect-like figure in black and white armour with a glowing blue 9 on the chest, holding the Axis staff" width="720" height="1080" loading="lazy">' +
+    '<i class="s9-g s9-eyeL"></i><i class="s9-g s9-eyeR"></i><i class="s9-g s9-nine"></i><i class="s9-g s9-hub"></i><i class="s9-g s9-tip"></i><i class="s9-sheen"></i></div></div>' +
     '<div class="s9-body"><b>STAX9</b><em>See the stat. Shift the axis.</em><div class="s9-traits"><span>Curious</span><span>Precise</span><span>Fearless</span><span>Objective</span></div><p class="s9-say"></p><div class="s9-links"></div><small>“Trust cannot be demanded. It must be engineered.”</small></div></div>' +
     '<button class="s9-btn" type="button" aria-label="Ask STAX9 for help" aria-expanded="false"><span class="s9-av"><img src="' + A + 'stax9-head.webp" alt="" width="96" height="96"></span><span class="s9-hi">Ask STAX9</span><i class="s9-dot"></i></button>';
   document.body.appendChild(root);
@@ -31,6 +31,9 @@
   const type = text => { say.textContent = ""; if (reduce) { say.textContent = text; return; } let i = 0; const go = () => { say.textContent = text.slice(0, ++i); if (i < text.length) setTimeout(go, 16); }; go(); };
   let opened = false;
   const open = v => { opened = v; panel.hidden = !v; root.classList.toggle("open", v); btn.setAttribute("aria-expanded", String(v)); if (v) type(tip[0]); try { sessionStorage.setItem("s9_seen", "1"); } catch (e) { /* storage blocked */ } };
+  // the large picture is fetched only when someone shows interest, so it costs nothing for everyone else
+  let warm = false; const preload = () => { if (!warm) { warm = true; new Image().src = A + "stax9-figure.webp"; } };
+  ["pointerenter", "focus", "touchstart"].forEach(ev => btn.addEventListener(ev, preload, {passive: true}));
   btn.addEventListener("click", () => open(!opened)); root.querySelector(".s9-x").addEventListener("click", () => open(false));
   document.addEventListener("keydown", e => { if (e.key === "Escape" && opened) open(false); });
   // the figure leans toward the pointer

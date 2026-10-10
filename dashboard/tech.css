@@ -340,7 +340,7 @@ body.fx-on #vx-glow,body.fx-on #vx-ring{opacity:1}
 .s9{position:fixed;left:18px;bottom:18px;z-index:1900;font-family:var(--sans,system-ui,sans-serif)}
 .s9-btn{display:flex;align-items:center;gap:10px;padding:6px 16px 6px 6px;border:1px solid rgba(29,161,255,.5);border-radius:40px;background:rgba(7,12,20,.9);color:#e8eef6;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 8px 30px rgba(0,0,0,.45);animation:s9Pulse 3.6s ease-out infinite;position:relative;transition:transform .25s,border-color .25s}
 .s9-btn:hover{transform:translateY(-3px);border-color:#1da1ff}
-.s9-av{width:48px;height:48px;border-radius:50%;border:1px solid rgba(29,161,255,.7);display:block;overflow:hidden;background:#050b14}
+.s9-av{width:48px;height:48px;border-radius:50%;border:1px solid rgba(29,161,255,.7);display:block;overflow:hidden;background:radial-gradient(circle at 50% 40%,#12335a,#050b14 75%)}
 .s9-av img{width:100%;height:100%;display:block;object-fit:cover;animation:s9Breathe 4s ease-in-out infinite}
 .s9-hi{font:600 13px/1 var(--mono,monospace);letter-spacing:.12em;text-transform:uppercase}
 .s9-dot{position:absolute;right:10px;top:8px;width:8px;height:8px;border-radius:50%;background:#35d399;box-shadow:0 0 10px #35d399}
@@ -352,14 +352,18 @@ body.fx-on #vx-glow,body.fx-on #vx-ring{opacity:1}
 .s9-panel[hidden]{display:none}
 @keyframes s9In{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
 .s9-x{position:absolute;right:10px;top:8px;z-index:3;width:30px;height:30px;border:0;background:rgba(5,9,15,.6);color:#c6d2e0;font-size:22px;cursor:pointer;border-radius:50%}.s9-x:hover{color:#fff;background:rgba(255,255,255,.12)}
-.s9-fig{position:relative;height:300px;overflow:hidden;background:#07101b;border-radius:18px 18px 0 0}
-.s9-stage{position:relative;height:100%;aspect-ratio:2/3;margin:0 auto;transform-style:preserve-3d;transition:transform .25s ease-out;animation:s9Float 5s ease-in-out infinite}
+.s9-fig{position:relative;height:300px;overflow:hidden;background:radial-gradient(60% 70% at 50% 55%,rgba(29,161,255,.28),transparent 72%),linear-gradient(180deg,#0a1626,#06101c);border-radius:18px 18px 0 0}
+.s9-shadow{position:absolute;left:50%;bottom:10px;width:150px;height:18px;margin-left:-75px;border-radius:50%;background:radial-gradient(closest-side,rgba(29,161,255,.55),transparent);animation:s9Shadow 5s ease-in-out infinite}
+@keyframes s9Shadow{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(.82);opacity:.5}}
+.s9-sheen{position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;-webkit-mask-image:url(/assets/stax9/stax9-figure.webp);mask-image:url(/assets/stax9/stax9-figure.webp);-webkit-mask-size:100% 100%;mask-size:100% 100%;background:linear-gradient(105deg,transparent 35%,rgba(150,215,255,.28) 50%,transparent 65%);background-size:260% 100%;animation:s9Sheen 4.2s ease-in-out infinite}
+@keyframes s9Sheen{from{background-position:130% 0}to{background-position:-130% 0}}
+.s9-stage{position:relative;height:96%;aspect-ratio:2/3;margin:2% auto 0;transform-style:preserve-3d;transition:transform .25s ease-out;animation:s9Float 5s ease-in-out infinite}
 .s9-stage img{height:100%;width:100%;display:block;object-fit:cover}
-@keyframes s9Float{0%,100%{translate:0 0;scale:1}50%{translate:0 -4px;scale:1.012}}
+@keyframes s9Float{0%,100%{translate:0 0}50%{translate:0 -8px}}
 .s9-g{position:absolute;border-radius:50%;pointer-events:none;mix-blend-mode:screen;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(120,210,255,.95),rgba(29,161,255,.35) 45%,transparent 70%);animation:s9Glow 2.6s ease-in-out infinite}
-.s9-eyeL{left:46.9%;top:15%;width:13%;height:8.7%}.s9-eyeR{left:56.2%;top:15.6%;width:10%;height:6.8%;animation-delay:.2s}
-.s9-nine{left:53.6%;top:27.3%;width:9%;height:6%;animation-delay:.5s}.s9-hub{left:79.7%;top:18.6%;width:12%;height:8%;animation-delay:.9s}
-.s9-tip{left:74.4%;top:85.5%;width:9%;height:14%;border-radius:40%;animation-delay:1.3s}
+.s9-eyeL{left:47.5%;top:12.9%;width:11%;height:7.4%}.s9-eyeR{left:57.7%;top:13.7%;width:9%;height:6%;animation-delay:.2s}
+.s9-nine{left:56.8%;top:25%;width:9%;height:6%;animation-delay:.5s}.s9-hub{left:80.6%;top:18.8%;width:12%;height:8%;animation-delay:.9s}
+.s9-tip{left:79%;top:87%;width:8%;height:13%;border-radius:40%;animation-delay:1.3s}
 @keyframes s9Glow{0%,100%{opacity:.18;transform:translate(-50%,-50%) scale(.85)}50%{opacity:.85;transform:translate(-50%,-50%) scale(1.15)}}
 .s9-scan{position:absolute;left:0;right:0;top:0;height:22%;pointer-events:none;background:linear-gradient(180deg,transparent,rgba(29,161,255,.16),transparent);animation:s9Scan 4.5s linear infinite}
 @keyframes s9Scan{from{transform:translateY(-120%)}to{transform:translateY(520%)}}

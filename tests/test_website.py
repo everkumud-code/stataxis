@@ -146,16 +146,18 @@ def test_the_scripts_define_the_scenes_the_pages_ask_for():
     assert wanted and max(wanted) < tech.count("(u, v, t) =>")
 
 
-def test_there_is_no_galaxy_and_no_invented_stax9_figure_on_the_site():
+def test_there_is_no_galaxy_and_no_drawn_stax9_figure_on_the_site():
     tech, css, site = text(DASH / "tech.js"), text(DASH / "tech.css"), text(DASH / "site.js")
-    assert "vx-galaxy" not in tech + css and "stax9.js" not in site
-    assert not (DASH / "stax9.js").exists() and not (DASH / "stax9-explorer.svg").exists()
+    assert "vx-galaxy" not in tech + css
+    assert not (DASH / "stax9-explorer.svg").exists()
 
 
 def test_stax9_is_the_owners_artwork_only_and_the_helper_uses_it():
     import base64
     folder = DASH / "assets" / "stax9"
     assert (folder / "STAX9.png").stat().st_size > 1_000_000 and (folder / "STAX9.svg").stat().st_size > 1_000_000
+    header = (folder / "STAX9.png").read_bytes()[:33]
+    assert header[:8] == bytes([137, 80, 78, 71, 13, 10, 26, 10]) and header[25] == 6, "the PNG must carry an alpha channel (colour type 6)"
     svg = text(folder / "STAX9.svg")
     assert "<title>STAX9 character</title>" in svg and base64.b64decode(re.search(r"base64,([^\"]+)\"", svg).group(1))[:8] == b"\x89PNG\r\n\x1a\n"
     js, site = text(DASH / "stax9.js"), text(DASH / "site.js")
