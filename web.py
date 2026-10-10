@@ -24,6 +24,7 @@ from collector.storage import create_database
 ROOT = Path(__file__).resolve().parent
 DASHBOARD = ROOT / "dashboard"
 
+mimetypes.add_type("image/webp", ".webp")  # older Python builds do not know it
 STATIC_EXTENSIONS = frozenset({".html", ".css", ".js", ".svg", ".png", ".jpg", ".webp", ".ico", ".csv", ".json", ".txt", ".woff2"})
 SECURITY_HEADERS = (
     ("Strict-Transport-Security", "max-age=31536000"),
