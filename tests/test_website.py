@@ -146,7 +146,7 @@ def test_the_scripts_define_the_scenes_the_pages_ask_for():
     assert wanted and max(wanted) < tech.count("(u, v, t) =>")
 
 
-def test_a_moving_galaxy_sits_behind_every_page_and_stands_still_for_reduced_motion():
-    tech, css = text(DASH / "tech.js"), text(DASH / "tech.css")
-    assert "galaxy: a slowly turning" in tech and "vx-galaxy" in tech and "reduce" in tech and "requestAnimationFrame(frame)" in tech
-    assert ".vx-galaxy{position:fixed" in css and "z-index:-1" in css and "pointer-events:none" in css
+def test_there_is_no_galaxy_and_no_invented_stax9_figure_on_the_site():
+    tech, css, site = text(DASH / "tech.js"), text(DASH / "tech.css"), text(DASH / "site.js")
+    assert "vx-galaxy" not in tech + css and "stax9.js" not in site
+    assert not (DASH / "stax9.js").exists() and not (DASH / "stax9-explorer.svg").exists()

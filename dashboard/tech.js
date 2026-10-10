@@ -157,63 +157,6 @@
     window.addEventListener("resize", () => { size(); if (reduce) draw(); });
   }
 
-  /* ---- galaxy: a slowly turning spiral galaxy behind every page, with twinkling stars, a drift that follows the mouse and the scroll, and an occasional shooting star ---- */
-  if (!$(".vx-galaxy")) {
-    const cv = document.createElement("canvas"); cv.className = "vx-galaxy"; cv.setAttribute("aria-hidden", "true"); document.body.insertBefore(cv, document.body.firstChild);
-    const g = cv.getContext("2d"); let W = 0, H = 0, dpr = 1, raf = 0, t = 0, mx = 0, my = 0, tx = 0, ty = 0, vis = true, shoot = null, nextShoot = 240;
-    let arms = [], field = [], glow = null;
-    const small = innerWidth < 700;
-    const build = () => {
-      dpr = Math.min(window.devicePixelRatio || 1, 1.5); W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const R0 = Math.max(W, H) * .78, n = small ? 700 : 2400; arms = []; field = [];
-      for (let i = 0; i < n; i++) {
-        const u = Math.random(), r = Math.pow(u, 1.12) * R0 + 6, arm = i % 2, a = arm * Math.PI + r / R0 * 4.4 + (Math.random() - .5) * (.9 - .5 * Math.pow(u, .5));
-        const core = Math.max(0, 1 - r / (R0 * .22));
-        arms.push({r, a, y: (Math.random() - .5) * (14 + 30 * core), s: .8 + Math.random() * 1.7 + core * 1.4, c: core > .35 ? 0 : (Math.random() < .55 ? 1 : (Math.random() < .5 ? 2 : 3)), tw: Math.random() * 6.28, w: 1 / Math.sqrt(r + 60)});
-      }
-      for (let i = 0; i < (small ? 120 : 320); i++) field.push({x: Math.random() * W, y: Math.random() * H, s: Math.random() * 1.2 + .3, tw: Math.random() * 6.28, z: Math.random()});
-      // the soft light of the galaxy, drawn once
-      glow = document.createElement("canvas"); glow.width = glow.height = 512; const q = glow.getContext("2d"), gr = q.createRadialGradient(256, 256, 0, 256, 256, 256);
-      gr.addColorStop(0, "rgba(255,236,200,.55)"); gr.addColorStop(.12, "rgba(120,190,255,.28)"); gr.addColorStop(.45, "rgba(40,90,200,.10)"); gr.addColorStop(1, "rgba(0,0,0,0)"); q.fillStyle = gr; q.fillRect(0, 0, 512, 512);
-    };
-    const COL = [[255, 238, 214], [120, 190, 255], [170, 150, 255], [80, 220, 255]];
-    const frame = () => {
-      t += .016; mx += (tx - mx) * .04; my += (ty - my) * .04;
-      g.clearRect(0, 0, W, H);
-      const cx = W * .64 - mx * 26, cy = H * .4 - my * 16 - (scrollY || 0) * .06, R0 = Math.max(W, H) * .78, tilt = .5, rot = -.38, cr = Math.cos(rot), sr = Math.sin(rot);
-      // far stars: they twinkle and drift a little with the mouse
-      for (const s of field) {
-        const a = .25 + .45 * (.5 + .5 * Math.sin(t * (1 + s.z * 2) + s.tw));
-        g.fillStyle = `rgba(210,225,245,${a * .8})`; g.fillRect(((s.x - mx * 14 * s.z) % W + W) % W, ((s.y - (scrollY || 0) * .03 * s.z - my * 8 * s.z) % H + H) % H, s.s, s.s);
-      }
-      g.globalCompositeOperation = "lighter";
-      g.globalAlpha = .9; const gs = R0 * 1.5; g.drawImage(glow, cx - gs / 2, cy - gs / 2, gs, gs); g.globalAlpha = 1;
-      for (const s of arms) {
-        const a = s.a + t * s.w * 1.6, x0 = Math.cos(a) * s.r, y0 = Math.sin(a) * s.r * tilt + s.y;
-        const px = cx + x0 * cr - y0 * sr, py = cy + x0 * sr + y0 * cr, k = .35 + .5 * (.5 + .5 * Math.sin(t * 1.4 + s.tw)), c = COL[s.c], fade = 1 - Math.min(1, s.r / R0) * .55;
-        g.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${(k * fade * .85).toFixed(3)})`;
-        g.fillRect(px, py, s.s, s.s);
-      }
-      g.globalCompositeOperation = "source-over";
-      if (--nextShoot <= 0 && !shoot) { shoot = {x: Math.random() * W * .8, y: Math.random() * H * .35, vx: 9 + Math.random() * 5, vy: 4 + Math.random() * 3, life: 0}; nextShoot = 420 + Math.random() * 600; }
-      if (shoot) {
-        shoot.x += shoot.vx; shoot.y += shoot.vy; shoot.life++;
-        const a = Math.max(0, 1 - shoot.life / 38), gr = g.createLinearGradient(shoot.x, shoot.y, shoot.x - shoot.vx * 9, shoot.y - shoot.vy * 9);
-        gr.addColorStop(0, `rgba(235,245,255,${a})`); gr.addColorStop(1, "rgba(120,190,255,0)"); g.strokeStyle = gr; g.lineWidth = 1.6; g.beginPath(); g.moveTo(shoot.x, shoot.y); g.lineTo(shoot.x - shoot.vx * 9, shoot.y - shoot.vy * 9); g.stroke();
-        if (shoot.life > 38) shoot = null;
-      }
-      raf = requestAnimationFrame(frame);
-    };
-    build();
-    if (reduce) { t = 6; frame(); cancelAnimationFrame(raf); }
-    else {
-      window.addEventListener("pointermove", e => { tx = e.clientX / W - .5; ty = e.clientY / H - .5; }, {passive: true});
-      document.addEventListener("visibilitychange", () => { cancelAnimationFrame(raf); if (!document.hidden) raf = requestAnimationFrame(frame); });
-      raf = requestAnimationFrame(frame);
-    }
-    let rz = 0; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { build(); if (reduce) { frame(); cancelAnimationFrame(raf); } }, 200); });
-  }
-
   /* ---- data rain: move the mouse and letters and numbers drop from its tail, then fade as they fall ---- */
   if (!reduce && window.matchMedia && window.matchMedia("(pointer:fine)").matches && !$(".vx-trail")) {
     const cv = document.createElement("canvas"); cv.className = "vx-trail"; cv.setAttribute("aria-hidden", "true"); document.body.appendChild(cv);
