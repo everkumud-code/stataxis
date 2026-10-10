@@ -106,3 +106,12 @@ def test_the_web_app_serves_the_new_pages_and_the_public_endpoints_without_login
         assert status.startswith("200") and json.loads(body), path
     assert json.loads(get("/api/v1/public/packages")[1])["order"][0] == "sx_free"
     assert get("/api/v1/market/weekly")[0].startswith("401")                 # everything else still needs a login
+
+
+def test_footer_wordmark_method_stage_and_radar_are_wired():
+    site, tech, css, home = text(DASH / "site.js"), text(DASH / "tech.js"), text(DASH / "tech.css"), text(DASH / "index.html")
+    assert "vx-wordmark" in site and "vx-wordmark" in tech and "STATAXIS" in tech
+    assert 'class="vx-steps vx-acc' in home and 'class="vx-stage' in home and "vx-acc" in tech
+    for phrase in ("Prior written permission from StatAxis", "not sourced from, provided by or endorsed by YouTube"):
+        assert phrase in site, phrase
+    assert ".vx-art .radar svg" in css

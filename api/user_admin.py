@@ -95,13 +95,12 @@ def _temp_password() -> str:
 
 
 def create_user(session: Session, *, email: str, name: str, organization: str, mobile: str, plan: str) -> dict[str, Any]:
-    email = (email or "").strip().lower()
-    if "@" not in email or " " in email or len(email) > 320:
-        raise ValueError("a valid email is required")
+    from api.auth_service import clean_login_id
+    email = clean_login_id(email)
     if not (name or "").strip() or not (organization or "").strip():
         raise ValueError("name and organisation are required")
     if session.query(User).filter_by(email=email).one_or_none() is not None:
-        raise ValueError("an account with this email already exists")
+        raise ValueError("an account with this login ID already exists")
     code = get_plan(plan).code.value
     check_seat(session, organization, code)
     temp = _temp_password()
@@ -110,6 +109,19 @@ def create_user(session: Session, *, email: str, name: str, organization: str, m
     session.add(user)
     session.commit()
     return {**payload(user), "temporary_password": temp, "note": "Shown once. Give it to the user and ask them to change it at once (Change password in the workspace)."}
+
+
+def rename_login(session: Session, user_id: int, new_id: str) -> dict[str, Any]:
+    """Change the ID a person signs in with. The password, package and privileges stay as they are."""
+    from api.auth_service import clean_login_id
+    user = _get(session, user_id)
+    new_id = clean_login_id(new_id)
+    other = session.query(User).filter(User.email == new_id, User.id != user.id).one_or_none()
+    if other is not None:
+        raise ValueError("another account already uses this login ID")
+    user.email = new_id
+    session.commit()
+    return payload(user)
 
 
 def reset_password(session: Session, user_id: int) -> dict[str, Any]:

@@ -20,6 +20,8 @@ def bootstrap_admin(session: Session) -> bool:
 
     user = session.query(User).filter_by(email=email).one_or_none()
     if user is None:
+        if session.query(User).filter_by(is_admin=True, active=True).first() is not None:
+            return False  # an admin exists under another login ID; do not create a second one from the environment
         user = User(
             email=email,
             password_hash=hash_password(password),

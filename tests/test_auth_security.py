@@ -10,7 +10,7 @@ def test_login_uses_dummy_hash_for_unknown_email(monkeypatch, tmp_path):
     monkeypatch.setattr("api.auth_service.verify_password", lambda password, encoded: calls.append(encoded) or False)
     engine = create_database(f"sqlite:///{tmp_path / 'auth-security.db'}")
     session = Session(engine)
-    with pytest.raises(PermissionError, match="invalid email or password"):
+    with pytest.raises(PermissionError, match="invalid login ID or password"):
         login(session, "missing@example.com", "correct horse battery")
     assert len(calls) == 1
     assert calls[0].startswith("pbkdf2_sha256$600000$")

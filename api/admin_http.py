@@ -66,6 +66,8 @@ def admin_application(session_factory: Callable[[], Any]):
                 if path == "/api/v1/admin/users/create":
                     return _json(start_response, 200, user_admin.create_user(session, email=str(body.get("email") or ""), name=str(body.get("name") or ""), organization=str(body.get("organization") or ""),
                                                                               mobile=str(body.get("mobile") or ""), plan=str(body.get("plan") or "")))
+                if path == "/api/v1/admin/users/rename-login":
+                    return _json(start_response, 200, user_admin.rename_login(session, int(body.get("user_id")), str(body.get("login_id") or "")))
                 if path == "/api/v1/admin/users/reset-password":
                     return _json(start_response, 200, user_admin.reset_password(session, int(body.get("user_id"))))
                 if path == "/api/v1/admin/users/approve":

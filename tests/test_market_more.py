@@ -241,7 +241,7 @@ def test_created_and_reset_accounts_get_a_one_time_password_that_works_and_unsaf
     with pytest.raises(ValueError, match="already exists"):
         user_admin.create_user(s, email="new@firm.com", name="Dup", organization="Firm", mobile="", plan="sx_pro")
     with pytest.raises(ValueError):
-        user_admin.create_user(s, email="not-an-email", name="A", organization="B", mobile="", plan="sx_pro")
+        user_admin.create_user(s, email="has a space", name="A", organization="B", mobile="", plan="sx_pro")
     with pytest.raises(ValueError):
         user_admin.create_user(s, email="a@b.co", name="A", organization="B", mobile="", plan="gold")
     with pytest.raises(ValueError, match="own account"):

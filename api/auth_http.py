@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 from sqlalchemy.orm import Session
 
-from api.auth_service import authenticate, change_password, login, register
+from api.auth_service import authenticate, change_password, clean_login_id, login, register
 from api.errors import AuthenticationError
 from api.rate_limit import client_ip, limiter
 
@@ -27,7 +27,7 @@ def auth_application(session_factory: Callable[[], Session]):
             return _change_password(environ, start_response, session_factory)
         try:
             payload = _read_json(environ)
-            email = _email(payload.get("email"))
+            email = _email(payload.get("email")) if path.endswith("/register") else clean_login_id(payload.get("email"))
             password = payload.get("password")
             if not isinstance(password, str):
                 raise ValueError("password is required")

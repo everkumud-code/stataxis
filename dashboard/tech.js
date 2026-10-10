@@ -56,6 +56,104 @@
     }
   }
 
+  /* ---- footer wordmark: STATAXIS drawn in dots; the dots swell, turn blue and part around the cursor, and a click sends a ring through the letters ---- */
+  const wmBox = $(".vx-wordmark");
+  if (wmBox) {
+    const c = $("canvas", wmBox), tag = $(".vx-wm-tag", wmBox), x = c.getContext("2d");
+    let W = 0, H = 0, dpr = 1, dots = [], mx = -1e4, my = -1e4, raf = 0, t = 0, vis = false, st = 8; const ripples = [];
+    const build = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 2); W = wmBox.clientWidth; H = wmBox.clientHeight;
+      c.width = W * dpr; c.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      st = Math.max(5, Math.round(W / 150));
+      const off = document.createElement("canvas"), o = off.getContext("2d"); off.width = W; off.height = H;
+      const face = '900 FSpx "Arial Black", Arial, Helvetica, sans-serif'; let fs = H * 1.05;
+      o.font = face.replace("FS", fs); fs *= Math.min(1, (W * .985) / o.measureText("STATAXIS").width);
+      o.font = face.replace("FS", fs); o.textBaseline = "alphabetic"; o.textAlign = "center"; o.fillStyle = "#fff"; o.fillText("STATAXIS", W / 2, H * .94);
+      const px = o.getImageData(0, 0, W, H).data; dots = [];
+      for (let j = st / 2; j < H; j += st) for (let i = st / 2; i < W; i += st) dots.push({x: i, y: j, on: px[((j | 0) * W + (i | 0)) * 4 + 3] > 128, ph: Math.random() * 6.283});
+    };
+    const draw = () => {
+      x.clearRect(0, 0, W, H); t += .02; const rad = Math.max(90, W * .09);
+      for (const d of dots) {
+        let px = d.x, py = d.y, a = d.on ? .8 : .07, r = d.on ? st * .3 : st * .1, hot = false;
+        if (d.on) a += Math.sin(t + d.ph + d.x * .01) * .1;
+        const dx = px - mx, dy = py - my, dist = Math.hypot(dx, dy);
+        if (dist < rad) { const f = 1 - dist / rad; px += dx / (dist || 1) * f * st * .9; py += dy / (dist || 1) * f * st * .9; a = Math.min(1, a + f * (d.on ? .5 : .9)); r += f * st * (d.on ? .45 : .6); hot = f > .25; }
+        for (const rp of ripples) { const dr = Math.abs(Math.hypot(d.x - rp.x, d.y - rp.y) - rp.r); if (dr < 40) { const f = 1 - dr / 40; a = Math.min(1, a + f * .9); r += f * st * .4; hot = true; } }
+        x.fillStyle = hot ? `rgba(29,161,255,${a})` : d.on ? `rgba(235,242,250,${a})` : `rgba(120,150,185,${a})`;
+        x.beginPath(); x.arc(px, py, r, 0, 6.283); x.fill();
+      }
+      for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].r += 10; if (ripples[i].r > W * 1.1) ripples.splice(i, 1); }
+      raf = requestAnimationFrame(draw);
+    };
+    const start = () => { cancelAnimationFrame(raf); if (vis && !document.hidden) draw(); };
+    build();
+    if (reduce) { draw(); cancelAnimationFrame(raf); }
+    else {
+      wmBox.addEventListener("pointermove", e => {
+        const r = wmBox.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top;
+        const code = ((Math.round(mx) * 31 + Math.round(my) * 17) % 65535).toString(16).toUpperCase().padStart(4, "0");
+        tag.innerHTML = `<b>STX-${code}</b>signal ${Math.abs(Math.sin(mx * .013 + my * .021)).toFixed(2)}`; tag.style.opacity = 1;
+        tag.style.transform = `translate(${Math.min(mx + 18, W - 130)}px,${Math.max(my - 44, 4)}px)`;
+      });
+      wmBox.addEventListener("pointerleave", () => { mx = my = -1e4; tag.style.opacity = 0; });
+      wmBox.addEventListener("pointerdown", e => { const r = wmBox.getBoundingClientRect(); ripples.push({x: e.clientX - r.left, y: e.clientY - r.top, r: 0}); });
+      new IntersectionObserver(es => { vis = es[0].isIntersecting; start(); }).observe(wmBox);
+      document.addEventListener("visibilitychange", start);
+    }
+    let rz = 0; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { build(); if (reduce) draw(); }, 150); });
+  }
+
+  /* ---- method stage: eight scenes drawn in dots; the open step chooses the scene, the cursor parts the dots ---- */
+  const acc = $(".vx-acc"), stage = $(".vx-stage");
+  if (acc && stage) {
+    const items = $$("li", acc), cv = $("canvas", stage), tags = $(".vx-stage-tags", stage), sid = $(".vx-stage-id", stage), x = cv.getContext("2d");
+    const NAMES = items.map(li => $("b", li).textContent);
+    const TAGS = [["Public YouTube data", "every few minutes", "live every 30 s"], ["Integrity checks", "Authenticity radar", "flags, not verdicts"], ["Weekly views", "Prime time", "STX · IFX Score"], ["Finding", "Evidence attached", "Confidence shown"],
+      ["Media company", "Buyer · Campaign", "Creator · Audience"], ["Branded PDF", "Findings first", "Method last"], ["Plan the spend", "Choose the messenger", "Open the tool"], ["Reviewer decision", "Kept on record", "Shapes the next report"]];
+    const POS = [[[56, 16], [10, 52], [52, 80]], [[58, 14], [8, 46], [54, 82]], [[10, 14], [56, 46], [20, 80]], [[8, 18], [54, 50], [14, 80]], [[56, 12], [6, 48], [52, 82]], [[10, 16], [54, 44], [18, 82]], [[8, 14], [52, 48], [12, 82]], [[54, 14], [6, 50], [48, 82]]];
+    // each scene returns how bright a dot at (u, v) in 0..1 should be, and whether it is "hot" (blue) at time t
+    const S = [
+      (u, v, t) => { const k = (v * 6 - t * 1.6 + Math.sin(u * 14) * 1.2) % 1; const col = Math.abs(Math.sin(u * 17.3)) > .55; return col ? Math.max(0, 1 - Math.abs(((k + 1) % 1) - .5) * 4) : .04; },
+      (u, v, t) => { const a = Math.atan2(v - .5, u - .5), d = Math.hypot(u - .5, v - .5); const sw = ((a - t * 1.8) % 6.283 + 6.283) % 6.283; return d < .46 ? (Math.abs(d * 7 % 1 - .5) < .08 ? .35 : .06) + Math.max(0, 1 - sw / 1.2) * .7 : 0; },
+      (u, v, t) => { const bars = 18, i = Math.floor(u * bars), h = .18 + .72 * (.5 + .5 * Math.sin(i * 1.7 + t * 1.4)) * (.4 + i / bars * .6); return (u * bars % 1) > .22 && v > 1 - h ? .35 + (v - (1 - h)) * 1.2 : .04; },
+      (u, v, t) => { const y = .55 - .25 * Math.sin(u * 8 + t) - .12 * Math.sin(u * 19 - t * 1.6); const d = Math.abs(v - y), peak = Math.exp(-Math.pow((u - (.5 + .3 * Math.sin(t * .6))) * 7, 2)); return Math.max(d < .045 ? .8 : 0, peak * (d < .3 ? .6 : 0)) + .04; },
+      (u, v, t) => { let b = .04; for (let k = 0; k < 5; k++) { const cx = .5 + .3 * Math.cos(k * 1.2566 + t * .5), cy = .5 + .3 * Math.sin(k * 1.2566 + t * .5), d = Math.hypot(u - cx, v - cy); b = Math.max(b, d < .1 ? .9 - d * 5 : 0, Math.abs(d - .13) < .01 ? .45 : 0); } return b; },
+      (u, v, t) => { const pages = [[.2, .14, .5, .7], [.28, .2, .5, .7], [.36, .26, .5, .7]]; let b = .04; pages.forEach(([l, tp, w, h], i) => { const inx = u > l && u < l + w, iny = v > tp && v < tp + h, edge = (Math.abs(u - l) < .012 || Math.abs(u - l - w) < .012) && iny || (Math.abs(v - tp) < .012 || Math.abs(v - tp - h) < .012) && inx; if (edge) b = Math.max(b, .55 + .3 * Math.sin(t * 2 + i)); if (i === 2 && inx && iny && Math.abs((v - tp) * 22 % 1 - .5) < .14 && u < l + w * (.45 + .45 * ((v * 9 + .5) % 1))) b = Math.max(b, .5); }); return b; },
+      (u, v, t) => { const k = (t * .35) % 1, on = Math.abs(v - (1 - u)) < .035, pos = Math.abs(u - k) < .06; const ring = Math.abs(Math.hypot(u - .82, v - .2) - (.07 + ((t * .5) % 1) * .12)) < .012; return Math.max(on ? .35 : 0, on && pos ? 1 : 0, ring ? .8 : 0, .04); },
+      (u, v, t) => { const a = Math.atan2(v - .5, u - .5), d = Math.hypot(u - .5, v - .5), head = (t * 1.5) % 6.283, da = ((a + 6.283 - head) % 6.283); return Math.abs(d - .3) < .025 ? .25 + Math.max(0, 1 - da / 2.2) * .75 : d < .02 ? .8 : .04; }];
+    let W = 0, H = 0, dpr = 1, cur = 0, raf = 0, t = 0, vis = false, mx = -1e4, my = -1e4, timer = 0, hover = false;
+    const size = () => { dpr = Math.min(window.devicePixelRatio || 1, 2); W = stage.clientWidth; H = stage.clientHeight; cv.width = W * dpr; cv.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0); };
+    const draw = () => {
+      x.clearRect(0, 0, W, H); t += .016; const st = 13, cols = Math.ceil(W / st), rows = Math.ceil(H / st), f = S[cur];
+      for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+        let px = (i + .5) * st, py = (j + .5) * st; const v = Math.max(0, Math.min(1.2, f(px / W, py / H, t)));
+        let a = .06 + v * .82, r = .8 + v * 2.4; const dx = px - mx, dy = py - my, d = Math.hypot(dx, dy);
+        if (d < 120) { const k = 1 - d / 120; px += dx / (d || 1) * k * 9; py += dy / (d || 1) * k * 9; a = Math.min(1, a + k * .6); r += k * 1.6; }
+        x.fillStyle = v > .45 ? `rgba(29,161,255,${Math.min(1, a)})` : `rgba(150,172,200,${a})`; x.beginPath(); x.arc(px, py, r, 0, 6.283); x.fill();
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    const show = n => {
+      cur = (n + items.length) % items.length; items.forEach((li, k) => li.classList.toggle("on", k === cur));
+      sid.textContent = `STEP ${String(cur + 1).padStart(2, "0")} · ${NAMES[cur].toUpperCase()}`;
+      tags.innerHTML = TAGS[cur].map((s, k) => `<span style="left:${POS[cur][k][0]}%;top:${POS[cur][k][1]}%;animation-delay:${k * .15 + .1}s">${esc(s)}</span>`).join("");
+    };
+    const tick = () => { clearTimeout(timer); if (reduce) return; timer = setTimeout(() => { if (!hover && vis) show(cur + 1); tick(); }, 4500); };
+    const restart = () => { acc.classList.remove("run"); void acc.offsetWidth; };
+    items.forEach((li, k) => { const go = () => { show(k); tick(); }; li.addEventListener("mouseenter", () => { hover = true; go(); }); li.addEventListener("click", go); li.addEventListener("focusin", go); li.tabIndex = 0; });
+    acc.addEventListener("mouseleave", () => { hover = false; });
+    size(); show(0);
+    if (reduce) { draw(); cancelAnimationFrame(raf); }
+    else {
+      stage.addEventListener("pointermove", e => { const r = stage.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top; });
+      stage.addEventListener("pointerleave", () => { mx = my = -1e4; });
+      new IntersectionObserver(es => { vis = es[0].isIntersecting; cancelAnimationFrame(raf); if (vis && !document.hidden) { draw(); tick(); } }).observe(stage);
+      document.addEventListener("visibilitychange", () => { cancelAnimationFrame(raf); if (!document.hidden && vis) draw(); });
+    }
+    window.addEventListener("resize", () => { size(); if (reduce) draw(); });
+  }
+
   /* ---- platform pulse in the bar under the hero ---- */
   const bar = $("#vx-pulse");
   const pulse = async () => {

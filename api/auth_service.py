@@ -19,7 +19,18 @@ _PUBLIC_EMAIL_DOMAINS = frozenset({
     "outlook.com", "live.com", "icloud.com", "proton.me", "protonmail.com",
     "aol.com", "rediffmail.com", "mail.com", "gmx.com", "zoho.com",
 })
+_LOGIN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._@+\-]{2,63}$")
 _DUMMY_PASSWORD_HASH = "pbkdf2_sha256$600000$AQEBAQEBAQEBAQEBAQEBAQ$qVMnbrzFRpnP-Sb4fsnYsDWHHcJSbJktHlJ96uK82i0"
+
+
+def clean_login_id(value) -> str:
+    """A login ID is an email or any short username the owner chooses: 3-64 letters, digits and . _ - @ +, no spaces, case-insensitive."""
+    if not isinstance(value, str):
+        raise ValueError("login ID is required")
+    login_id = value.strip().lower()
+    if not _LOGIN_ID_RE.fullmatch(login_id):
+        raise ValueError("login ID must be 3-64 characters: letters, digits and . _ - @ + (no spaces)")
+    return login_id
 
 
 def register(session: Session, email: str, password: str, full_name: str, mobile: str,
@@ -53,9 +64,9 @@ def login(session: Session, email: str, password: str) -> dict:
     user = session.query(User).filter_by(email=normalized, active=True).one_or_none()
     if user is None:
         verify_password(password, _DUMMY_PASSWORD_HASH)
-        raise PermissionError("invalid email or password")
+        raise PermissionError("invalid login ID or password")
     if not verify_password(password, user.password_hash):
-        raise PermissionError("invalid email or password")
+        raise PermissionError("invalid login ID or password")
     if not user.is_admin and user.approval_status != "approved":
         raise PermissionError("profile pending admin approval")
     if not user.is_admin and user.requested_plan:
