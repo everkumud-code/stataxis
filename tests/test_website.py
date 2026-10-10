@@ -36,7 +36,7 @@ def test_the_home_page_keeps_the_original_content_and_adds_to_it():
     assert "YouTube is a trademark of Google LLC" in home and "not endorsed by YouTube or Google" in home and "youtube.com/t/terms" in home
     # the hero is the short form the owner asked for; the tagline stays beside it
     hero = home[home.index('<section class="vx-hero">'):home.index("</section>", home.index('<section class="vx-hero">'))]
-    for phrase in ("Digital media market intelligence", "See the market.<br>Read the signal.<br>Decide.", "Measured audiences. Findings for your role. Reports you can act on.",
+    for phrase in ("Digital media market intelligence", "Stand on the right axis.<br>See what the market cannot.", "Precision audience intelligence for India’s media elite.",
                    "▶ Interactive demo", "Platform", "For media buyers", "Stat the View. <em>Axis the Viewpoint.</em>"):
         assert phrase in hero, phrase
     assert len(re.sub(r"<[^>]+>", " ", hero.split('<div class="vx-bar"')[0]).split()) < 40

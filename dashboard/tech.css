@@ -268,3 +268,7 @@ body.fx-on #vx-glow,body.fx-on #vx-ring{opacity:1}
 .vx-code-wide{position:relative;top:auto;margin-top:34px}
 @media(max-width:900px){.vx-stage{position:relative;top:auto;min-height:320px}.vx-method{gap:30px}}
 @media(prefers-reduced-motion:reduce){.vx-stage-tags span{animation:none;opacity:1;transform:none}.vx-acc li span{transition:none}}
+
+/* the home headline is two long lines: size it so each stays on one line on a wide screen */
+.vx-hero .vx-h1{font-size:clamp(36px,6.3vw,98px);max-width:none;line-height:1}
+@media(max-width:640px){.vx-hero .vx-h1{font-size:clamp(34px,10vw,52px)}}
