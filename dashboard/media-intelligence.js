@@ -20,7 +20,7 @@
     const hero = $('.stax9-hero'), copy = $('.hero-copy');
     if (!hero || !copy || hero.dataset.enhanced) return;
     hero.dataset.enhanced = '1';
-    hero.innerHTML = `<div class="stax9-visual"><div class="stax9-glow"></div><span style="display:grid;place-items:center;width:120px;height:120px;border-radius:50%;border:2px solid #12c8ff;color:#eaf7ff;font:900 64px Arial,sans-serif;box-shadow:0 0 30px #12c8ff66">9</span><span class="stax9-tag">STAX9 · EXPLORER</span></div><div class="stax9-copy"><strong>MEET STAX9</strong><p>A curious, precise intelligence companion built to look beyond the obvious.</p><span>Same data. A wider view.</span></div>`;
+    hero.innerHTML = `<div class="stax9-visual"><div class="stax9-glow"></div><img src="/assets/stax9/stax9-figure.webp" alt="STAX9, the StatAxis explorer" width="240" height="360" loading="eager" style="height:280px;width:auto;border-radius:14px"><span class="stax9-tag">STAX9 · EXPLORER</span></div><div class="stax9-copy"><strong>MEET STAX9</strong><p>A curious, precise intelligence companion built to look beyond the obvious.</p><span>Same data. A wider view.</span></div>`;
     const trust = document.createElement('blockquote');
     trust.className = 'hero-trust';
     trust.innerHTML = '<span>“</span><strong>Trust cannot be demanded.<br>It must be engineered.</strong><span>”</span>';

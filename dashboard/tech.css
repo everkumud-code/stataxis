@@ -335,3 +335,41 @@ body.fx-on #vx-glow,body.fx-on #vx-ring{opacity:1}
 .vx-q:hover:before,.vx-role:hover:before,.vx-post:hover:before,.vx-p:hover:before,.vx-dcol:hover:before,.vx-path:hover:before,.sx-card:hover:before{width:100%}
 .sx-card .num,.vx-role .t,.vx-post .t{transition:letter-spacing .4s,color .3s}.sx-card:hover .num,.vx-role:hover .t,.vx-post:hover .t{letter-spacing:.3em}
 @media(prefers-reduced-motion:reduce){.vx-det li:before,.vx-tl.go li i{animation:none}.vx-wbar .bar i{transition:none}.vx-wbar .bar i,.vx-tl:after{flex-basis:var(--w);width:var(--w)}.vx-tl:after{width:100%}.vx-stat:after{transform:none;transition:none}.vx-faq details[open] .ans{animation:none}}
+
+/* ---- STAX9, the helper: the owner's artwork, with light that moves over it ---- */
+.s9{position:fixed;left:18px;bottom:18px;z-index:1900;font-family:var(--sans,system-ui,sans-serif)}
+.s9-btn{display:flex;align-items:center;gap:10px;padding:6px 16px 6px 6px;border:1px solid rgba(29,161,255,.5);border-radius:40px;background:rgba(7,12,20,.9);color:#e8eef6;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 8px 30px rgba(0,0,0,.45);animation:s9Pulse 3.6s ease-out infinite;position:relative;transition:transform .25s,border-color .25s}
+.s9-btn:hover{transform:translateY(-3px);border-color:#1da1ff}
+.s9-av{width:48px;height:48px;border-radius:50%;border:1px solid rgba(29,161,255,.7);display:block;overflow:hidden;background:#050b14}
+.s9-av img{width:100%;height:100%;display:block;object-fit:cover;animation:s9Breathe 4s ease-in-out infinite}
+.s9-hi{font:600 13px/1 var(--mono,monospace);letter-spacing:.12em;text-transform:uppercase}
+.s9-dot{position:absolute;right:10px;top:8px;width:8px;height:8px;border-radius:50%;background:#35d399;box-shadow:0 0 10px #35d399}
+@keyframes s9Pulse{0%{box-shadow:0 8px 30px rgba(0,0,0,.45),0 0 0 0 rgba(29,161,255,.5)}70%,100%{box-shadow:0 8px 30px rgba(0,0,0,.45),0 0 0 14px rgba(29,161,255,0)}}
+@keyframes s9Breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+.s9.nudge .s9-av,.s9.nudge .s9-hi{animation:s9Wiggle .9s ease-in-out 3}
+@keyframes s9Wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+.s9-panel{position:absolute;left:0;bottom:70px;width:min(400px,calc(100vw - 36px));max-height:calc(100vh - 110px);overflow:auto;border:1px solid rgba(29,161,255,.45);border-radius:18px;background:linear-gradient(180deg,#0a1220,#05090f);box-shadow:0 24px 70px rgba(0,0,0,.65);animation:s9In .45s cubic-bezier(.2,.8,.2,1)}
+.s9-panel[hidden]{display:none}
+@keyframes s9In{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
+.s9-x{position:absolute;right:10px;top:8px;z-index:3;width:30px;height:30px;border:0;background:rgba(5,9,15,.6);color:#c6d2e0;font-size:22px;cursor:pointer;border-radius:50%}.s9-x:hover{color:#fff;background:rgba(255,255,255,.12)}
+.s9-fig{position:relative;height:300px;overflow:hidden;background:#07101b;border-radius:18px 18px 0 0}
+.s9-stage{position:relative;height:100%;aspect-ratio:2/3;margin:0 auto;transform-style:preserve-3d;transition:transform .25s ease-out;animation:s9Float 5s ease-in-out infinite}
+.s9-stage img{height:100%;width:100%;display:block;object-fit:cover}
+@keyframes s9Float{0%,100%{translate:0 0;scale:1}50%{translate:0 -4px;scale:1.012}}
+.s9-g{position:absolute;border-radius:50%;pointer-events:none;mix-blend-mode:screen;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(120,210,255,.95),rgba(29,161,255,.35) 45%,transparent 70%);animation:s9Glow 2.6s ease-in-out infinite}
+.s9-eyeL{left:46.9%;top:15%;width:13%;height:8.7%}.s9-eyeR{left:56.2%;top:15.6%;width:10%;height:6.8%;animation-delay:.2s}
+.s9-nine{left:53.6%;top:27.3%;width:9%;height:6%;animation-delay:.5s}.s9-hub{left:79.7%;top:18.6%;width:12%;height:8%;animation-delay:.9s}
+.s9-tip{left:74.4%;top:85.5%;width:9%;height:14%;border-radius:40%;animation-delay:1.3s}
+@keyframes s9Glow{0%,100%{opacity:.18;transform:translate(-50%,-50%) scale(.85)}50%{opacity:.85;transform:translate(-50%,-50%) scale(1.15)}}
+.s9-scan{position:absolute;left:0;right:0;top:0;height:22%;pointer-events:none;background:linear-gradient(180deg,transparent,rgba(29,161,255,.16),transparent);animation:s9Scan 4.5s linear infinite}
+@keyframes s9Scan{from{transform:translateY(-120%)}to{transform:translateY(520%)}}
+.s9-body{padding:14px 20px 20px}.s9-body b{display:block;font-size:24px;letter-spacing:-.02em;color:#fff}
+.s9-body em{display:block;font:500 10.5px/1.6 var(--mono,monospace);letter-spacing:.2em;text-transform:uppercase;color:#1da1ff;font-style:normal;margin-bottom:10px}
+.s9-traits{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}.s9-traits span{font:500 10.5px/1 var(--mono,monospace);letter-spacing:.12em;text-transform:uppercase;padding:6px 9px;border:1px solid rgba(29,161,255,.35);border-radius:4px;color:#9fb0c4}
+.s9-say{margin:0 0 14px;min-height:3.2em;font-size:15.5px;line-height:1.55;color:#c6d2e0}
+.s9-links{display:flex;flex-wrap:wrap;gap:8px}
+.s9-links a{padding:9px 13px;border:1px solid rgba(29,161,255,.4);border-radius:30px;font-size:13px;color:#e8eef6;text-decoration:none;transition:background .25s,transform .25s}.s9-links a i{font-style:normal;color:#1da1ff;margin-left:2px;display:inline-block;transition:transform .25s}
+.s9-links a:hover{background:rgba(29,161,255,.16);transform:translateY(-2px)}.s9-links a:hover i{transform:translateX(3px)}
+.s9-body small{display:block;margin-top:16px;font-size:12px;color:#6c7b90;font-style:italic;line-height:1.5}
+@media(prefers-reduced-motion:reduce){.s9 *,.s9-btn,.s9-panel{animation:none!important;transition:none!important}.s9-g{opacity:.5}}
+@media(max-width:560px){.s9{left:12px;bottom:12px}.s9-hi{display:none}.s9-btn{padding:5px}.s9-fig{height:240px}}
