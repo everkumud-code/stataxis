@@ -123,6 +123,12 @@ input::placeholder{color:#59738a}
 .pkg td{padding:6px 8px}
 .pkg input:not([type=checkbox]),input[type=number]{background:#091a29;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
 .msg{padding:10px 12px;border-radius:8px;margin-top:12px;background:#0b2032}
+.pwdlg{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--text);padding:22px;width:min(420px,calc(100vw - 32px))}
+.pwdlg::backdrop{background:rgba(2,8,16,.7)}
+.pwdlg h2{margin:0 0 4px;font-size:18px}.pwdlg p.hint{margin:0 0 14px;color:var(--muted);font-size:13px}
+.pwdlg label{display:grid;gap:4px;margin-top:12px;color:var(--muted);font-size:12.5px}
+.pwdlg input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:#071727;color:var(--text);font:inherit}
+.pwdlg .btnrow{display:flex;gap:10px;margin-top:16px;justify-content:flex-end}
 .msg.ok{color:var(--green)}.msg.bad{color:var(--red)}
 input[type=number],input[type=text]{min-width:0}
 
@@ -175,8 +181,21 @@ input[type=number],input[type=text]{min-width:0}
   <div class="logo">STATAXIS<small>Intelligence workspace</small></div>
   <span class="plan" id="plan" hidden></span>
   <div class="who" id="who"></div>
+  <button class="btn" id="chpw" type="button">Change password</button>
   <button class="btn" id="signout" type="button">Sign out</button>
 </header>
+
+<dialog class="pwdlg" id="pwdlg" aria-labelledby="pwtitle">
+  <form id="pwform" method="dialog" autocomplete="off">
+    <h2 id="pwtitle">Change password</h2>
+    <p class="hint">Use at least 12 characters. You stay signed in on this device.</p>
+    <label>Current password<input type="password" name="current_password" required autocomplete="current-password"></label>
+    <label>New password<input type="password" name="new_password" required minlength="12" maxlength="256" autocomplete="new-password"></label>
+    <label>Repeat new password<input type="password" name="confirm" required minlength="12" maxlength="256" autocomplete="new-password"></label>
+    <div id="pwmsg" class="msg" aria-live="polite" hidden></div>
+    <div class="btnrow"><button class="btn" type="button" id="pwcancel">Cancel</button><button class="btn primary" type="submit" id="pwsave">Change password</button></div>
+  </form>
+</dialog>
 
 <div class="layout">
   <nav class="side" id="nav" aria-label="Workspace sections"></nav>
@@ -806,6 +825,30 @@ async function render() {
 }
 window.addEventListener("hashchange", () => { render(); $("#view").focus({preventScroll: true}); });
 $("#signout").onclick = signOut;
+
+/* ---------- change my own password ---------- */
+const pwDialog = $("#pwdlg"), pwForm = $("#pwform"), pwMsg = $("#pwmsg");
+const pwSay = (text, ok) => { pwMsg.hidden = !text; pwMsg.textContent = text || ""; pwMsg.className = "msg " + (ok ? "ok" : "bad"); };
+$("#chpw").onclick = () => { pwForm.reset(); pwSay(""); if (pwDialog.showModal) pwDialog.showModal(); else pwDialog.setAttribute("open", ""); pwForm.elements.current_password.focus(); };
+$("#pwcancel").onclick = () => pwDialog.close();
+pwForm.onsubmit = async ev => {
+  ev.preventDefault();
+  const f = pwForm.elements, btn = $("#pwsave");
+  if (f.new_password.value.length < 12) return pwSay("The new password must be at least 12 characters.");
+  if (f.new_password.value !== f.confirm.value) return pwSay("The two new passwords are not the same.");
+  if (f.new_password.value === f.current_password.value) return pwSay("The new password must be different from the current one.");
+  btn.disabled = true; pwSay("Saving…", true);
+  try {
+    const res = await fetch("/api/v1/auth/change-password", {method: "POST", headers: {"Content-Type": "application/json", Authorization: "Bearer " + token()},
+      body: JSON.stringify({current_password: f.current_password.value, new_password: f.new_password.value})});
+    let d = null; try { d = await res.json(); } catch { /* non-JSON body */ }
+    if (res.status === 401) { signOut(); return; }
+    if (!res.ok) throw new Error(res.status === 429 ? "Too many tries. Please wait a few minutes and try again." : (d && d.error) || "Could not change the password.");
+    pwForm.reset(); pwSay("Password changed. Use the new password next time you sign in.", true);
+    setTimeout(() => { if (pwDialog.open) pwDialog.close(); }, 1800);
+  } catch (e) { pwSay(e.message); }
+  btn.disabled = false;
+};
 
 (async function boot() {
   if (!acct) return;
