@@ -8,6 +8,17 @@
   const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
   const fmt = n => isFinite(n) ? Number(n).toLocaleString("en-IN") : "—";
 
+  /* ---- the scenes: each returns how bright a dot at (u, v) should be at time t; the method stage and the page headers both use them ---- */
+  const SCENES = [
+      (u, v, t) => { const k = (v * 6 - t * 1.6 + Math.sin(u * 14) * 1.2) % 1; const col = Math.abs(Math.sin(u * 17.3)) > .55; return col ? Math.max(0, 1 - Math.abs(((k + 1) % 1) - .5) * 4) : .04; },
+      (u, v, t) => { const a = Math.atan2(v - .5, u - .5), d = Math.hypot(u - .5, v - .5); const sw = ((a - t * 1.8) % 6.283 + 6.283) % 6.283; return d < .46 ? (Math.abs(d * 7 % 1 - .5) < .08 ? .35 : .06) + Math.max(0, 1 - sw / 1.2) * .7 : 0; },
+      (u, v, t) => { const bars = 18, i = Math.floor(u * bars), h = .18 + .72 * (.5 + .5 * Math.sin(i * 1.7 + t * 1.4)) * (.4 + i / bars * .6); return (u * bars % 1) > .22 && v > 1 - h ? .35 + (v - (1 - h)) * 1.2 : .04; },
+      (u, v, t) => { const y = .55 - .25 * Math.sin(u * 8 + t) - .12 * Math.sin(u * 19 - t * 1.6); const d = Math.abs(v - y), peak = Math.exp(-Math.pow((u - (.5 + .3 * Math.sin(t * .6))) * 7, 2)); return Math.max(d < .045 ? .8 : 0, peak * (d < .3 ? .6 : 0)) + .04; },
+      (u, v, t) => { let b = .04; for (let k = 0; k < 5; k++) { const cx = .5 + .3 * Math.cos(k * 1.2566 + t * .5), cy = .5 + .3 * Math.sin(k * 1.2566 + t * .5), d = Math.hypot(u - cx, v - cy); b = Math.max(b, d < .1 ? .9 - d * 5 : 0, Math.abs(d - .13) < .01 ? .45 : 0); } return b; },
+      (u, v, t) => { const pages = [[.2, .14, .5, .7], [.28, .2, .5, .7], [.36, .26, .5, .7]]; let b = .04; pages.forEach(([l, tp, w, h], i) => { const inx = u > l && u < l + w, iny = v > tp && v < tp + h, edge = (Math.abs(u - l) < .012 || Math.abs(u - l - w) < .012) && iny || (Math.abs(v - tp) < .012 || Math.abs(v - tp - h) < .012) && inx; if (edge) b = Math.max(b, .55 + .3 * Math.sin(t * 2 + i)); if (i === 2 && inx && iny && Math.abs((v - tp) * 22 % 1 - .5) < .14 && u < l + w * (.45 + .45 * ((v * 9 + .5) % 1))) b = Math.max(b, .5); }); return b; },
+      (u, v, t) => { const k = (t * .35) % 1, on = Math.abs(v - (1 - u)) < .035, pos = Math.abs(u - k) < .06; const ring = Math.abs(Math.hypot(u - .82, v - .2) - (.07 + ((t * .5) % 1) * .12)) < .012; return Math.max(on ? .35 : 0, on && pos ? 1 : 0, ring ? .8 : 0, .04); },
+      (u, v, t) => { const a = Math.atan2(v - .5, u - .5), d = Math.hypot(u - .5, v - .5), head = (t * 1.5) % 6.283, da = ((a + 6.283 - head) % 6.283); return Math.abs(d - .3) < .025 ? .25 + Math.max(0, 1 - da / 2.2) * .75 : d < .02 ? .8 : .04; }];
+
   /* ---- start-up counter: once a session, only on the home page, never for those who want less motion ---- */
   const home = location.pathname === "/" || location.pathname.endsWith("/index.html");
   let seen = false; try { seen = sessionStorage.getItem("sx_boot") === "1"; sessionStorage.setItem("sx_boot", "1"); } catch (e) { /* storage blocked */ }
@@ -113,15 +124,7 @@
       ["Media company", "Buyer · Campaign", "Creator · Audience"], ["Branded PDF", "Findings first", "Method last"], ["Plan the spend", "Choose the messenger", "Open the tool"], ["Reviewer decision", "Kept on record", "Shapes the next report"]];
     const POS = [[[56, 16], [10, 52], [52, 80]], [[58, 14], [8, 46], [54, 82]], [[10, 14], [56, 46], [20, 80]], [[8, 18], [54, 50], [14, 80]], [[56, 12], [6, 48], [52, 82]], [[10, 16], [54, 44], [18, 82]], [[8, 14], [52, 48], [12, 82]], [[54, 14], [6, 50], [48, 82]]];
     // each scene returns how bright a dot at (u, v) in 0..1 should be, and whether it is "hot" (blue) at time t
-    const S = [
-      (u, v, t) => { const k = (v * 6 - t * 1.6 + Math.sin(u * 14) * 1.2) % 1; const col = Math.abs(Math.sin(u * 17.3)) > .55; return col ? Math.max(0, 1 - Math.abs(((k + 1) % 1) - .5) * 4) : .04; },
-      (u, v, t) => { const a = Math.atan2(v - .5, u - .5), d = Math.hypot(u - .5, v - .5); const sw = ((a - t * 1.8) % 6.283 + 6.283) % 6.283; return d < .46 ? (Math.abs(d * 7 % 1 - .5) < .08 ? .35 : .06) + Math.max(0, 1 - sw / 1.2) * .7 : 0; },
-      (u, v, t) => { const bars = 18, i = Math.floor(u * bars), h = .18 + .72 * (.5 + .5 * Math.sin(i * 1.7 + t * 1.4)) * (.4 + i / bars * .6); return (u * bars % 1) > .22 && v > 1 - h ? .35 + (v - (1 - h)) * 1.2 : .04; },
-      (u, v, t) => { const y = .55 - .25 * Math.sin(u * 8 + t) - .12 * Math.sin(u * 19 - t * 1.6); const d = Math.abs(v - y), peak = Math.exp(-Math.pow((u - (.5 + .3 * Math.sin(t * .6))) * 7, 2)); return Math.max(d < .045 ? .8 : 0, peak * (d < .3 ? .6 : 0)) + .04; },
-      (u, v, t) => { let b = .04; for (let k = 0; k < 5; k++) { const cx = .5 + .3 * Math.cos(k * 1.2566 + t * .5), cy = .5 + .3 * Math.sin(k * 1.2566 + t * .5), d = Math.hypot(u - cx, v - cy); b = Math.max(b, d < .1 ? .9 - d * 5 : 0, Math.abs(d - .13) < .01 ? .45 : 0); } return b; },
-      (u, v, t) => { const pages = [[.2, .14, .5, .7], [.28, .2, .5, .7], [.36, .26, .5, .7]]; let b = .04; pages.forEach(([l, tp, w, h], i) => { const inx = u > l && u < l + w, iny = v > tp && v < tp + h, edge = (Math.abs(u - l) < .012 || Math.abs(u - l - w) < .012) && iny || (Math.abs(v - tp) < .012 || Math.abs(v - tp - h) < .012) && inx; if (edge) b = Math.max(b, .55 + .3 * Math.sin(t * 2 + i)); if (i === 2 && inx && iny && Math.abs((v - tp) * 22 % 1 - .5) < .14 && u < l + w * (.45 + .45 * ((v * 9 + .5) % 1))) b = Math.max(b, .5); }); return b; },
-      (u, v, t) => { const k = (t * .35) % 1, on = Math.abs(v - (1 - u)) < .035, pos = Math.abs(u - k) < .06; const ring = Math.abs(Math.hypot(u - .82, v - .2) - (.07 + ((t * .5) % 1) * .12)) < .012; return Math.max(on ? .35 : 0, on && pos ? 1 : 0, ring ? .8 : 0, .04); },
-      (u, v, t) => { const a = Math.atan2(v - .5, u - .5), d = Math.hypot(u - .5, v - .5), head = (t * 1.5) % 6.283, da = ((a + 6.283 - head) % 6.283); return Math.abs(d - .3) < .025 ? .25 + Math.max(0, 1 - da / 2.2) * .75 : d < .02 ? .8 : .04; }];
+    const S = SCENES;
     let W = 0, H = 0, dpr = 1, cur = 0, raf = 0, t = 0, vis = false, mx = -1e4, my = -1e4, timer = 0, hover = false;
     const size = () => { dpr = Math.min(window.devicePixelRatio || 1, 2); W = stage.clientWidth; H = stage.clientHeight; cv.width = W * dpr; cv.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0); };
     const draw = () => {
@@ -227,6 +230,44 @@
     window.addEventListener("pointermove", e => { if (!down) return; const dx = e.clientX - sx; if (Math.abs(dx) > 4) { moved = true; s.classList.add("drag"); } s.scrollLeft = sl - dx; });
     window.addEventListener("pointerup", () => { down = false; s.classList.remove("drag"); });
     s.addEventListener("click", e => { if (moved) e.preventDefault(); }, true);
+  });
+
+  /* ---- depth and motion for every page: staggered reveals, count-up figures, header scenes, a timeline that draws itself ---- */
+  $$(".sx-card,.sx-band,.sx-section-head,.sx-hero > *:not(.vx-scene),.vx-det li,.vx-dcol,.vx-path").forEach(el => el.classList.add("rv"));
+  new Set($$(".rv").map(el => el.parentElement)).forEach(par => {
+    const kids = [...par.children].filter(c => c.classList.contains("rv"));
+    if (kids.length > 1) kids.forEach((c, i) => { if (!c.style.transitionDelay) c.style.transitionDelay = Math.min(i * 70, 420) + "ms"; });
+  });
+  const countUp = el => {
+    const n = +el.dataset.count, t0 = performance.now(), dur = 1300;
+    if (reduce) { el.textContent = fmt(n); return; }
+    const tick = t => { const k = Math.min(1, (t - t0) / dur), v = Math.round(n * (1 - Math.pow(1 - k, 3))); el.textContent = fmt(v); if (k < 1) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  };
+  const watch = (sel, fn) => { const els = $$(sel); if (!els.length) return; if (!("IntersectionObserver" in window)) { els.forEach(fn); return; } const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { fn(e.target); io.unobserve(e.target); } }), {threshold: .3}); els.forEach(e => io.observe(e)); };
+  watch("[data-count]", countUp);
+  watch(".vx-tl, .vx-wbar", el => el.classList.add("go"));
+  $$(".vx-scene[data-scene]").forEach(box => {
+    const cv = $("canvas", box), fn = SCENES[+box.dataset.scene] || SCENES[0], x = cv.getContext("2d"), host = box.parentElement;
+    let W = 0, H = 0, dpr = 1, raf = 0, t = Math.random() * 20, vis = false, mx = -1e4, my = -1e4;
+    const size = () => { dpr = Math.min(window.devicePixelRatio || 1, 2); W = box.clientWidth; H = box.clientHeight; cv.width = W * dpr; cv.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0); };
+    const draw = () => {
+      x.clearRect(0, 0, W, H); t += .016; const st = 14, cols = Math.ceil(W / st), rows = Math.ceil(H / st);
+      for (let i = 0; i < cols; i++) for (let k = 0; k < rows; k++) {
+        let px = (i + .5) * st, py = (k + .5) * st; const v = Math.max(0, Math.min(1.2, fn(px / W, py / H, t))); let a = .05 + v * .8, r = .8 + v * 2.2;
+        const dx = px - mx, dy = py - my, d = Math.hypot(dx, dy);
+        if (d < 110) { const f = 1 - d / 110; px += dx / (d || 1) * f * 8; py += dy / (d || 1) * f * 8; a = Math.min(1, a + f * .6); r += f * 1.5; }
+        x.fillStyle = v > .45 ? `rgba(29,161,255,${Math.min(1, a)})` : `rgba(150,172,200,${a})`; x.beginPath(); x.arc(px, py, r, 0, 6.283); x.fill();
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    size();
+    if (reduce) { draw(); cancelAnimationFrame(raf); return; }
+    host.addEventListener("pointermove", e => { const r = box.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top; });
+    host.addEventListener("pointerleave", () => { mx = my = -1e4; });
+    new IntersectionObserver(es => { vis = es[0].isIntersecting; cancelAnimationFrame(raf); if (vis && !document.hidden) draw(); }).observe(box);
+    document.addEventListener("visibilitychange", () => { cancelAnimationFrame(raf); if (!document.hidden && vis) draw(); });
+    window.addEventListener("resize", size);
   });
 
   /* ---- reveal on scroll ---- */

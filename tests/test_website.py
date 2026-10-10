@@ -122,3 +122,25 @@ def test_the_cursor_drops_letters_and_numbers_from_its_tail_only_for_a_mouse_and
     tech, css = text(DASH / "tech.js"), text(DASH / "tech.css")
     assert "data rain" in tech and "vx-trail" in tech and "pointer:fine" in tech and "reduce" in tech
     assert ".vx-trail{position:fixed" in css and "pointer-events:none" in css
+
+
+@pytest.mark.parametrize("name", ["platform.html", "solutions.html", "research.html", "stx.html", "insights.html", "ifx.html"])
+def test_every_sub_page_has_a_scene_figures_that_count_up_and_a_faq(name):
+    html = text(DASH / name)
+    assert 'class="vx-scene"' in html and "data-count=" in html and 'class="vx-faq"' in html and "vx-dcol" in html or "vx-paths" in html
+
+
+def test_the_coverage_plan_is_stated_the_way_the_owner_gave_it_and_the_weights_add_up():
+    plat = text(DASH / "platform.html")
+    for phrase in ("Jan 2027", "Instagram and Facebook", "Jul 2027", "Connected TV", "subject to the platform"):
+        assert phrase in plat, phrase
+    stx = text(DASH / "stx.html")
+    assert sum(int(x) for x in re.findall(r"<em>(\d+)%</em>", stx)) == 100
+    assert sum(int(x) for x in re.findall(r"<em>(\d+)%</em>", text(DASH / "ifx.html"))) == 100
+
+
+def test_the_scripts_define_the_scenes_the_pages_ask_for():
+    tech = text(DASH / "tech.js")
+    assert "const SCENES = [" in tech and tech.count("(u, v, t) =>") >= 8
+    wanted = {int(n) for name in PAGES for n in re.findall(r'data-scene="(\d+)"', text(DASH / name))}
+    assert wanted and max(wanted) < tech.count("(u, v, t) =>")
