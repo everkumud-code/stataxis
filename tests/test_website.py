@@ -34,7 +34,7 @@ def test_each_public_page_has_the_look_a_title_a_description_and_the_shared_chro
 def test_the_home_page_keeps_its_promises():
     home = text(DASH / "index.html")
     assert "YouTube is a trademark of Google LLC" in home and "not endorsed by YouTube or Google" in home and "youtube.com/t/terms" in home
-    for needle in ("Know who India is", "IFX Score", "Authenticity radar", "tx-matrix", "vx-pulse", "Verified audience programme", "/blog/average-beats-peak.html"):
+    for needle in ("Stat the View.", "Axis the <em>Viewpoint.</em>", "Know who India is watching, before you spend", "IFX Score", "Authenticity radar", "tx-matrix", "vx-pulse", "Verified audience programme", "/blog/average-beats-peak.html"):
         assert needle in home
     assert home.count('id="vx-pulse"') == 1 and home.count("Choose where you want to go") == 0   # the duplicated access section is gone
 
