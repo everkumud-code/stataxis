@@ -31,12 +31,34 @@ def test_each_public_page_has_the_look_a_title_a_description_and_the_shared_chro
     assert html.count("<h1") == 1
 
 
-def test_the_home_page_keeps_its_promises():
+def test_the_home_page_keeps_the_original_content_and_adds_to_it():
     home = text(DASH / "index.html")
     assert "YouTube is a trademark of Google LLC" in home and "not endorsed by YouTube or Google" in home and "youtube.com/t/terms" in home
-    for needle in ("Stat the View.", "Axis the <em>Viewpoint.</em>", "Know who India is watching, before you spend", "IFX Score", "Authenticity radar", "tx-matrix", "vx-pulse", "Verified audience programme", "/blog/average-beats-peak.html"):
-        assert needle in home
-    assert home.count('id="vx-pulse"') == 1 and home.count("Choose where you want to go") == 0   # the duplicated access section is gone
+    # the original hero text is untouched and the tagline sits beside it
+    for original in ("DIGITAL MEDIA MARKET INTELLIGENCE & DATA SERVICES", "See the market.<br>Understand the signal.<br>Make better decisions.",
+                     "StatAxis brings measurement, market intelligence, research and custom data services together for businesses, media buyers, agencies, publishers and research teams.",
+                     "Explore Interactive Demo", "Explore Platform", "For Corporates & Media Buyers", "Stat the View. <em>Axis the Viewpoint.</em>"):
+        assert original in home or original.replace("&", "&amp;") in home, original
+    # the original sections are all still there, word for word
+    for original in ("From evidence to decision intelligence.", "OBSERVE → MEASURE → COMPARE → EXPLAIN", "One intelligence layer. Multiple media surfaces.", "Insights & research become part of the product.",
+                     "Intelligence Platform", "Media Buyer Intelligence", "YouTube data, clearly identified.", "Choose where you want to go.", "Admin Console"):
+        assert original in home or original.replace("&", "&amp;") in home, original
+    assert home.count("Choose where you want to go.") == 1 and home.count("YouTube data, clearly identified.") == 1
+    # and the new sections are added
+    for addition in ("IFX Score", "Authenticity radar", "tx-matrix", "vx-pulse", "Verified audience programme", "/blog/average-beats-peak.html", "Eleven questions"):
+        assert addition in home, addition
+
+
+def test_the_other_original_pages_keep_their_words():
+    expect = {"platform.html": ("One place to understand the digital media market.", "DATA → ANALYSIS → STATAXIS VIEW", "Data organised around the questions users actually ask."),
+              "solutions.html": ("Data that supports the decision.", "Built for teams that need evidence.", "Channel benchmarking", "Industry reports"),
+              "research.html": ("Digital signals, market evidence and human answers.", "Perspective matters.", "IIM Calcutta"),
+              "stx.html": ("STX Index™ turns multiple signals into one qualified view.", "Seven weighted components.", "Missing is not zero"),
+              "insights.html": ("The market, explained with evidence.", "How to read a digital media market", "From digital video to social and CTV")}
+    for name, phrases in expect.items():
+        html = text(DASH / name)
+        for ph in phrases:
+            assert ph in html, f"{name}: {ph}"
 
 
 def test_every_internal_link_and_script_lands_on_a_file():

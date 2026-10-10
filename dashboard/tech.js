@@ -25,7 +25,7 @@
   if (hero) {
     const c = $("canvas", hero), rd = $("#vx-xy");
     if (c && !reduce) {
-      const x = c.getContext("2d"); let W = 0, H = 0, dpr = 1, mx = -1e4, my = -1e4, raf = 0, t = 0, vis = true;
+      const x = c.getContext("2d"); let W = 0, H = 0, dpr = 1, mx = -1e4, my = -1e4, raf = 0, t = 0, vis = true; const ripples = [];
       const size = () => { dpr = Math.min(window.devicePixelRatio || 1, 2); W = hero.clientWidth; H = hero.clientHeight; c.width = W * dpr; c.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0); };
       const step = 24;
       const draw = () => {
@@ -39,14 +39,17 @@
           let a = (.05 + w * .5) * side + .025, r = 1.15 + w * 1.4 * side;
           const dx = px - mx, dy = py - my, d = Math.hypot(dx, dy);
           if (d < 150) { const f = 1 - d / 150; px += dx / (d || 1) * f * 18; py += dy / (d || 1) * f * 18; a = Math.min(1, a + f * .9); r += f * 2.2; }
-          x.fillStyle = d < 150 ? `rgba(29,161,255,${a})` : `rgba(165,185,210,${a})`;
+          for (const rp of ripples) { const dr = Math.abs(Math.hypot(px - rp.x, py - rp.y) - rp.r); if (dr < 46) { const f = 1 - dr / 46; a = Math.min(1, a + f * .85); r += f * 2.4; } }
+          x.fillStyle = d < 150 || a > .6 ? `rgba(29,161,255,${a})` : `rgba(165,185,210,${a})`;
           x.beginPath(); x.arc(px, py, r, 0, 6.283); x.fill();
         }
+        for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].r += 9; if (ripples[i].r > Math.max(W, H) * 1.1) ripples.splice(i, 1); }
         raf = requestAnimationFrame(draw);
       };
       size(); draw();
       hero.addEventListener("pointermove", e => { const r = hero.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top; if (rd) rd.textContent = `X ${(mx / r.width).toFixed(3)} Y ${(my / r.height).toFixed(3)}`; });
       hero.addEventListener("pointerleave", () => { mx = my = -1e4; });
+      hero.addEventListener("pointerdown", e => { const r = hero.getBoundingClientRect(); ripples.push({x: e.clientX - r.left, y: e.clientY - r.top, r: 0}); });
       window.addEventListener("resize", size);
       new IntersectionObserver(es => { vis = es[0].isIntersecting; cancelAnimationFrame(raf); if (vis && !document.hidden) draw(); }).observe(hero);
       document.addEventListener("visibilitychange", () => { cancelAnimationFrame(raf); if (!document.hidden && vis) draw(); });
@@ -95,6 +98,48 @@
 
   /* ---- bars that breathe ---- */
   $$(".vx-bars").forEach(b => { if (!b.children.length) b.innerHTML = Array.from({length: 18}, (_, i) => `<i style="height:${30 + Math.round(Math.abs(Math.sin(i * .8)) * 60)}%;animation-delay:${(-i * .23).toFixed(2)}s"></i>`).join(""); });
+
+
+  /* ---- mouse and hover effects: only with a real pointer, never when motion is unwanted ---- */
+  const finePointer = window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  if (!reduce) {
+    const bar = document.createElement("div"); bar.id = "vx-progress"; document.body.appendChild(bar);
+    const prog = () => { const h = document.documentElement.scrollHeight - innerHeight; bar.style.transform = `scaleX(${h > 0 ? Math.min(1, scrollY / h) : 0})`; };
+    addEventListener("scroll", prog, {passive: true}); addEventListener("resize", prog); prog();
+  }
+  if (finePointer && !reduce) {
+    const glow = document.createElement("div"), ring = document.createElement("div"); glow.id = "vx-glow"; ring.id = "vx-ring"; ring.setAttribute("aria-hidden", "true"); glow.setAttribute("aria-hidden", "true");
+    document.body.append(glow, ring);
+    let tx = -1e3, ty = -1e3, gx = tx, gy = ty, cx = tx, cy = ty, on = false;
+    const loop = () => { gx += (tx - gx) * .08; gy += (ty - gy) * .08; cx += (tx - cx) * .28; cy += (ty - cy) * .28;
+      glow.style.transform = `translate(${gx}px,${gy}px)`; ring.style.transform = `translate(${cx}px,${cy}px)`; requestAnimationFrame(loop); };
+    requestAnimationFrame(loop);
+    const PANELS = ".vx-prod,.vx-role,.vx-post,.vx-q,.vx-p,.vx-edge,.sx-card,.sx-band,.vx-partner";
+    const TILT = ".vx-q,.vx-role,.vx-post,.sx-card";
+    const BTNS = ".vx-btn,.sx-btn,.vx-menu a.cta";
+    document.querySelectorAll(PANELS).forEach(p => p.classList.add("fx"));
+    document.addEventListener("pointermove", e => {
+      tx = e.clientX; ty = e.clientY; if (!on) { on = true; document.body.classList.add("fx-on"); }
+      const t = e.target.closest ? e.target : e.target.parentElement; if (!t) return;
+      ring.classList.toggle("big", !!t.closest("a,button,.vx-q,.vx-prod,.vx-post,.vx-role"));
+      ring.classList.toggle("dot", !!t.closest("input,textarea,select,.vx-code"));
+      const panel = t.closest(PANELS);
+      if (panel) {
+        const r = panel.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+        panel.style.setProperty("--mx", x + "px"); panel.style.setProperty("--my", y + "px");
+        if (panel.matches(TILT)) { panel.style.setProperty("--ry", ((x / r.width - .5) * 7).toFixed(2) + "deg"); panel.style.setProperty("--rx", ((.5 - y / r.height) * 6).toFixed(2) + "deg"); }
+      }
+      const b = t.closest(BTNS);
+      if (b) { const r = b.getBoundingClientRect(); b.style.transform = `translate(${((e.clientX - r.left) / r.width - .5) * 10}px,${((e.clientY - r.top) / r.height - .5) * 8}px)`; }
+    }, {passive: true});
+    document.addEventListener("pointerout", e => {
+      const from = e.target.closest ? e.target : null; if (!from) return;
+      const panel = from.closest(PANELS); if (panel && !panel.contains(e.relatedTarget)) { panel.style.setProperty("--rx", "0deg"); panel.style.setProperty("--ry", "0deg"); }
+      const b = from.closest(BTNS); if (b && !b.contains(e.relatedTarget)) b.style.transform = "";
+    });
+    document.documentElement.addEventListener("pointerleave", () => { on = false; document.body.classList.remove("fx-on"); });
+    document.addEventListener("pointerdown", () => { ring.classList.add("dot"); }); document.addEventListener("pointerup", () => { ring.classList.remove("dot"); });
+  }
 
   /* ---- apply links keep the role and package the visitor picked ---- */
   const q = new URLSearchParams(location.search);
