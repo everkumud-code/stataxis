@@ -116,3 +116,9 @@ def test_footer_wordmark_method_stage_and_radar_are_wired():
     for phrase in ("Prior written permission from StatAxis", "not sourced from, provided by or endorsed by YouTube"):
         assert phrase in site, phrase
     assert ".vx-art .radar svg" in css
+
+
+def test_the_cursor_drops_letters_and_numbers_from_its_tail_only_for_a_mouse_and_never_for_reduced_motion():
+    tech, css = text(DASH / "tech.js"), text(DASH / "tech.css")
+    assert "data rain" in tech and "vx-trail" in tech and "pointer:fine" in tech and "reduce" in tech
+    assert ".vx-trail{position:fixed" in css and "pointer-events:none" in css

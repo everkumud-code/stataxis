@@ -154,6 +154,48 @@
     window.addEventListener("resize", () => { size(); if (reduce) draw(); });
   }
 
+  /* ---- data rain: move the mouse and letters and numbers drop from its tail, then fade as they fall ---- */
+  if (!reduce && window.matchMedia && window.matchMedia("(pointer:fine)").matches && !$(".vx-trail")) {
+    const cv = document.createElement("canvas"); cv.className = "vx-trail"; cv.setAttribute("aria-hidden", "true"); document.body.appendChild(cv);
+    const g = cv.getContext("2d"); let W = 0, H = 0, dpr = 1, raf = 0, lx = null, ly = null, carry = 0; const bits = [];
+    const POOL = "0123456789STATAXIS0123456789ABCDEFGHJKMNPRVWXYZ%+▲▼·#";
+    const size = () => { dpr = Math.min(window.devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0); };
+    const spawn = (x, y) => {
+      if (bits.length > 220) bits.shift();
+      bits.push({x: x + (Math.random() - .5) * 10, y: y + (Math.random() - .5) * 8, vx: (Math.random() - .5) * .7, vy: .2 + Math.random() * .7, life: 0, max: 55 + Math.random() * 60,
+        ch: POOL[(Math.random() * POOL.length) | 0], fs: 11 + Math.random() * 6, blue: Math.random() < .55});
+    };
+    const frame = () => {
+      g.clearRect(0, 0, W, H);
+      for (let i = bits.length - 1; i >= 0; i--) {
+        const b = bits[i]; b.life++; b.vy += .085; b.x += b.vx; b.y += b.vy;
+        if (b.life > b.max || b.y > H + 20) { bits.splice(i, 1); continue; }
+        const k = b.life / b.max, a = (k < .12 ? k / .12 : 1 - Math.pow((k - .12) / .88, 1.4)) * .95;
+        g.font = `500 ${b.fs}px ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace`;
+        g.fillStyle = b.blue ? `rgba(29,161,255,${a})` : `rgba(226,236,248,${a * .85})`;
+        if (k < .1) { g.shadowColor = "rgba(29,161,255,.9)"; g.shadowBlur = 8; } else g.shadowBlur = 0;
+        g.fillText(b.ch, b.x, b.y);
+      }
+      g.shadowBlur = 0;
+      raf = bits.length ? requestAnimationFrame(frame) : 0;
+    };
+    const wake = () => { if (!raf && !document.hidden) raf = requestAnimationFrame(frame); };
+    window.addEventListener("pointermove", e => {
+      if (e.pointerType && e.pointerType !== "mouse") return;
+      const x = e.clientX, y = e.clientY;
+      if (lx != null) {
+        const dx = x - lx, dy = y - ly, d = Math.hypot(dx, dy); carry += d;
+        // one glyph for every ~16px of travel, placed along the path just travelled: that is the tail
+        while (carry >= 16) { carry -= 16; const t = Math.max(0, 1 - carry / (d || 1)); spawn(lx + dx * t, ly + dy * t); }
+        wake();
+      }
+      lx = x; ly = y;
+    }, {passive: true});
+    document.addEventListener("pointerleave", () => { lx = ly = null; });
+    document.addEventListener("visibilitychange", () => { if (document.hidden) { cancelAnimationFrame(raf); raf = 0; lx = ly = null; } else wake(); });
+    window.addEventListener("resize", size); size();
+  }
+
   /* ---- platform pulse in the bar under the hero ---- */
   const bar = $("#vx-pulse");
   const pulse = async () => {
