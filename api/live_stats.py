@@ -63,7 +63,7 @@ class _Stream:
 
 
 def _load_streams(
-    session: Session, *, start_at: datetime, end_at: datetime, language: str | None, segment: str | None,
+    session: Session, *, start_at: datetime, end_at: datetime, language: str | None, segment: str | None, topic: str | None = None,
 ) -> tuple[dict[int, dict[str, _Stream]], dict[int, Channel], dict[int, str]]:
     segment_key = normalize_segment(segment) if segment else None
     stmt = (
@@ -88,6 +88,8 @@ def _load_streams(
         if target and language_group(languages[channel.id]).lower() != target and languages[channel.id].lower() != target:
             continue
         if segment_key and (channel.segment or "news") != segment_key:
+            continue
+        if topic and (video.topic or "Other") != topic:
             continue
         channels[channel.id] = channel
         stream = streams[channel.id].setdefault(
@@ -140,6 +142,7 @@ def live_window_stats(
     language: str | None = None,
     segment: str | None = None,
     bucket_seconds: int = 60,
+    topic: str | None = None,
 ) -> dict[str, Any]:
     """Average and peak concurrent viewers for Primary / Secondary / All feeds over a window."""
     start_at, end_at = _utc(start_at), _utc(end_at)
@@ -155,7 +158,7 @@ def live_window_stats(
         raise ValueError("window is too long for this bucket size")
 
     threshold = min_primary_hours()
-    streams, channels, languages = _load_streams(session, start_at=start_at, end_at=end_at, language=language, segment=segment)
+    streams, channels, languages = _load_streams(session, start_at=start_at, end_at=end_at, language=language, segment=segment, topic=topic)
 
     rows: list[dict[str, Any]] = []
     combined: dict[datetime, dict[str, int]] = defaultdict(lambda: {"primary": 0, "secondary": 0, "all": 0})

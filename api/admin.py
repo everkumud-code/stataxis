@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from api.access import extract_youtube_video_id
 from api.auth import AuthIdentity
 from collector.storage import Channel, ChannelLanguageOverride, Observation, Video
+from metrics.markets import normalize_segment
 from collector.youtube.client import YouTubeClient
 from collector.youtube.manual_live import ManualLiveTarget, fetch_manual_live
 
@@ -16,8 +17,9 @@ def require_admin(identity: AuthIdentity) -> None:
         raise PermissionError("admin access required")
 
 
-def add_channel(session: Session, identity: AuthIdentity, url: str, display_name: str, language: str, region: str, market: str, *, client: YouTubeClient | None = None) -> dict[str, object]:
+def add_channel(session: Session, identity: AuthIdentity, url: str, display_name: str, language: str, region: str, market: str, *, client: YouTubeClient | None = None, segment: str | None = None) -> dict[str, object]:
     require_admin(identity)
+    segment_key = normalize_segment(segment) if segment else None
     normalized_url = url.strip()
     normalized_name = display_name.strip()
     normalized_language = language.strip()
@@ -48,6 +50,7 @@ def add_channel(session: Session, identity: AuthIdentity, url: str, display_name
                 language=normalized_language,
                 region=normalized_region,
                 active=True,
+                segment=segment_key or "news",
             )
             session.add(channel)
             session.flush()
@@ -58,6 +61,8 @@ def add_channel(session: Session, identity: AuthIdentity, url: str, display_name
             channel.language = normalized_language
             channel.region = normalized_region
             channel.active = True
+            if segment_key:
+                channel.segment = segment_key
             existing = True
         session.commit()
         return {
@@ -68,6 +73,7 @@ def add_channel(session: Session, identity: AuthIdentity, url: str, display_name
             "language": channel.language,
             "region": channel.region,
             "market": channel.network,
+            "segment": channel.segment or "news",
             "active": channel.active,
             "existing": existing,
         }
@@ -89,6 +95,18 @@ def rename_channel(session: Session, identity: AuthIdentity, channel_id: int, di
     channel.name = normalized
     session.commit()
     return {"channel_id": channel.id, "name": channel.name}
+
+
+def set_channel_segment(session: Session, identity: AuthIdentity, channel_id: int, segment: str) -> dict[str, object]:
+    """Put a channel in a group (news, business, print, party, leader, commentator) so reports can compare like with like."""
+    require_admin(identity)
+    key = normalize_segment(segment)
+    channel = session.get(Channel, channel_id)
+    if channel is None:
+        raise LookupError("channel not found")
+    channel.segment = key
+    session.commit()
+    return {"channel_id": channel.id, "name": channel.name, "segment": key}
 
 
 def deactivate_channel(session: Session, identity: AuthIdentity, channel_id: int) -> dict[str, object]:

@@ -17,6 +17,8 @@ from api.evaluate_http import evaluate_application
 from api.http import wsgi_application
 from api.insight_extensions import insight_application
 from api.live_http import live_application
+from api.market_http import market_application
+from api.public_http import public_application
 from collector.storage import create_database
 
 ROOT = Path(__file__).resolve().parent
@@ -60,6 +62,8 @@ _evaluate_api = evaluate_application(_session)
 _live_api = live_application(_session)
 _admin_api = admin_application(_session)
 _insight_api = protect_application(insight_application(_session))
+_market_api = market_application(_session)
+_public_api = public_application(_session)
 
 
 def _start_response(start_response: Callable[..., Any], status: str, headers: list[tuple[str, str]], *,
@@ -80,6 +84,10 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         return _evaluate_api(environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
     if path.startswith("/api/v1/admin/"):
         return _admin_api(environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
+    if path.startswith("/api/v1/public/"):
+        return _public_api(environ, lambda status, headers, *args: _start_response(start_response, status, headers))
+    if path.startswith("/api/v1/market/"):
+        return _market_api(environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
     if path.startswith("/api/v1/insights/"):
         return _insight_api(environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
     if path.startswith("/api/") or path == "/health":

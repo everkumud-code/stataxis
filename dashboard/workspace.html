@@ -117,7 +117,7 @@ input::placeholder{color:#59738a}
 
 
 .btnrow{display:flex;gap:8px;flex-wrap:wrap}
-.chform{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:end}
+.chform{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:end}
 .chform label{display:grid;gap:4px;color:var(--muted);font-size:12.5px}
 .chform input,.pkg input:not([type=checkbox]){width:100%;min-width:0}
 .pkg td{padding:6px 8px}
@@ -724,6 +724,7 @@ add("adm-channels", "Admin", "Channels", async el => {
     <form class="chform" id="addch"><label>YouTube link<input type="url" name="url" required placeholder="https://www.youtube.com/@channel"></label>
     <label>Name to show<input type="text" name="display_name" required maxlength="120"></label><label>Language<input type="text" name="language" placeholder="Hindi"></label>
     <label>Market<input type="text" name="market" placeholder="News"></label><label>Region<input type="text" name="region" value="India"></label>
+    <label>Group<select name="segment"><option value="news">News</option><option value="business">Business news</option><option value="print">Print media</option><option value="party">Political parties</option><option value="leader">Political leaders</option><option value="commentator">Political commentators</option><option value="creator">Creators &amp; influencers</option><option value="journalist">Independent journalists</option></select></label>
     <button class="btn primary" type="submit">Add</button></form><div id="addmsg" aria-live="polite"></div></section>
     <section class="card" style="margin-top:14px"><h2>Monitoring universe</h2><div id="chl"><p class="muted">Loading…</p></div></section>`;
   const draw = () => { $("#chl", el).innerHTML = table([
@@ -735,7 +736,7 @@ add("adm-channels", "Admin", "Channels", async el => {
   $("#addch", el).onsubmit = async ev => {
     ev.preventDefault(); const f = ev.target, fd = Object.fromEntries(new FormData(f)), msg = $("#addmsg", el), btn = f.querySelector("button");
     btn.disabled = true; msg.className = "msg"; msg.textContent = "Adding…";
-    try { const d = await post("/api/v1/admin/channels", {url: fd.url, display_name: fd.display_name, language: fd.language, region: fd.region, market: fd.market});
+    try { const d = await post("/api/v1/admin/channels", {url: fd.url, display_name: fd.display_name, language: fd.language, region: fd.region, market: fd.market, segment: fd.segment});
       msg.className = "msg ok"; msg.textContent = "Added " + d.name; f.reset(); f.region.value = "India"; await reloadChannels(); draw();
     } catch (e) { msg.className = "msg bad"; msg.textContent = e.message; }
     btn.disabled = false;
@@ -815,6 +816,7 @@ $("#signout").onclick = signOut;
   render();
 })();
 </script>
+<script src="market.js"></script>
 <p class="sx-derived-note" style="max-width:1100px;margin:24px auto;padding:0 16px;font-size:12px;line-height:1.5;color:#64748b;text-align:center">STX Index and other scores on this page are generated independently by StatAxis. They are not sourced from, provided by or endorsed by YouTube. Underlying statistics come from public YouTube API data. <a href="/privacy.html">Privacy Policy</a> · <a href="/terms.html">Terms &amp; Conditions</a></p>
 </body>
 </html>

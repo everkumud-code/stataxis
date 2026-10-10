@@ -192,7 +192,7 @@ def export_live_audience_xlsx(
     for group, item in payload["languages"].items():
         markets.append([
             group, item["channel_count"], item["observations"], item["current_concurrent"],
-            item["peak_concurrent"], item["average_concurrent"], item["metric_note"],
+            item["peak_concurrent"], item["average_concurrent"], item.get("metric_note", ""),
         ])
     _format_sheet(markets)
 

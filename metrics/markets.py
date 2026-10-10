@@ -9,6 +9,8 @@ decides how channels are grouped into markets for reports:
   party        -> "Political Parties & Leaders"
   leader       -> "Political Parties & Leaders"
   commentator  -> "Political Commentators"
+  creator      -> "Creators & Influencers"          (people who publish videos and Shorts, not live streams)
+  journalist   -> "Independent Journalists"
 """
 
 from __future__ import annotations
@@ -22,6 +24,8 @@ SEGMENTS: dict[str, str] = {
     "party": "Political Parties",
     "leader": "Political Leaders",
     "commentator": "Political Commentators",
+    "creator": "Creators & Influencers",
+    "journalist": "Independent Journalists",
 }
 
 _FIXED_MARKETS = {
@@ -30,6 +34,8 @@ _FIXED_MARKETS = {
     "party": "Political Parties & Leaders",
     "leader": "Political Parties & Leaders",
     "commentator": "Political Commentators",
+    "creator": "Creators & Influencers",
+    "journalist": "Independent Journalists",
 }
 
 

@@ -85,6 +85,58 @@ class Observation(Base):
     collector_version: Mapped[str] = mapped_column(String(32), default="0.1.0")
 
 
+class AuthenticityReview(Base):
+    """An admin's decision on one kind of unusual-viewership flag for one channel: cleared, watching or confirmed."""
+    __tablename__ = "stx_authenticity_reviews"
+    __table_args__ = (UniqueConstraint("channel_id", "signal", name="uq_stx_authenticity_review"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
+    signal: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(20))
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class FeatureAccess(Base):
+    """The lowest package that may use a feature (an admin can change it); a feature with no row uses the built-in default."""
+    __tablename__ = "stx_feature_access"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    feature: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    min_plan: Mapped[str] = mapped_column(String(32))
+    updated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class AudienceProfile(Base):
+    """Who a channel's audience is (age, gender, states, countries), with where the figures came from. YouTube does not publish this for other people's channels,
+    so a profile exists only when the channel (or a study) supplied it, and it always says who and when."""
+    __tablename__ = "stx_audience_profiles"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), unique=True, index=True)
+    source: Mapped[str] = mapped_column(String(40))
+    source_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    as_of: Mapped[str] = mapped_column(String(10))
+    age_json: Mapped[str] = mapped_column(Text, default="{}")
+    gender_json: Mapped[str] = mapped_column(Text, default="{}")
+    states_json: Mapped[str] = mapped_column(Text, default="{}")
+    countries_json: Mapped[str] = mapped_column(Text, default="{}")
+    updated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class UserFeatureOverride(Base):
+    """A privilege an admin gave to, or took from, one person, whatever their package says."""
+    __tablename__ = "stx_user_feature_overrides"
+    __table_args__ = (UniqueConstraint("user_id", "feature", name="uq_stx_user_feature"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("stx_users.id"), index=True)
+    feature: Mapped[str] = mapped_column(String(40))
+    allowed: Mapped[bool] = mapped_column(Boolean)
+    set_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    set_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
 class CollectionRun(Base):
     __tablename__ = "stx_collection_runs"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

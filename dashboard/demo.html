@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>StatAxis — Product Demo</title>
-<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="site.css"><link rel="stylesheet" href="tech.css">
 <style>
 :root{--bg:#061322;--panel:#0b1b2b;--panel2:#0f2438;--line:#20394e;--muted:#7891a6;--text:#e8f1f8;--blue:#159de8;--gold:#e1b94f;--green:#35d399;--red:#ff7180}
 *{box-sizing:border-box}.demo{min-height:100vh;background:var(--bg);color:var(--text);font:13px "Manrope",Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;position:relative;overflow:hidden}.demo:before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.18;background-image:radial-gradient(circle at 14% 30%,rgba(21,157,232,.65) 0 1px,transparent 2px),radial-gradient(circle at 78% 72%,rgba(225,185,79,.55) 0 1px,transparent 2px),linear-gradient(rgba(21,157,232,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(21,157,232,.07) 1px,transparent 1px);background-size:170px 170px,230px 230px,68px 68px,68px 68px;animation:demoDataFlow 16s linear infinite}.demo:after{content:"";position:fixed;top:0;bottom:0;left:-30%;width:28%;z-index:0;pointer-events:none;background:linear-gradient(90deg,transparent,rgba(21,157,232,.06),rgba(225,185,79,.13),transparent);filter:blur(14px);animation:demoDataScan 9s ease-in-out infinite}.demo>*{position:relative;z-index:1}@keyframes demoDataFlow{to{background-position:170px 85px,-115px 115px,68px 34px,34px 68px}}@keyframes demoDataScan{0%,100%{transform:translateX(0);opacity:.2}50%{transform:translateX(430%);opacity:.7}}@media(prefers-reduced-motion:reduce){.demo:before,.demo:after{animation:none}}
@@ -161,5 +161,5 @@ document.getElementById('packages').innerHTML=Array.from({length:36},(_,i)=>{let
 drawRows();
 </script>
 <p class="sx-derived-note" style="max-width:1100px;margin:24px auto;padding:0 16px;font-size:12px;line-height:1.5;color:#64748b;text-align:center">STX Index and other scores on this page are generated independently by StatAxis. They are not sourced from, provided by or endorsed by YouTube. Underlying statistics come from public YouTube API data. <a href="/privacy.html">Privacy Policy</a> · <a href="/terms.html">Terms &amp; Conditions</a></p>
-</body>
+<script src="tech.js"></script></body>
 </html>

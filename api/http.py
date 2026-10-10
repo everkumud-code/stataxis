@@ -369,6 +369,12 @@ def _report_response(environ: dict[str, Any], start_response: Callable[..., Any]
         filters = _export_filters_from_query(query)
     except ValueError as exc:
         return _json_response(start_response, 400, {"error": str(exc)})
+    try:
+        from api.feature_access import require_export
+        if plan != "sx_free":
+            require_export(session_factory, user_id=int(environ.get("STATAXIS_USER_ID") or 0) or None, plan=plan, is_admin=environ.get("HTTP_X_STATAXIS_ROLE") == "admin")
+    except PermissionError as exc:
+        return _json_response(start_response, 403, {"error": str(exc)})
     session = session_factory()
     try:
         status, headers, body = export_response(session, plan, filters)
