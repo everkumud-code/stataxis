@@ -34,11 +34,12 @@ def test_each_public_page_has_the_look_a_title_a_description_and_the_shared_chro
 def test_the_home_page_keeps_the_original_content_and_adds_to_it():
     home = text(DASH / "index.html")
     assert "YouTube is a trademark of Google LLC" in home and "not endorsed by YouTube or Google" in home and "youtube.com/t/terms" in home
-    # the original hero text is untouched and the tagline sits beside it
-    for original in ("DIGITAL MEDIA MARKET INTELLIGENCE & DATA SERVICES", "See the market.<br>Understand the signal.<br>Make better decisions.",
-                     "StatAxis brings measurement, market intelligence, research and custom data services together for businesses, media buyers, agencies, publishers and research teams.",
-                     "Explore Interactive Demo", "Explore Platform", "For Corporates & Media Buyers", "Stat the View. <em>Axis the Viewpoint.</em>"):
-        assert original in home or original.replace("&", "&amp;") in home, original
+    # the hero is the short form the owner asked for; the tagline stays beside it
+    hero = home[home.index('<section class="vx-hero">'):home.index("</section>", home.index('<section class="vx-hero">'))]
+    for phrase in ("Digital media market intelligence", "See the market.<br>Read the signal.<br>Decide.", "Measured audiences. Findings for your role. Reports you can act on.",
+                   "▶ Interactive demo", "Platform", "For media buyers", "Stat the View. <em>Axis the Viewpoint.</em>"):
+        assert phrase in hero, phrase
+    assert len(re.sub(r"<[^>]+>", " ", hero.split('<div class="vx-bar"')[0]).split()) < 40
     # the original sections are all still there, word for word
     for original in ("From evidence to decision intelligence.", "OBSERVE → MEASURE → COMPARE → EXPLAIN", "One intelligence layer. Multiple media surfaces.", "Insights & research become part of the product.",
                      "Intelligence Platform", "Media Buyer Intelligence", "YouTube data, clearly identified.", "Choose where you want to go.", "Admin Console"):
