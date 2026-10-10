@@ -38,3 +38,5 @@ const SX_COOKIE_KEY = "stataxis_cookie_consent_v1", SX_TERMS_KEY = "stataxis_ter
   terms.onchange = update;
   enter.onclick = () => { if (!cookieOk || !terms.checked) return; localStorage.setItem(SX_TERMS_KEY, "accepted"); gate.remove(); document.documentElement.style.overflow = ""; };
 })();
+
+{ const h = document.createElement("script"); h.src = "/stax9.js"; h.defer = true; document.body.appendChild(h); }

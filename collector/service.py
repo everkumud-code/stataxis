@@ -165,6 +165,27 @@ def _log_loop_error(loop: str, exc: Exception, secrets: tuple[str | None, ...]) 
     logger.error("%s loop failed: %s: %s", loop, type(exc).__name__, message)
 
 
+def _with_database_channels(session: Session, targets: list) -> list:
+    """The configured channels plus every active channel registered in the database (added in the admin screen or by an importer)."""
+    from collector.youtube.collector import ChannelTarget
+
+    from sqlalchemy.exc import SQLAlchemyError
+
+    known = {target.channel_id for target in targets}
+    try:
+        rows = session.query(Channel).filter(Channel.active.is_(True)).order_by(Channel.id).all()
+    except SQLAlchemyError as exc:  # the configured channels are still collected if the lookup fails
+        session.rollback()
+        logger.warning("could not read the registered channels, using the configured ones only: %s", type(exc).__name__)
+        return targets
+    extra = [
+        ChannelTarget(channel_id=row.youtube_channel_id, name=row.name, language=row.language, network=row.network, segment=row.segment or "news")
+        for row in rows
+        if row.youtube_channel_id not in known
+    ]
+    return [*targets, *extra]
+
+
 def _collection_loop(
     engine,
     client: YouTubeClient,
@@ -181,7 +202,7 @@ def _collection_loop(
         if now >= next_collect:
             try:
                 with Session(engine) as session:
-                    targets = load_targets(ROOT / "config/channels.json")
+                    targets = _with_database_channels(session, load_targets(ROOT / "config/channels.json"))
                     warning = quota_warning(len(targets), collect_seconds, live_poll_seconds)
                     if warning:
                         logger.warning(warning)

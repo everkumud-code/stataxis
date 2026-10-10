@@ -11,6 +11,7 @@ decides how channels are grouped into markets for reports:
   commentator  -> "Political Commentators"
   creator      -> "Creators & Influencers"          (people who publish videos and Shorts, not live streams)
   journalist   -> "Independent Journalists"
+  brand        -> "Brands & Entertainment"          (music, TV and brand channels)
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ SEGMENTS: dict[str, str] = {
     "commentator": "Political Commentators",
     "creator": "Creators & Influencers",
     "journalist": "Independent Journalists",
+    "brand": "Brands & Entertainment",
 }
 
 _FIXED_MARKETS = {
@@ -36,6 +38,7 @@ _FIXED_MARKETS = {
     "commentator": "Political Commentators",
     "creator": "Creators & Influencers",
     "journalist": "Independent Journalists",
+    "brand": "Brands & Entertainment",
 }
 
 

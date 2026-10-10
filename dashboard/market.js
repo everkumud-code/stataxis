@@ -4,7 +4,7 @@
 "use strict";
 (() => {
   const SEGMENTS = [["", "All groups"], ["news", "News"], ["business", "Business news"], ["print", "Print media"], ["party", "Political parties"], ["leader", "Political leaders"],
-    ["commentator", "Political commentators"], ["creator", "Creators & influencers"], ["journalist", "Independent journalists"]];
+    ["commentator", "Political commentators"], ["creator", "Creators & influencers"], ["journalist", "Independent journalists"], ["brand", "Brands & entertainment"]];
   const GENRES = ["Politics", "Sports", "Entertainment", "Business", "Current Affairs", "Other"];
   const LANGS = [["", "All languages"], ["Hindi", "Hindi"], ["English", "English"], ["Regional", "Regional"]];
   const opt = (list, cur) => list.map(([v, l]) => `<option value="${esc(v)}"${String(cur ?? "") === v ? " selected" : ""}>${esc(l)}</option>`).join("");
