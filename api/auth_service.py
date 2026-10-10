@@ -65,6 +65,25 @@ def login(session: Session, email: str, password: str) -> dict:
     return {"access_token": issue_token(identity), "token_type": "Bearer", "account": account_payload(user)}
 
 
+def change_password(session: Session, user_id: int, current_password: str, new_password: str) -> None:
+    """Let a signed-in account replace its own password. The current password must be proven first."""
+    if not isinstance(current_password, str) or not isinstance(new_password, str):
+        raise ValueError("current and new password are required")
+    if len(new_password) < 12:
+        raise ValueError("new password must be at least 12 characters")
+    if len(new_password) > 256:
+        raise ValueError("new password is too long")
+    user = session.query(User).filter_by(id=user_id, active=True).one_or_none()
+    if user is None:
+        raise PermissionError("invalid password")
+    if not verify_password(current_password, user.password_hash):
+        raise PermissionError("current password is not correct")
+    if current_password == new_password:
+        raise ValueError("new password must be different from the current one")
+    user.password_hash = hash_password(new_password)
+    session.commit()
+
+
 def authenticate(authorization: str | None) -> AuthIdentity:
     if not authorization or not authorization.startswith("Bearer "):
         raise AuthenticationError("authentication required")
