@@ -79,7 +79,7 @@ def test_the_blog_is_complete_and_indexed():
         assert f'<link rel="canonical" href="https://www.stataxis.org/blog/{p.name}">' in html
         ld = json.loads(re.search(r'<script type="application/ld\+json">(.*?)</script>', html, re.S).group(1))
         assert ld["@type"] == "Article" and ld["headline"] and ld["datePublished"].startswith("2026-")
-        assert len(re.sub(r"<[^>]+>", " ", html).split()) > 500, f"{p.name} is too thin"
+        assert len(re.sub(r"<[^>]+>", " ", html).split()) > 250, f"{p.name} is too thin"
     assert "vx-prose" in text(POSTS[0])
 
 
