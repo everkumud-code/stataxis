@@ -173,3 +173,9 @@ def test_the_server_serves_the_stax9_artwork_with_the_right_type(name, kind):
     out = {}
     body = web.application({"REQUEST_METHOD": "GET", "PATH_INFO": "/assets/stax9/" + name, "QUERY_STRING": "", "REMOTE_ADDR": "127.0.0.1"}, lambda status, headers: out.update(status=status, headers=dict(headers)))
     assert out["status"].startswith("200") and out["headers"]["Content-Type"].startswith(kind) and len(b"".join(body)) > 10_000
+
+
+def test_the_main_menu_has_a_client_login_button_that_leads_to_the_workspace_for_a_signed_in_client():
+    site, css = text(DASH / "site.js"), text(DASH / "tech.css")
+    assert site.count("data-client-login") >= 3 and 'href="/login.html"' in site and "Client login" in site and "My workspace" in site and "/workspace.html" in site
+    assert ".vx-menu a.login" in css

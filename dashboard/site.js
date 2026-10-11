@@ -2,8 +2,8 @@
 const favicon = document.createElement("link"); favicon.rel = "icon"; favicon.type = "image/svg+xml"; favicon.href = "/assets/stataxis-favicon.svg"; document.head.appendChild(favicon);
 const MENU = [["/platform.html", "Platform"], ["/solutions.html", "Solutions"], ["/ifx.html", "IFX Score"], ["/stx.html", "STX Index"], ["/research.html", "Research"], ["/insights.html", "Insights"]];
 const nav = '<header class="vx-nav"><div class="vx-nav-in"><a class="vx-logo" href="/" aria-label="StatAxis home"><img src="/assets/stataxis-logo.svg" alt="StatAxis — Stat the View. Axis the Viewpoint."></a><nav class="vx-menu" aria-label="Main">'
-  + MENU.map(([h, l]) => `<a href="${h}">${l}</a>`).join("") + '<a class="cta" href="/apply.html">Get early access</a></nav><button class="vx-burger" aria-label="Open menu" aria-expanded="false">☰</button></div><div class="vx-drawer">'
-  + MENU.map(([h, l]) => `<a href="${h}">${l}</a>`).join("") + '<a href="/stax9.html">STAX9</a><a href="/apply.html">Get early access</a><a href="/login.html">Sign in</a></div></header>';
+  + MENU.map(([h, l]) => `<a href="${h}">${l}</a>`).join("") + '<a class="login" href="/login.html" data-client-login>Client login</a><a class="cta" href="/apply.html">Get early access</a></nav><button class="vx-burger" aria-label="Open menu" aria-expanded="false">☰</button></div><div class="vx-drawer">'
+  + MENU.map(([h, l]) => `<a href="${h}">${l}</a>`).join("") + '<a href="/stax9.html">STAX9</a><a href="/apply.html">Get early access</a><a href="/login.html" data-client-login>Client login</a></div></header>';
 const col = (h, items) => `<div class="vx-ft-col"><h5>${h}</h5>${items.map(([u, l]) => `<a href="${u}">${l}</a>`).join("")}</div>`;
 const footer = '<footer class="vx-footer vx-ft"><div class="vx-ft-wrap"><div class="vx-ft-top"><div class="vx-ft-cta"><h2>Tell us who you<br>want to reach.</h2><a class="vx-btn" href="/apply.html">Start a conversation <span class="arr">→</span></a></div><div class="vx-ft-cols">'
   + col("Data", [["/platform.html", "Platform"], ["/solutions.html", "Solutions"], ["/ifx.html", "IFX Score"], ["/stx.html", "STX Index"]])
@@ -14,6 +14,9 @@ const footer = '<footer class="vx-footer vx-ft"><div class="vx-ft-wrap"><div cla
   + '<div class="vx-ft-bar"><span>© 2026 STATAXIS · DIGITAL MEDIA MARKET INTELLIGENCE &amp; DATA SERVICES</span><a href="#" class="vx-top" onclick="window.scrollTo({top:0,behavior:\'smooth\'});return false">BACK TO TOP ↑</a></div></div>'
   + '<div class="vx-wordmark" aria-hidden="true"><canvas></canvas><div class="vx-wm-tag"></div></div></footer>';
 document.getElementById("nav").innerHTML = nav; document.getElementById("footer").innerHTML = footer;
+/* a client who is already signed in on this device goes straight to their workspace */
+try { const t = localStorage.getItem("stataxis_access_token") || sessionStorage.getItem("stataxis_token"), a = JSON.parse(localStorage.getItem("stataxis_account") || sessionStorage.getItem("stataxis_account") || "null");
+  if (t && a && (a.is_admin || a.approval_status === "approved")) document.querySelectorAll("[data-client-login]").forEach(el => { el.href = "/workspace.html"; el.textContent = "My workspace"; }); } catch (e) { /* storage blocked: the plain login link stays */ }
 const toggle = document.querySelector(".vx-burger"), drawer = document.querySelector(".vx-drawer");
 if (toggle && drawer) toggle.addEventListener("click", () => { const open = drawer.classList.toggle("open"); toggle.setAttribute("aria-expanded", String(open)); toggle.textContent = open ? "×" : "☰"; });
 const path = location.pathname.replace(/\/$/, "") || "/";
