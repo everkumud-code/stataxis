@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, create_engine, inspect, text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from collector.topics import assign_topic
@@ -270,10 +270,24 @@ def create_database(url: str):
 
 
 def effective_channel_language(session: Session, channel: Channel, fallback: str = "unknown") -> str:
-    override = session.query(ChannelLanguageOverride).filter_by(channel_id=channel.id).one_or_none()
-    if override is not None:
-        return override.language
+    """A channel's language: the one an administrator set for it, else the one it was registered with.
+
+    The overrides are read once for the whole session and kept in ``session.info``. Reading them again for every video, sample or channel in a loop made the live screens take
+    many seconds (one database call for each of tens of thousands of rows); a change to an override clears the kept copy.
+    """
+    overrides = session.info.get("_language_overrides")
+    if overrides is None:
+        overrides = {row.channel_id: row.language for row in session.query(ChannelLanguageOverride).all()}
+        session.info["_language_overrides"] = overrides
+    if channel.id in overrides:
+        return overrides[channel.id]
     return channel.language or fallback
+
+
+@event.listens_for(Session, "after_flush")
+def _forget_language_overrides(session: Session, _context) -> None:
+    if any(isinstance(item, ChannelLanguageOverride) for item in (*session.new, *session.dirty, *session.deleted)):
+        session.info.pop("_language_overrides", None)
 
 
 def _parse_rfc3339(value: str | None) -> datetime | None:
