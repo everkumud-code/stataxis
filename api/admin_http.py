@@ -6,7 +6,7 @@ from typing import Any, Callable
 from api.admin import add_channel, add_video, deactivate_channel, remove_video, rename_channel, set_channel_language, set_channel_segment
 from api.auth_service import authenticate
 from api import audience as audience_mod
-from api import feature_access, user_admin
+from api import feature_access, my_channels, user_admin
 from api.package_config import list_package_slots, update_package_slot
 from collector.storage import User
 
@@ -66,6 +66,14 @@ def admin_application(session_factory: Callable[[], Any]):
                 if path == "/api/v1/admin/users/create":
                     return _json(start_response, 200, user_admin.create_user(session, email=str(body.get("email") or ""), name=str(body.get("name") or ""), organization=str(body.get("organization") or ""),
                                                                               mobile=str(body.get("mobile") or ""), plan=str(body.get("plan") or "")))
+                if path == "/api/v1/admin/channel-claims/list":
+                    return _json(start_response, 200, {"claims": my_channels.list_claims(session, str(body.get("status") or "") or None)})
+                if path == "/api/v1/admin/channel-claims/decide":
+                    return _json(start_response, 200, my_channels.decide(session, int(body.get("claim_id")), str(body.get("decision") or ""), by=identity.email, note=str(body.get("note") or ""), track=bool(body.get("track"))))
+                if path == "/api/v1/admin/channel-claims/assign":
+                    return _json(start_response, 200, my_channels.assign(session, int(body.get("user_id")), int(body.get("channel_id")), by=identity.email, track=bool(body.get("track"))))
+                if path == "/api/v1/admin/channel-claims/remove":
+                    return _json(start_response, 200, my_channels.admin_remove(session, int(body.get("claim_id"))))
                 if path == "/api/v1/admin/users/rename-login":
                     return _json(start_response, 200, user_admin.rename_login(session, int(body.get("user_id")), str(body.get("login_id") or "")))
                 if path == "/api/v1/admin/users/reset-password":

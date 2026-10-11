@@ -16,6 +16,9 @@
     "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh",
     "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"];
   const SOURCES = [["youtube_analytics", "YouTube Studio analytics shown by the channel"], ["channel_media_kit", "Channel's media kit"], ["third_party_study", "Named third-party study"], ["admin_entered", "Entered by the STAXIS team"]];
+  let MINE = []; /* ids of the channels mapped to this login (approved claims) */
+  const loadMine = async () => { try { MINE = (await api("/api/v1/my/channels")).channel_ids || []; } catch { MINE = []; } };
+  loadMine();
   const SP = JSON.parse(sessionStorage.getItem("sx_market") || "{}");
   const keep = (k, v) => { SP[k] = v; try { sessionStorage.setItem("sx_market", JSON.stringify(SP)); } catch { /* storage blocked */ } };
   const num = v => v == null || v === "" ? "—" : Number(v).toLocaleString("en-IN", {maximumFractionDigits: 1});
@@ -30,7 +33,7 @@
   /* Category, language and time are in each screen's own form; this is the rest of the common filters: an individual channel, place, age group and gender. */
   const filterFields = (f, {place = true, age = true, channel = true, known = true} = {}) => `<details style="grid-column:1/-1" ${(f.channels || f.states || f.ages || f.gender) ? "open" : ""}><summary class="muted">More filters: ${[channel && "individual channel", place && "place", age && "age group"].filter(Boolean).join(", ")}</summary>
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:start;margin-top:10px">
-    ${channel ? `<label>Channel(s)<br><select name="channels" multiple size="6" style="min-width:220px">${(typeof channels !== "undefined" ? channels : []).map(c => `<option value="${esc(c.id)}"${has(f.channels, String(c.id)) ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select><br><span class="muted">None chosen means all</span></label>` : ""}
+    ${channel ? `<label>Channel(s)<br><select name="channels" multiple size="6" style="min-width:220px">${(typeof channels !== "undefined" ? channels : []).map(c => `<option value="${esc(c.id)}"${has(f.channels, String(c.id)) ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select><br><span class="muted">None chosen means all</span>${MINE.length ? `<br><button class="btn" type="button" data-mine style="margin-top:6px">Select my channels</button>` : ""}</label>` : ""}
     ${place ? `<label>Place (states)<br><select name="states" multiple size="6" style="min-width:200px">${STATES.map(s => `<option${has(f.states, s) ? " selected" : ""}>${esc(s)}</option>`).join("")}</select></label>` : ""}
     ${age ? `<div><div class="muted">Age group</div>${AGES.map(a => `<label style="display:block"><input type="checkbox" name="ages" value="${a}"${has(f.ages, a) ? " checked" : ""}> ${a}</label>`).join("")}
       <label style="display:block;margin-top:8px">Gender<br><select name="gender">${opt([["", "Any"], ["male", "Male"], ["female", "Female"]], f.gender || "")}</select></label></div>` : ""}
@@ -179,11 +182,13 @@
           {h: "Impact", html: 1, v: r => bar(r.pillars.impact, "#e1b94f")}, {h: "Followership", html: 1, v: r => bar(r.pillars.followership, "#159de8")}, {h: "eXposure", html: 1, v: r => bar(r.pillars.exposure, "#35d399")},
           {h: "Confidence", n: 1, v: r => r.confidence + "% " + r.confidence_label}, {h: "Strong on", v: r => r.strengths.join(", ") || "—"}, {h: "Watch", v: r => r.watch.join(", ") || "—"},
           {h: "Uploads", n: 1, v: r => `${r.uploads} (${r.uploads_video} video, ${r.uploads_shorts} Shorts)`}, {h: "Views per subscriber", n: 1, v: r => r.pull_percent == null ? "—" : r.pull_percent + "%"},
+          {h: "Comments per 1,000 views", n: 1, v: r => r.comments_per_1000_views == null ? "—" : r.comments_per_1000_views}, {h: "Hit rate", n: 1, v: r => r.hit_rate_percent == null ? "—" : r.hit_rate_percent + "%"},
+          {h: "Live turnout (median peak)", n: 1, v: r => r.live_streams ? `${whole(r.live_peak_median)} (${r.live_streams} live)` : "—"}, {h: "Last upload", n: 1, v: r => r.days_since_last_upload == null ? "—" : (r.days_since_last_upload < 1 ? "today" : Math.round(r.days_since_last_upload) + " d ago")},
           {h: "Best format", v: r => r.best_format || "—"}], d.channels, "No creators in this group yet. Admins can put channels in the Creators or Independent journalists group under Channel groups.")}</section>
           <section class="card" style="margin-top:14px"><h2>What the three pillars are</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
-            <div><strong style="color:#e1b94f">Impact</strong> (${Math.round(d.pillar_weights.impact * 100)}%)<p class="muted">How strongly the content lands: depth of reaction and staying power. Saves, shares and conversions are not public on YouTube, so they are not counted.</p></div>
-            <div><strong style="color:#159de8">Followership</strong> (${Math.round(d.pillar_weights.followership * 100)}%)<p class="muted">The audience behind the creator: its size, its loyalty (views per subscriber) and its growth.</p></div>
-            <div><strong style="color:#35d399">eXposure</strong> (${Math.round(d.pillar_weights.exposure * 100)}%)<p class="muted">How far and how often the creator is seen: reach per upload, regular publishing and steady results. YouTube only for now.</p></div></div>
+            <div><strong style="color:#e1b94f">Impact</strong> (${Math.round(d.pillar_weights.impact * 100)}%)<p class="muted">How strongly the content lands: depth of reaction, conversation in the comments and staying power. Saves, shares and conversions are not public on YouTube, so they are not counted.</p></div>
+            <div><strong style="color:#159de8">Followership</strong> (${Math.round(d.pillar_weights.followership * 100)}%)<p class="muted">The audience behind the creator: its size, its loyalty (views per subscriber), its growth and, for creators who go live, the turnout at a live stream.</p></div>
+            <div><strong style="color:#35d399">eXposure</strong> (${Math.round(d.pillar_weights.exposure * 100)}%)<p class="muted">How far and how often the creator is seen: reach per upload, regular publishing, steady results, hit rate and fresh uploads. YouTube only for now.</p></div></div>
             <p class="muted" style="margin-top:8px">Not measured: ${esc(d.not_measured.join("; "))}.</p></section>${method(d.method)}`;
       } catch (e) { out.innerHTML = fail(e); wireUpgrade(out); }
     };
@@ -223,7 +228,7 @@
           {h: "Cost per 1,000 viewers", n: 1, v: r => r.cost_per_1000 == null ? "—" : "₹" + whole(r.cost_per_1000)},
           ...(tg ? [{h: "Audience match", n: 1, html: 1, v: r => r.audience_match ? Math.round(r.audience_match.share * 100) + "%" + (r.audience_match.missing.length ? ` <span class="tag" title="Profile has no ${esc(r.audience_match.missing.join(", "))}">partial</span>` : "") : '<span class="tag" title="Nobody has told STAXIS who watches this channel">no audience data</span>'},
             {h: "Matched viewers", n: 1, v: r => r.matched_audience == null ? "—" : whole(r.matched_audience)}, {h: "Cost per 1,000 matched", n: 1, v: r => r.cost_per_1000_matched == null ? "—" : "₹" + whole(r.cost_per_1000_matched)}] : []),
-          {h: "Value index", n: 1, v: r => r.value_index == null ? "—" : r.value_index}], d.channels, "Nobody was live in these hours on these days.")}
+          {h: "Value index", n: 1, v: r => r.value_index == null ? "—" : r.value_index}], d.channels, d.note || "Nobody was live in these hours on these days.")}
           <div class="btnrow" style="margin-top:10px"><button class="btn primary" type="button" id="precalc">Recalculate with my rates</button></div></section>${planBlock(d.plan)}
           <p class="muted" style="margin-top:8px">Value index: 100 is the middle of the channels you gave a rate for; higher is more audience per rupee. High-risk channels are never bought.</p>${method(d.method)}`;
         $("#precalc", out).onclick = () => { const r = {}; out.querySelectorAll("[data-rate]").forEach(i => { if (i.value) r[i.dataset.rate] = Number(i.value); }); keep("plannerRates", r); run(); };
@@ -360,24 +365,96 @@
     run();
   });
 
+  /* ---------- my channels: every login maps its own channels to itself ---------- */
+  document.addEventListener("click", ev => {
+    const b = ev.target.closest && ev.target.closest("[data-mine]"); if (!b) return;
+    const sel = b.closest("label, details, form")?.querySelector('select[name="channels"]') || b.closest("form")?.querySelector('select[name="channels"]'); if (!sel) return;
+    [...sel.options].forEach(o => { o.selected = MINE.map(String).includes(o.value); });
+  });
+  add("mychannels", "Market tools", "My channels", async el => {
+    el.innerHTML = head("My channels", "Map your own channels to this login. Once a channel is yours, one click selects it in every filter, and you can open its IFX Score and authenticity record.") +
+      `<div id="mcmsg" class="msg" hidden></div><div id="mcout"><p class="muted">Loading…</p></div>
+      <section class="card" style="margin-top:14px"><h2>Add a channel</h2>
+        <form id="mcs" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><label>Find it among the tracked channels<br><input type="text" name="q" placeholder="name or @handle" style="min-width:260px"></label><button class="btn" type="submit">Search</button></form>
+        <div id="mcres" style="margin:10px 0"></div>
+        <form id="mcr" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:12px"><label>Or paste its @handle or link<br><input type="text" name="ref" placeholder="@yourchannel  or  https://youtube.com/@yourchannel" style="min-width:320px"></label><button class="btn primary" type="submit">Claim it</button></form>
+        <p class="muted" style="margin-top:8px">Claiming starts a check, not an approval. You get a short code to put in the channel's own description; finding it there proves the channel is yours.</p></section>`;
+    const say = (t, ok) => { const m = $("#mcmsg", el); m.hidden = !t; m.className = "msg " + (ok ? "ok" : "bad"); m.textContent = t || ""; };
+    const chip = (t, c = "") => `<span class="tag ${c}">${esc(t)}</span>`;
+    const load = async () => {
+      const d = await api("/api/v1/my/channels"); MINE = d.channel_ids || [];
+      if (!d.claims.length) { $("#mcout", el).innerHTML = state("No channel is mapped to this login yet", "Add yours below. Until then, the tools show everyone's numbers, not yours."); return; }
+      $("#mcout", el).innerHTML = d.claims.map(c => {
+        const ch = c.channel, ok = c.status === "approved", wait = c.status === "pending", no = c.status === "rejected";
+        return `<section class="card" style="margin-top:14px"><div class="head"><h2>${esc(ch.name)} ${ok ? chip("Yours", "green") : wait ? chip("Waiting for proof") : chip("Declined", "red")} ${ch.tracked ? chip("Tracked") : chip("Not tracked yet")}</h2></div>
+          <p class="muted">${esc(ch.handle || ch.youtube_channel_id)} · ${esc(ch.language === "unknown" ? "" : ch.language)}${ok ? ` · mapped ${c.method === "code" ? "by the code in the description" : "by an administrator"}` : ""}${no && c.note ? ` · ${esc(c.note)}` : ""}</p>
+          ${wait ? `<div class="card" style="border-color:#159de8;margin:10px 0"><p style="margin:0 0 6px">Your code</p><code style="font-size:20px;user-select:all">${esc(c.code)}</code><p class="muted" style="margin:8px 0 0">${esc(d.help)}</p></div>` : ""}
+          ${ok && !ch.tracked ? `<p class="muted">This channel is yours, but StatAxis is not collecting it yet (collection uses YouTube quota). An administrator switches it on.</p>` : ""}
+          <div class="btnrow">${wait ? `<button class="btn primary" type="button" data-verify="${esc(c.id)}">Verify now</button>` : ""}${ok && ch.tracked ? `<button class="btn" type="button" data-open="creators">Open my IFX Score</button><button class="btn" type="button" data-open="authenticity">My authenticity record</button>` : ""}<button class="btn" type="button" data-drop="${esc(c.id)}">Remove</button></div></section>`;
+      }).join("");
+      el.querySelectorAll("[data-verify]").forEach(b => b.onclick = async () => { b.disabled = true; try { const r = await post("/api/v1/my/channels/verify", {claim_id: +b.dataset.verify}); say(r.found ? `${r.channel.name} is now mapped to you.` : "The code was not found in the description yet. Save the description on YouTube, wait a minute and try again.", r.found); await load(); } catch (e) { say(e.message); b.disabled = false; } });
+      el.querySelectorAll("[data-drop]").forEach(b => b.onclick = async () => { if (!confirm("Remove this channel from your login? Its data stays; only the mapping goes.")) return; try { await post("/api/v1/my/channels/remove", {claim_id: +b.dataset.drop}); say("Removed.", true); await load(); } catch (e) { say(e.message); } });
+      el.querySelectorAll("[data-open]").forEach(b => b.onclick = () => { const key = b.dataset.open === "creators" ? "creators" : "auth"; keep(key, {...(SP[key] || {}), channels: MINE.join(",")}); location.hash = "#/" + b.dataset.open; });
+    };
+    $("#mcs", el).onsubmit = async ev => {
+      ev.preventDefault(); const q = new FormData(ev.target).get("q"); const box = $("#mcres", el);
+      try { const r = await api("/api/v1/my/channels/search", {q}); box.innerHTML = r.channels.length ? r.channels.map(c => `<div style="display:flex;gap:10px;align-items:center;padding:6px 0;border-top:1px solid #152c40"><span style="flex:1">${esc(c.name)} <span class="muted">${esc(c.handle || "")}</span></span><button class="btn" type="button" data-claim="${esc(c.id)}">This is mine</button></div>`).join("") : `<p class="muted">No tracked channel matches. Paste its @handle below instead.</p>`;
+        box.querySelectorAll("[data-claim]").forEach(b => b.onclick = async () => { try { await post("/api/v1/my/channels/claim", {channel_id: +b.dataset.claim}); say("Claimed. Put the code in your channel description, then press Verify.", true); box.innerHTML = ""; await load(); } catch (e) { say(e.message); } });
+      } catch (e) { say(e.message); }
+    };
+    $("#mcr", el).onsubmit = async ev => { ev.preventDefault(); try { await post("/api/v1/my/channels/claim", {ref: new FormData(ev.target).get("ref")}); ev.target.reset(); say("Claimed. Put the code in your channel description, then press Verify.", true); await load(); } catch (e) { say(e.message); } };
+    await load();
+  });
+
+  add("adm-claims", "Admin", "Channel claims", async el => {
+    if (!isAdmin) { el.innerHTML = adminOnly("Channel claims"); return; }
+    el.innerHTML = head("Channel claims", "Who says which channel is theirs. A claim becomes the person's channel when the code is found in the channel's description, or when you approve it. You can also map a channel to a login yourself.") +
+      `<div id="clmsg" class="msg" hidden></div>
+      <form class="card" id="clf" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><label>Show<br><select name="status">${opt([["", "All"], ["pending", "Waiting"], ["approved", "Approved"], ["rejected", "Declined"]], "pending")}</select></label><button class="btn" type="submit">Show</button></form>
+      <div id="clout"><p class="muted">Loading…</p></div>
+      <section class="card" style="margin-top:14px"><h2>Map a channel to a login</h2><form id="cla" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+        <label>Login<br><select name="user_id" id="claus" style="min-width:240px"></select></label>
+        <label>Channel<br><select name="channel_id" style="min-width:260px">${(typeof channels !== "undefined" ? channels : []).map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("")}</select></label>
+        <label><input type="checkbox" name="track" checked> Start tracking it</label><button class="btn primary" type="submit">Map it</button></form></section>`;
+    const say = (t, ok) => { const m = $("#clmsg", el); m.hidden = !t; m.className = "msg " + (ok ? "ok" : "bad"); m.textContent = t || ""; };
+    const load = async () => {
+      const status = new FormData($("#clf", el)).get("status") || "";
+      const d = await post("/api/v1/admin/channel-claims/list", {status});
+      $("#clout", el).innerHTML = `<section class="card" style="margin-top:14px">${table([
+        {h: "Login", html: 1, v: c => `<strong>${esc(c.user.login)}</strong><br><span class="muted">${esc(c.user.name || "")} ${esc(c.user.organization || "")}</span>`},
+        {h: "Channel", html: 1, v: c => `${esc(c.channel.name)}<br><span class="muted">${esc(c.channel.handle || c.channel.youtube_channel_id)}</span> ${c.channel.tracked ? "" : '<span class="tag">not tracked</span>'}`},
+        {h: "Status", html: 1, v: c => `${esc(c.status)}${c.method ? ` <span class="muted">(${esc(c.method)})</span>` : ""}${c.note ? `<br><span class="muted">${esc(c.note)}</span>` : ""}`},
+        {h: "", html: 1, v: c => `<div class="btnrow">${c.status !== "approved" ? `<button class="btn primary" data-ap="${esc(c.id)}" data-tr="1" type="button">Approve and track</button><button class="btn" data-ap="${esc(c.id)}" type="button">Approve</button>` : (!c.channel.tracked ? `<button class="btn primary" data-ap="${esc(c.id)}" data-tr="1" type="button">Start tracking</button>` : "")}${c.status !== "rejected" ? `<button class="btn" data-rj="${esc(c.id)}" type="button">Decline</button>` : ""}<button class="btn" data-rm="${esc(c.id)}" type="button">Remove</button></div>`}], d.claims, "No claims match.")}</section>`;
+      el.querySelectorAll("[data-ap]").forEach(b => b.onclick = async () => { try { await post("/api/v1/admin/channel-claims/decide", {claim_id: +b.dataset.ap, decision: "approve", track: b.dataset.tr === "1"}); say("Approved.", true); load(); } catch (e) { say(e.message); } });
+      el.querySelectorAll("[data-rj]").forEach(b => b.onclick = async () => { const note = prompt("Why? (optional, the person sees it)") ?? null; if (note === null) return; try { await post("/api/v1/admin/channel-claims/decide", {claim_id: +b.dataset.rj, decision: "reject", note}); say("Declined.", true); load(); } catch (e) { say(e.message); } });
+      el.querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { if (!confirm("Remove this mapping?")) return; try { await post("/api/v1/admin/channel-claims/remove", {claim_id: +b.dataset.rm}); say("Removed.", true); load(); } catch (e) { say(e.message); } });
+    };
+    $("#clf", el).onsubmit = ev => { ev.preventDefault(); load(); };
+    $("#cla", el).onsubmit = async ev => { ev.preventDefault(); const f = new FormData(ev.target); try { const r = await post("/api/v1/admin/channel-claims/assign", {user_id: +f.get("user_id"), channel_id: +f.get("channel_id"), track: f.has("track")}); say(`${r.channel.name} is now mapped to ${r.user.login}.`, true); load(); } catch (e) { say(e.message); } };
+    try { const u = await post("/api/v1/admin/users/list", {q: ""}); $("#claus", el).innerHTML = u.users.map(x => `<option value="${esc(x.id)}">${esc(x.email)}${x.name ? " · " + esc(x.name) : ""}</option>`).join(""); } catch { /* the form stays empty */ }
+    await load();
+  }, {admin: 1});
+
   /* ---------- live event compare: up to 30 channels, live ---------- */
   add("liveevent", "Market tools", "Live event compare", async el => {
     const f = SP.live || {terms: "", segment: "", language: "", minutes: "60", stx_period: "7d", auto: true};
     el.innerHTML = head("Live event compare", "Up to 30 channels covering the same live event, side by side: the audience each has now, how it moved, the peak, the STX index and the tone of what each is showing. The screen refreshes by itself.") +
-      `<form class="card" id="lf" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><label>Event words<br><input type="text" name="terms" value="${esc(f.terms)}" placeholder="e.g. budget, election result" style="min-width:230px"></label>
+      `<form class="card" id="lf" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><label style="flex:1 1 100%">Name of this live event (you can change it any time)<br><input type="text" name="name" id="lname" maxlength="80" value="${esc(f.name || "")}" placeholder="e.g. Budget 2026, live coverage" style="width:min(520px,100%);font-size:18px"></label><label>Event words<br><input type="text" name="terms" value="${esc(f.terms)}" placeholder="e.g. budget, election result" style="min-width:230px"></label>
       <label>Category<br><select name="segment">${opt(SEGMENTS, f.segment)}</select></label><label>Language<br><select name="language">${opt(LANGS, f.language)}</select></label>
       <label>Window<br><select name="minutes">${opt([["30", "Last 30 min"], ["60", "Last hour"], ["120", "Last 2 hours"], ["180", "Last 3 hours"]], f.minutes)}</select></label>
       <label>STX period<br><select name="stx_period">${opt([["today", "Today"], ["7d", "7 days"], ["month", "Month"]], f.stx_period)}</select></label>
       ${filterFields(f, {place: false, age: false, known: false})}<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="auto"${f.auto ? " checked" : ""}> Refresh every 15 s</label><button class="btn primary" type="submit">Compare now</button></form>
       <p class="muted" id="lstat" style="margin:8px 0"></p><div id="lout"></div>`;
     let timer = null, last = null;
+    const eventName = () => (($("#lname", el) || {}).value || "").trim() || String(f.terms || "").split(",")[0].trim().replace(/^./, c => c.toUpperCase()) || "Live event";
+    $("#lname", el).addEventListener("input", () => { f.name = $("#lname", el).value; keep("live", f); const t = $("#ltitle", el); if (t) t.textContent = eventName(); });
     const read = () => { const form = $("#lf", el), v = formValues(form); v.auto = new FormData(form).has("auto"); Object.assign(f, v); keep("live", f); return v; };
     const toneCls = {positive: "green", negative: "red", "mixed/neutral": ""};
     const draw = d => {
       last = d;
       const s = d.summary, mix = s.tone_mix, tot = Math.max(mix.positive + mix.negative + mix["mixed/neutral"], 1), out = $("#lout", el);
-      if (!d.channels.length) { out.innerHTML = state("Nobody to compare yet", d.note || "No channel is live with these filters.") + (d.not_live.length ? `<p class="muted">Not live: ${esc(d.not_live.join(", "))}</p>` : ""); return; }
-      out.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px">${kpi("Channels live", s.channels_live, "covering the event")}${kpi("Live viewers now", whole(s.total_live_now), "all channels together")}${kpi("Leader", s.leader || "—", (s.leader_share_percent ?? "—") + "% of the audience")}
+      if (!d.channels.length) { out.innerHTML = `<h2 id="ltitle" style="margin:6px 0 12px;font-size:28px">${esc(eventName())}</h2>` + state("Nobody to compare yet", d.note || "No channel is live with these filters.") + (d.not_live.length ? `<p class="muted">Not live: ${esc(d.not_live.join(", "))}</p>` : ""); return; }
+      out.innerHTML = `<h2 id="ltitle" style="margin:6px 0 12px;font-size:28px">${esc(eventName())}</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px">${kpi("Channels live", s.channels_live, "covering the event")}${kpi("Live viewers now", whole(s.total_live_now), "all channels together")}${kpi("Leader", s.leader || "—", (s.leader_share_percent ?? "—") + "% of the audience")}
         ${kpi("Tone of what is on screen", s.audience_weighted_tone == null ? "—" : (s.audience_weighted_tone > 0.15 ? "Positive" : s.audience_weighted_tone < -0.15 ? "Negative" : "Mixed"), "weighted by audience")}${kpi("Strongest STX", s.best_stx || "—", "STX " + d.stx_period)}</div>
         <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;margin:12px 0" title="positive ${mix.positive}, mixed ${mix["mixed/neutral"]}, negative ${mix.negative}"><span style="width:${100 * mix.positive / tot}%;background:#35d399"></span><span style="width:${100 * mix["mixed/neutral"] / tot}%;background:#6b8299"></span><span style="width:${100 * mix.negative / tot}%;background:#ff7180"></span></div>
         <style>.lwall{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:12px 0}@media(max-width:1200px){.lwall{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:620px){.lwall{grid-template-columns:repeat(2,minmax(0,1fr))}}.lwall .lw{background:#0b2032;border:1px solid #152c40;border-radius:8px;padding:10px;min-width:0}.lwall .lw b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lwall .lw .big{font-size:22px;font-weight:700;margin:4px 0}</style>
@@ -391,8 +468,8 @@
           {h: "Tone", html: 1, v: r => `<span class="tag ${toneCls[r.tone.label] || ""}" title="Score ${r.tone.score}; ${Math.round(r.tone.words_recognised * 100)}% of the title's words were recognised">${esc(r.tone.label)}</span>`}], d.channels)}</section>
         ${d.not_live.length ? `<p class="muted" style="margin-top:8px">Not live right now: ${esc(d.not_live.join(", "))}</p>` : ""}
         <div class="btnrow" style="margin-top:12px"><button class="btn" type="button" id="lpng">Download picture card (PNG)</button></div>${method(d.method)}`;
-      $("#lpng", el).onclick = async () => saveCanvas(await cardPng("Live event: viewers now", `${new Date(d.as_of).toLocaleTimeString("en-IN", {hour: "2-digit", minute: "2-digit"})} · ${s.channels_live} channels live`,
-        d.channels.slice(0, 10).map(r => ({label: r.name, value: r.live_now, text: whole(r.live_now) + "  ·  STX " + (r.stx ? dec(r.stx.score) : "—")})), {footer: "Average live viewers across each channel's live streams. Tone is read from stream titles."}), `stataxis-live-event-${Date.now()}.png`);
+      $("#lpng", el).onclick = async () => saveCanvas(await cardPng(eventName() + " · viewers now", `${new Date(d.as_of).toLocaleTimeString("en-IN", {hour: "2-digit", minute: "2-digit"})} · ${s.channels_live} channels live`,
+        d.channels.slice(0, 10).map(r => ({label: r.name, value: r.live_now, text: whole(r.live_now) + "  ·  STX " + (r.stx ? dec(r.stx.score) : "—")})), {footer: "Average live viewers across each channel's live streams. Tone is read from stream titles."}), `stataxis-live-${eventName().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "event"}-${Date.now()}.png`);
     };
     const run = async () => {
       const v = read(), qv = {terms: v.terms, segment: v.segment, language: v.language, minutes: v.minutes, stx_period: v.stx_period, channels: v.channels};

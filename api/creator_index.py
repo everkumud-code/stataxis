@@ -2,9 +2,9 @@
 
 The STX Index for channels leans on live audiences. A creator has none, so the IFX Score is built from what a creator does have in public, under three pillars:
 
-  Impact        how strongly the content lands: depth of reaction (likes and comments per view) and staying power (old videos still earning)
-  Followership  the audience behind the creator: its size, its loyalty (views per subscriber) and its growth
-  eXposure      how far and how often the creator is seen: reach per upload, regular publishing and steady results
+  Impact        how strongly the content lands: depth of reaction (likes and comments per view), conversation (comments per 1,000 views) and staying power (old videos still earning)
+  Followership  the audience behind the creator: its size, its loyalty (views per subscriber), its growth and, for those who go live, the turnout at a live stream
+  eXposure      how far and how often the creator is seen: reach per upload, regular publishing, steady results, hit rate (how often an upload beats the typical peer upload) and fresh uploads
 
 Each part is ranked against the other creators in the same comparison (not against a fixed scale), the parts are combined, and the result is pulled toward 50 when STAXIS has little data,
 exactly as the channel index does. Saves, shares and conversions are not public on YouTube, so they are not used, and exposure on other platforms is not seen: this score is YouTube only
@@ -29,21 +29,21 @@ from collector.storage import Observation, Video
 INDEX_NAME = "IFX Score"  # the one place the name is set
 TAGLINE = "Impact · Followership · eXposure"
 PARTS = {  # part: (pillar, weight)
-    "engagement": ("impact", 0.20), "staying": ("impact", 0.15),
-    "size": ("followership", 0.10), "loyalty": ("followership", 0.15), "growth": ("followership", 0.10),
-    "reach": ("exposure", 0.15), "cadence": ("exposure", 0.10), "steadiness": ("exposure", 0.05),
+    "engagement": ("impact", 0.12), "conversation": ("impact", 0.08), "staying": ("impact", 0.15),
+    "size": ("followership", 0.08), "loyalty": ("followership", 0.12), "growth": ("followership", 0.08), "live": ("followership", 0.07),
+    "reach": ("exposure", 0.10), "cadence": ("exposure", 0.08), "steadiness": ("exposure", 0.04), "hitrate": ("exposure", 0.05), "freshness": ("exposure", 0.03),
 }
 WEIGHTS = {k: w for k, (_p, w) in PARTS.items()}
 PILLARS = {"impact": "Impact", "followership": "Followership", "exposure": "eXposure"}
 PILLAR_WEIGHTS = {p: round(sum(w for _k, (pp, w) in PARTS.items() if pp == p), 2) for p in PILLARS}
-LABELS = {"engagement": "Depth of reaction", "staying": "Old videos still earn", "size": "Audience size", "loyalty": "Views per subscriber", "growth": "Audience growth",
-          "reach": "Reach per upload", "cadence": "Regular publishing", "steadiness": "Steady results"}
+LABELS = {"engagement": "Depth of reaction", "conversation": "Conversation in the comments", "staying": "Old videos still earn", "size": "Audience size", "loyalty": "Views per subscriber",
+          "growth": "Audience growth", "live": "Live turnout", "reach": "Reach per upload", "cadence": "Regular publishing", "steadiness": "Steady results", "hitrate": "Hit rate", "freshness": "Fresh uploads"}
 NOT_MEASURED = ["Saves, shares and conversions (YouTube does not publish them for other people's videos)", "Exposure on other platforms (this score is YouTube only)"]
 METHOD = (
-    f"The {INDEX_NAME} ({TAGLINE}) ranks each creator against the others in the comparison on eight measured parts under three pillars. "
-    "Impact: depth of reaction ((likes + 5 x comments) / views) and staying power (how fast videos older than 10 days keep gaining views). "
-    "Followership: audience size (subscribers), loyalty (median views of a mature upload / subscribers) and growth (subscriber change, needs 3+ days of history). "
-    "eXposure: reach per upload (median views), regular publishing (uploads per week and how even the gaps are) and steady results (how little views vary from upload to upload). "
+    f"The {INDEX_NAME} ({TAGLINE}) ranks each creator against the others in the comparison on twelve measured parts under three pillars. "
+    "Impact: depth of reaction ((likes + 5 x comments) / views), conversation (comments per 1,000 views) and staying power (how fast videos older than 10 days keep gaining views). "
+    "Followership: audience size (subscribers), loyalty (median views of a mature upload / subscribers), growth (subscriber change, needs 3+ days of history) and live turnout (median peak viewers of the creator's own live streams / subscribers; only for creators who went live). "
+    "eXposure: reach per upload (median views), regular publishing (uploads per week and how even the gaps are), steady results (how little views vary from upload to upload), hit rate (the share of mature uploads that reach at least the typical peer upload) and fresh uploads (how recently the creator last published). "
     "A part STAXIS cannot measure is left out and the others are re-weighted. Live streams are excluded. "
     "The shown score is pulled toward 50 by (1 - confidence), so thin data cannot give a confident-looking score. A creator with open high-risk unusual-viewership flags loses 10 points; "
     "one whose flag an admin confirmed is not scored. Not measured: saves, shares and conversions, and exposure on other platforms."
@@ -80,6 +80,13 @@ def creator_index(session: Session, *, segment: str | None = None, language: str
     older = [v for v in mine if (parse_published(v.published_at) or now) <= now - timedelta(days=10)]
     spans = _first_last(session, [v.id for v in older], now - timedelta(days=14))
     subs = _subscribers(session, ids, since - timedelta(days=60))
+    live_peaks: dict[int, int] = {}  # a creator's own live streams in the window: the highest viewer count seen at once
+    live_vids = [v for v in videos if v.live_started_at and utc(v.live_started_at) >= since]
+    for i in range(0, len(live_vids), 400):
+        chunk = [v.id for v in live_vids[i:i + 400]]
+        for vid, top in session.execute(select(Observation.video_id, func.max(Observation.concurrent_viewers)).where(Observation.video_id.in_(chunk), Observation.concurrent_viewers.is_not(None)).group_by(Observation.video_id)):
+            if top and top > 0:
+                live_peaks[vid] = int(top)
     by_channel: dict[int, list[Video]] = defaultdict(list)
     for v in mine:
         by_channel[v.channel_id].append(v)
@@ -108,7 +115,15 @@ def creator_index(session: Session, *, segment: str | None = None, language: str
             if gap_days >= 3 and f.view_count:
                 rates.append((l.view_count - f.view_count) / f.view_count / gap_days)
         cv = (stdev(mviews) / mean(mviews)) if len(mviews) >= 5 and mean(mviews) else None
+        comments = sum(int(latest[v.id].comment_count or 0) for v in vs if int(latest[v.id].view_count) >= 1000)
+        own_peaks = [live_peaks[v.id] for v in live_vids if v.channel_id == c.id and v.id in live_peaks]
+        last_up = parse_published(vs[-1].published_at) if vs else None
+        days_since = max(0.0, (now - last_up).total_seconds() / 86400) if last_up else None
         raw[c.id] = {
+            "conversation": (comments / react_views) if react_views else None,
+            "live": (median(own_peaks) / subs_now) if own_peaks and subs_now else None, "live_streams": len(own_peaks), "live_peak_median": median(own_peaks) if own_peaks else None,
+            "freshness": (1 / (1 + days_since / 7)) if days_since is not None else None, "days_since_last_upload": days_since, "_mviews": mviews,
+            "hitrate": None,
             "videos": len(vs), "uploads_video": len([v for v in vs if latest[v.id].classification != "SHORT"]), "uploads_shorts": len([v for v in vs if latest[v.id].classification == "SHORT"]),
             "subscribers": subs_now, "median_views": median(mviews) if mviews else None,
             "loyalty": (median(mviews) / subs_now) if mviews and subs_now else None, "pull": (median(mviews) / subs_now) if mviews and subs_now else None,
@@ -121,6 +136,11 @@ def creator_index(session: Session, *, segment: str | None = None, language: str
             "growth": ((s["last"][1] - s["first"][1]) / s["first"][1] * 7 / history) if history >= 3 and s.get("first") and s["first"][1] else None,
             "history_days": history,
         }
+    reach_values = [r["reach"] for r in raw.values() if r["reach"] is not None]
+    typical = median(reach_values) if len(reach_values) >= 4 else None  # the typical peer upload: the middle of the creators' median views
+    for r in raw.values():
+        if typical is not None and len(r["_mviews"]) >= 5:
+            r["hitrate"] = sum(1 for x in r["_mviews"] if x >= typical) / len(r["_mviews"])
     peers = {k: [r[k] for r in raw.values() if r[k] is not None] for k in PARTS}
     risk = authenticity.scan(session, days=7, segment=segment, language=language, channel_ids=channel_ids, now=now, use_cache=False) if with_authenticity and ids else {"channels": []}
     risk_by = {r["channel_id"]: r for r in risk["channels"]}
@@ -169,6 +189,8 @@ def creator_index(session: Session, *, segment: str | None = None, language: str
             "median_views": rnd(r["median_views"], 0), "pull_percent": rnd(r["pull"] * 100, 1) if r["pull"] is not None else None,
             "pull_video_percent": rnd(r["pull_video"] * 100, 1) if r["pull_video"] is not None else None, "pull_shorts_percent": rnd(r["pull_shorts"] * 100, 1) if r["pull_shorts"] is not None else None,
             "engagement_percent": rnd(r["engagement"] * 100, 2) if r["engagement"] is not None else None, "uploads_per_week": rnd(r["uploads_per_week"], 1),
+            "comments_per_1000_views": rnd(r["conversation"] * 1000, 1) if r["conversation"] is not None else None, "hit_rate_percent": rnd(r["hitrate"] * 100, 0) if r["hitrate"] is not None else None,
+            "live_streams": r["live_streams"], "live_peak_median": rnd(r["live_peak_median"], 0), "days_since_last_upload": rnd(r["days_since_last_upload"], 1),
             "authenticity_risk": rk["risk"] if rk else "not_checked", "withheld_reason": "An admin confirmed unusual viewership for this channel." if confirmed else None,
         })
     rows.sort(key=lambda x: (x["index_score"] is not None, x["index_score"] or 0), reverse=True)

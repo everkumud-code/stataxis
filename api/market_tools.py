@@ -11,6 +11,7 @@ from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api import audience as audience_mod
@@ -18,7 +19,7 @@ from api.live_stats import live_window_stats
 from api.market_common import (
     IST, ist_hours, ist_window, latest_observations, mean, now_utc, parse_day, parse_published, percentile_rank, pick_channels, rnd, stdev, today_ist, utc,
 )
-from collector.storage import ChannelStats, Video
+from collector.storage import ChannelStats, Observation, Video
 from metrics.markets import market_label
 
 PRIME_SLOTS = [(17, 18), (18, 19), (19, 20), (20, 21), (21, 22), (22, 23)]
@@ -260,7 +261,8 @@ def media_plan(session: Session, *, start_hour: int, end_hour: int, days: int = 
     targeted = bool(t_ages or t_states or t_gender)
     if budget is not None and float(budget) <= 0:
         raise ValueError("the budget must be more than zero")
-    last_day = today_ist(now) - timedelta(days=1)
+    # today counts as soon as the chosen hours have ended; before that the last complete day is yesterday
+    last_day = today_ist(now) if now.astimezone(IST).hour >= end_hour else today_ist(now) - timedelta(days=1)
     day_list = [last_day - timedelta(days=i) for i in range(days)][::-1]
     acc: dict[int, dict[str, Any]] = {}
     for day in day_list:
@@ -309,7 +311,13 @@ def media_plan(session: Session, *, start_hour: int, end_hour: int, days: int = 
         row["audience_share_percent"] = rnd(100 * row["average_concurrent"] / total, 1) if total else None
         row["value_index"] = round(100 * median_cost / row[cost_key]) if median_cost and row[cost_key] else None
     plan = _split_budget(rows, float(budget), max_share, targeted) if budget and rates else None
-    return {"window": {"start_hour": start_hour, "end_hour": end_hour, "days": [d.isoformat() for d in day_list], "timezone": "IST"}, "filters": {"language": language, "segment": segment},
+    since = session.query(func.min(Observation.observed_at)).filter(Observation.concurrent_viewers.is_not(None)).scalar()
+    since_ist = utc(since).astimezone(IST) if since else None
+    note = None
+    if not rows:
+        note = (f"StatAxis has live viewer samples only since {since_ist:%d %b %H:%M} IST, so no day has a complete {start_hour:02d}:00 to {end_hour:02d}:00 window in these dates yet. "
+                "The planner fills in as days complete; today counts once your hours have ended.") if since_ist else "No live viewer samples have been collected yet, so there is nothing to plan from."
+    return {"data_since": since_ist.isoformat() if since_ist else None, "note": note, "window": {"start_hour": start_hour, "end_hour": end_hour, "days": [d.isoformat() for d in day_list], "timezone": "IST"}, "filters": {"language": language, "segment": segment},
             "method": PLANNER_METHOD + (TARGET_METHOD if targeted else ""), "median_cost_per_1000": median_cost, "channels": rows, "plan": plan,
             "target": {"ages": t_ages, "states": t_states, "gender": t_gender or None, "active": targeted, "channels_with_audience_data": sum(1 for r in rows if r["audience_known"])}}
 

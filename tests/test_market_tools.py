@@ -329,3 +329,26 @@ def test_http_gates_each_tool_by_package_reads_the_package_live_and_only_admins_
         s.get(User, 3).active = False
         s.commit()
     assert call(app, "GET", "/api/v1/market/authenticity", pro)[0] == 401
+
+
+def test_the_planner_counts_today_once_the_chosen_hours_have_ended():
+    s = make_session()
+    seeded_live(s)
+    morning = media_plan(s, start_hour=20, end_hour=22, days=7, now=NOW)                      # 11:30 IST: tonight is not over, the last complete day is yesterday
+    assert morning["window"]["days"][-1] == "2026-10-11"
+    night = media_plan(s, start_hour=20, end_hour=22, days=7, now=datetime(2026, 10, 12, 17, 0, tzinfo=UTC))   # 22:30 IST: today's 20:00 to 22:00 is over
+    assert night["window"]["days"][-1] == "2026-10-12" and night["window"]["days"][0] == "2026-10-06"
+    assert {r["name"]: r["days_seen"] for r in night["channels"]} == {"Alpha": 6, "Beta": 6}   # 6 to 11 Oct had samples; 12 Oct had none yet
+
+
+def test_an_empty_planner_says_why_instead_of_a_bare_empty_table():
+    s = make_session()
+    nothing = media_plan(s, start_hour=20, end_hour=22, days=7, now=NOW)
+    assert nothing["channels"] == [] and nothing["data_since"] is None and "No live viewer samples" in nothing["note"]
+    a = channel(s, "a", "Alpha")
+    live_day(s, a, "early", datetime(2026, 10, 12).date(), 0, 5, 3_000)   # samples exist, but only from the small hours of 12 Oct
+    s.commit()
+    out = media_plan(s, start_hour=20, end_hour=22, days=7, now=NOW)
+    assert out["channels"] == [] and out["data_since"].startswith("2026-10-12T00:00") and "only since 12 Oct 00:00 IST" in out["note"] and "20:00 to 22:00" in out["note"]
+    full = media_plan(s, start_hour=0, end_hour=5, days=7, now=NOW)       # a window that has ended today is counted
+    assert [r["name"] for r in full["channels"]] == ["Alpha"] and full["note"] is None

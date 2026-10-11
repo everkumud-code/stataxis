@@ -125,6 +125,23 @@ class AudienceProfile(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
+class UserChannel(Base):
+    """A login's own channel. A claim starts pending; it counts as the person's channel only once approved: either the code the person was given
+    was found in the channel's own description (proof that they control it), or an administrator approved or assigned it."""
+    __tablename__ = "stx_user_channels"
+    __table_args__ = (UniqueConstraint("user_id", "channel_id", name="uq_stx_user_channel"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("stx_users.id"), index=True)
+    channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending | approved | rejected
+    method: Mapped[str | None] = mapped_column(String(16), nullable=True)  # code | admin
+    code: Mapped[str] = mapped_column(String(40))
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class UserFeatureOverride(Base):
     """A privilege an admin gave to, or took from, one person, whatever their package says."""
     __tablename__ = "stx_user_feature_overrides"

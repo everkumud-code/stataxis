@@ -294,3 +294,35 @@ def test_channel_group_can_be_chosen_when_adding_and_changed_later():
         set_channel_segment(s, ident, c.id, "sports")
     with pytest.raises(PermissionError):
         set_channel_segment(s, AuthIdentity(2, "u@x.com", "sx_pro", False), c.id, "news")
+
+
+def test_ifx_has_twelve_parts_with_the_pillars_still_35_35_30_and_scores_the_new_ones():
+    from api import creator_index as ci
+    assert len(ci.PARTS) == 12 and abs(sum(ci.WEIGHTS.values()) - 1) < 1e-9 and ci.PILLAR_WEIGHTS == {"impact": 0.35, "followership": 0.35, "exposure": 0.3}
+    assert {"conversation", "live", "hitrate", "freshness"} <= set(ci.PARTS) and set(ci.LABELS) == set(ci.PARTS) and "twelve measured parts" in ci.METHOD
+    s, _ = make_session()
+    for i, (name, subs, views, comments, gap) in enumerate([("Talker", 100_000, 30_000, 400, 2), ("Quiet", 100_000, 30_000, 20, 2), ("Big", 100_000, 90_000, 100, 2), ("Small", 100_000, 6_000, 60, 2), ("Stale", 100_000, 30_000, 100, 2), ("Live", 100_000, 30_000, 100, 2)]):
+        c = channel(s, f"i{i}", name, segment="creator")
+        s.add(ChannelStats(channel_id=c.id, observed_at=NOW - timedelta(hours=1), subscribers=subs, total_views=1))
+        for k in range(10):
+            age = (22 if name == "Stale" else 0) + k * gap + 3   # the stale channel last published about 25 days ago
+            vv = Video(youtube_video_id=f"{name}{k}", channel_id=c.id, title="t", topic="Other", published_at=(NOW - timedelta(days=age)).strftime("%Y-%m-%dT%H:%M:%SZ"))
+            s.add(vv)
+            s.flush()
+            s.add(Observation(video_id=vv.id, channel_id=c.id, observed_at=NOW - timedelta(hours=1), view_count=views, like_count=views // 25, comment_count=comments, concurrent_viewers=None, is_live=False, classification="REGULAR_VIDEO", source="test"))
+        if name in {"Live", "Big", "Small", "Talker"}:   # four creators went live: enough peers for turnout to be ranked
+            top = {"Live": 9_000, "Big": 20_000, "Small": 1_000, "Talker": 5_000}[name]
+            lv = Video(youtube_video_id=f"live-{name}", channel_id=c.id, title="live", topic="Other", published_at=(NOW - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ"), live_started_at=NOW - timedelta(days=5))
+            s.add(lv)
+            s.flush()
+            for m, level in enumerate((top // 2, top, top * 3 // 4)):
+                s.add(Observation(video_id=lv.id, channel_id=c.id, observed_at=NOW - timedelta(days=5) + timedelta(minutes=m), view_count=1, like_count=0, comment_count=0, concurrent_viewers=level, is_live=True, classification="LIVE", source="test"))
+    s.commit()
+    out = creator_index(s, segment="creator", days=30, now=NOW, with_authenticity=False)
+    rows = {r["name"]: r for r in out["channels"]}
+    assert rows["Talker"]["parts"]["conversation"] > rows["Quiet"]["parts"]["conversation"] and rows["Talker"]["comments_per_1000_views"] == 13.3
+    assert rows["Big"]["parts"]["hitrate"] > rows["Small"]["parts"]["hitrate"] and rows["Big"]["hit_rate_percent"] == 100 and rows["Small"]["hit_rate_percent"] == 0
+    assert rows["Stale"]["parts"]["freshness"] < rows["Talker"]["parts"]["freshness"] and rows["Stale"]["days_since_last_upload"] > 20
+    assert rows["Live"]["live_streams"] == 1 and rows["Live"]["live_peak_median"] == 9_000 and rows["Live"]["parts"]["live"] > rows["Small"]["parts"]["live"] and rows["Big"]["parts"]["live"] > rows["Live"]["parts"]["live"]
+    assert "live" not in rows["Quiet"]["parts"] and rows["Quiet"]["live_streams"] == 0   # a creator who never went live is not marked down: the part is left out and the rest re-weighted
+    assert set(out["part_labels"]) == set(ci.PARTS)

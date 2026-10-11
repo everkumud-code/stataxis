@@ -18,6 +18,7 @@ from api.http import wsgi_application
 from api.insight_extensions import insight_application
 from api.live_http import live_application
 from api.market_http import market_application
+from api.my_channels_http import my_channels_application
 from api.public_http import public_application
 from collector.storage import create_database
 
@@ -64,6 +65,7 @@ _live_api = live_application(_session)
 _admin_api = admin_application(_session)
 _insight_api = protect_application(insight_application(_session))
 _market_api = market_application(_session)
+_my_channels_api = my_channels_application(_session)
 _public_api = public_application(_session)
 
 
@@ -87,6 +89,8 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         return _admin_api(environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
     if path.startswith("/api/v1/public/"):
         return _public_api(environ, lambda status, headers, *args: _start_response(start_response, status, headers))
+    if path.startswith("/api/v1/my/"):
+        return _my_channels_api(environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
     if path.startswith("/api/v1/market/"):
         return _market_api(environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
     if path.startswith("/api/v1/insights/"):
