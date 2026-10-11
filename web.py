@@ -130,7 +130,16 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         return api_result
     if path.startswith("/demo-api/"):
         return _demo.application(environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
-    if path in {"/demo", "/demo.html"}:
+    method = environ.get("REQUEST_METHOD", "GET")
+    # clean addresses: the old /name.html moves, for good, to /name (the page itself is served at /name)
+    if method in {"GET", "HEAD"} and path.endswith(".html") and ".." not in Path(path).parts and ((DASHBOARD / path.lstrip("/")).is_file() or path == "/demo.html"):
+        clean = path[:-5]
+        if clean.endswith("/index"):
+            clean = clean[:-5] or "/"
+        query = environ.get("QUERY_STRING", "")
+        _start_response(start_response, "301 Moved Permanently", [("Location", (clean or "/") + ("?" + query if query else "")), ("Content-Length", "0")])
+        return [b""]
+    if path == "/demo":
         body = demo_page((DASHBOARD / "workspace.html").read_text(encoding="utf-8"))
         _start_response(start_response, "200 OK", [("Content-Type", "text/html; charset=utf-8"), ("Content-Length", str(len(body)))], no_store=True)
         return [body]
@@ -147,6 +156,8 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         path = "/workspace.html"
     elif path == "/favicon.ico":
         path = "/favicon.svg"
+    elif ".." not in Path(path).parts and "." not in path.rsplit("/", 1)[-1] and (DASHBOARD / (path.lstrip("/") + ".html")).is_file():
+        path += ".html"   # /platform and /blog/average-beats-peak are the pages platform.html and blog/average-beats-peak.html
 
     if path.startswith("/") and ".." not in Path(path).parts:
         file_path = DASHBOARD / path.lstrip("/")
@@ -155,9 +166,9 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
             if path == "/index.html":
                 marker = b'<a href="#method">Methodology</a>'
                 nav = (b'<a href="#method">Methodology</a>'
-                       b'<a href="/stax9.html">STAX9 + STX</a>'
-                       b'<a href="/stx-index.html">STX Index</a>'
-                       b'<a href="/plans.html">SX Packages</a>')
+                       b'<a href="/stax9">STAX9 + STX</a>'
+                       b'<a href="/stx-index">STX Index</a>'
+                       b'<a href="/plans">SX Packages</a>')
                 if marker in body:
                     body = body.replace(marker, nav, 1)
             content_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"

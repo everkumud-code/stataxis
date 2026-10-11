@@ -36,7 +36,7 @@ def test_nothing_served_to_a_browser_contains_a_secret():
 
 
 def test_every_response_carries_the_hardening_headers():
-    for path in ("/", "/ifx.html", "/api/v1/market/weekly"):
+    for path in ("/", "/ifx", "/api/v1/market/weekly"):
         _status, headers, _body = get(path)
         assert headers["X-Content-Type-Options"] == "nosniff" and headers["X-Frame-Options"] == "DENY" and headers["Cross-Origin-Opener-Policy"] == "same-origin"
         assert "camera=()" in headers["Permissions-Policy"] and headers["Cross-Origin-Resource-Policy"] == "same-site" and headers["Referrer-Policy"]
@@ -60,5 +60,5 @@ def test_the_copy_guard_is_loaded_everywhere_a_visitor_or_a_member_looks_and_lea
 
 
 def test_the_demo_page_and_its_api_also_get_the_guard_and_the_headers():
-    status, headers, body = get("/demo.html")
+    status, headers, body = get("/demo")
     assert status.startswith("200") and b"guard.js" in body and headers["Cache-Control"] == "no-store" and "Permissions-Policy" in headers

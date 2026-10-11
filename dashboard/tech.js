@@ -20,7 +20,7 @@
       (u, v, t) => { const a = Math.atan2(v - .5, u - .5), d = Math.hypot(u - .5, v - .5), head = (t * 1.5) % 6.283, da = ((a + 6.283 - head) % 6.283); return Math.abs(d - .3) < .025 ? .25 + Math.max(0, 1 - da / 2.2) * .75 : d < .02 ? .8 : .04; }];
 
   /* ---- start-up counter: once a session, only on the home page, never for those who want less motion ---- */
-  const home = location.pathname === "/" || location.pathname.endsWith("/index.html");
+  const home = location.pathname === "/" || location.pathname.endsWith("/");
   let seen = false; try { seen = sessionStorage.getItem("sx_boot") === "1"; sessionStorage.setItem("sx_boot", "1"); } catch (e) { /* storage blocked */ }
   if (home && !reduce && !seen && !$(".sx-consent")) {
     const pre = document.createElement("div"); pre.className = "vx-pre"; pre.setAttribute("aria-hidden", "true");
@@ -221,7 +221,7 @@
     box.innerHTML = `<div class="vx-scroll"><table class="vx-matrix"><thead><tr><th>Tool</th>${plans.map(p => `<th>${esc(p.name.replace("SX ", ""))}<small>${p.max_seats ? p.max_seats + " seat" + (p.max_seats > 1 ? "s" : "") : "no seat limit"}</small></th>`).join("")}</tr></thead><tbody>${
       d.features.map(f => `<tr><td><strong>${esc(f.label)}</strong><small>${esc(f.description)}</small></td>${plans.map(p => `<td class="${order.indexOf(p.code) >= order.indexOf(f.min_plan) ? "y" : "n"}">${order.indexOf(p.code) >= order.indexOf(f.min_plan) ? "●" : "–"}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
       <p class="vx-sub" style="font-size:15px">${d.commercial_packages.length ? d.commercial_packages.map(p => esc(p.name) + (p.amount != null ? " · " + esc(p.currency) + " " + Number(p.amount).toLocaleString("en-IN") : "")).join("  |  ") : "Prices are given on application. Tell us who you are and we will recommend the package that fits."}</p>`;
-  }).catch(() => { box.innerHTML = '<p class="vx-sub">The package list could not be loaded right now. <a href="/apply.html" style="color:#4db6ff">Apply for access</a> and we will send it.</p>'; });
+  }).catch(() => { box.innerHTML = '<p class="vx-sub">The package list could not be loaded right now. <a href="/apply" style="color:#4db6ff">Apply for access</a> and we will send it.</p>'; });
 
   /* ---- drag-to-scroll shelves ---- */
   $$(".vx-shelf").forEach(s => {

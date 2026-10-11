@@ -6,17 +6,17 @@
   const A = "/assets/stax9/";
   const path = location.pathname.replace(/\/$/, "").replace(/\.html$/, "") || "/";
   const TIPS = {
-    "/": ["Welcome. I am STAX9. Tell me who you are and I will point you to the right place.", [["I buy media", "/solutions.html"], ["I publish or report", "/ifx.html"], ["I run a newsroom", "/platform.html"], ["Apply for access", "/apply.html"]]],
-    "/platform": ["Four views, eight steps and one rule: every number shows its working. The FAQ at the bottom answers the common questions.", [["How STX is scored", "/stx.html"], ["See the IFX Score", "/ifx.html"], ["Apply", "/apply.html"]]],
-    "/solutions": ["Name the decision and the audience. We write it back as a question the data can answer.", [["Platform tour", "/platform.html"], ["Apply as a media buyer", "/apply.html?role=buyer&plan=sx_analyst"]]],
-    "/ifx": ["Three pillars, one score and a confidence beside it. Watch the weights fill as you scroll.", [["The method, in words", "/blog/ifx-score-explained.html"], ["Join the programme", "/apply.html?role=influencer&plan=sx_intelligence"]]],
-    "/stx": ["Seven parts make the STX Index. Read the confidence before you quote a score.", [["Meet the IFX Score", "/ifx.html"], ["Platform tour", "/platform.html"]]],
-    "/research": ["Behaviour tells you what. Answers tell you why. Bring me the question.", [["Read the Insights", "/insights.html"], ["Start a brief", "mailto:stax9@stataxis.org?subject=Research%20brief"]]],
-    "/insights": ["Pick a path by what you do. Each article explains one part of how we measure.", [["Why the average beats the peak", "/blog/average-beats-peak.html"], ["What a flat line says", "/blog/what-a-flat-line-says.html"]]],
-    "/apply": ["Tell us who you are and what you need. An administrator reviews every request.", [["What each package gives", "/platform.html#packages"], ["Back to home", "/"]]],
-    "/demo": ["This is a demonstration. For live data, apply for access.", [["Apply for access", "/apply.html"], ["Platform tour", "/platform.html"]]],
+    "/": ["Welcome. I am STAX9. Tell me who you are and I will point you to the right place.", [["I buy media", "/solutions"], ["I publish or report", "/ifx"], ["I run a newsroom", "/platform"], ["Apply for access", "/apply"]]],
+    "/platform": ["Four views, eight steps and one rule: every number shows its working. The FAQ at the bottom answers the common questions.", [["How STX is scored", "/stx"], ["See the IFX Score", "/ifx"], ["Apply", "/apply"]]],
+    "/solutions": ["Name the decision and the audience. We write it back as a question the data can answer.", [["Platform tour", "/platform"], ["Apply as a media buyer", "/apply?role=buyer&plan=sx_analyst"]]],
+    "/ifx": ["Three pillars, one score and a confidence beside it. Watch the weights fill as you scroll.", [["The method, in words", "/blog/ifx-score-explained"], ["Join the programme", "/apply?role=influencer&plan=sx_intelligence"]]],
+    "/stx": ["Seven parts make the STX Index. Read the confidence before you quote a score.", [["Meet the IFX Score", "/ifx"], ["Platform tour", "/platform"]]],
+    "/research": ["Behaviour tells you what. Answers tell you why. Bring me the question.", [["Read the Insights", "/insights"], ["Start a brief", "mailto:stax9@stataxis.org?subject=Research%20brief"]]],
+    "/insights": ["Pick a path by what you do. Each article explains one part of how we measure.", [["Why the average beats the peak", "/blog/average-beats-peak"], ["What a flat line says", "/blog/what-a-flat-line-says"]]],
+    "/apply": ["Tell us who you are and what you need. An administrator reviews every request.", [["What each package gives", "/platform#packages"], ["Back to home", "/"]]],
+    "/demo": ["This is a demonstration. For live data, apply for access.", [["Apply for access", "/apply"], ["Platform tour", "/platform"]]],
   };
-  const tip = TIPS[path] || (path.startsWith("/blog/") ? ["Liked this one? There are more in the lab.", [["All insights", "/insights.html"], ["The IFX Score", "/ifx.html"]]] : ["I am STAX9. Ask me where to go.", [["Home", "/"], ["Platform", "/platform.html"], ["Apply", "/apply.html"]]]);
+  const tip = TIPS[path] || (path.startsWith("/blog/") ? ["Liked this one? There are more in the lab.", [["All insights", "/insights"], ["The IFX Score", "/ifx"]]] : ["I am STAX9. Ask me where to go.", [["Home", "/"], ["Platform", "/platform"], ["Apply", "/apply"]]]);
   const esc = v => String(v).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
   const root = document.createElement("div"); root.className = "s9";
   root.innerHTML =

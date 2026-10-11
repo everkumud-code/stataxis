@@ -46,7 +46,7 @@ def test_the_home_page_keeps_the_original_content_and_adds_to_it():
         assert original in home or original.replace("&", "&amp;") in home, original
     assert home.count("Choose where you want to go.") == 1 and home.count("YouTube data, clearly identified.") == 1
     # and the new sections are added
-    for addition in ("IFX Score", "Authenticity radar", "tx-matrix", "vx-pulse", "Verified audience programme", "/blog/average-beats-peak.html", "Eleven questions"):
+    for addition in ("IFX Score", "Authenticity radar", "tx-matrix", "vx-pulse", "Verified audience programme", "/blog/average-beats-peak", "Eleven questions"):
         assert addition in home, addition
 
 
@@ -63,10 +63,10 @@ def test_the_other_original_pages_keep_their_words():
 
 
 def test_every_internal_link_and_script_lands_on_a_file():
-    served = {"/": "index.html", "/login": "login.html", "/admin": "admin.html", "/apply": "apply.html", "/workspace": "workspace.html", "/demo.html": "workspace.html"}
+    served = {"/": "index.html", "/login": "login.html", "/admin": "admin.html", "/apply": "apply.html", "/workspace": "workspace.html", "/demo": "workspace.html"}
     for page in [DASH / p for p in PAGES] + POSTS + [DASH / "site.js"]:
         for href in re.findall(r'(?:href|src)=["\'](/[^"\'#?]*)', text(page)):
-            target = served.get(href) or href.lstrip("/")
+            target = served.get(href) or (href.lstrip("/") + ".html" if "." not in href.rsplit("/", 1)[-1] else href.lstrip("/"))
             if target and not href.startswith("/api/"):
                 assert (DASH / target).is_file(), f"{page.name} links to {href}"
 
@@ -76,8 +76,8 @@ def test_the_blog_is_complete_and_indexed():
     index = text(DASH / "insights.html")
     for p in POSTS:
         html = text(p)
-        assert f"/blog/{p.name}" in index, p.name
-        assert f'<link rel="canonical" href="https://www.stataxis.org/blog/{p.name}">' in html
+        assert f'/blog/{p.stem}"' in index, p.name
+        assert f'<link rel="canonical" href="https://www.stataxis.org/blog/{p.stem}">' in html
         ld = json.loads(re.search(r'<script type="application/ld\+json">(.*?)</script>', html, re.S).group(1))
         assert ld["@type"] == "Article" and ld["headline"] and ld["datePublished"].startswith("2026-")
         assert len(re.sub(r"<[^>]+>", " ", html).split()) > 250, f"{p.name} is too thin"
@@ -99,7 +99,7 @@ def test_the_web_app_serves_the_new_pages_and_the_public_endpoints_without_login
         out = {}
         res = web.application({"REQUEST_METHOD": "GET", "PATH_INFO": path, "QUERY_STRING": "", "REMOTE_ADDR": "127.0.0.1"}, lambda status, headers: out.update(status=status, headers=dict(headers)))
         return out["status"], b"".join(res)
-    for path in ("/", "/ifx.html", "/blog/data-to-decision.html", "/tech.css", "/tech.js", "/market.js", "/assets/stataxis-logo.svg"):
+    for path in ("/", "/ifx", "/blog/data-to-decision", "/platform", "/login", "/apply", "/tech.css", "/tech.js", "/market.js", "/assets/stataxis-logo.svg"):
         status, body = get(path)
         assert status.startswith("200") and body, path
     for path in ("/api/v1/public/pulse", "/api/v1/public/packages"):
@@ -177,5 +177,41 @@ def test_the_server_serves_the_stax9_artwork_with_the_right_type(name, kind):
 
 def test_the_main_menu_has_a_client_login_button_that_leads_to_the_workspace_for_a_signed_in_client():
     site, css = text(DASH / "site.js"), text(DASH / "tech.css")
-    assert site.count("data-client-login") >= 3 and 'href="/login.html"' in site and "Client login" in site and "My workspace" in site and "/workspace.html" in site
+    assert site.count("data-client-login") >= 3 and 'href="/login"' in site and "Client login" in site and "My workspace" in site and '"/workspace"' in site
     assert ".vx-menu a.login" in css
+
+
+CLEAN = ["/", "/platform", "/solutions", "/ifx", "/stx", "/research", "/insights", "/login", "/apply", "/workspace", "/demo", "/privacy", "/terms", "/stax9", "/blog/average-beats-peak"]
+
+
+@pytest.mark.parametrize("path", CLEAN)
+def test_every_page_opens_at_its_clean_address(path):
+    out = {}
+    res = web.application({"REQUEST_METHOD": "GET", "PATH_INFO": path, "QUERY_STRING": "", "REMOTE_ADDR": "127.0.0.1"}, lambda status, headers: out.update(status=status, headers=dict(headers)))
+    body = b"".join(res)
+    assert out["status"].startswith("200") and out["headers"]["Content-Type"].startswith("text/html") and b"<html" in body[:400].lower(), path
+
+
+@pytest.mark.parametrize("old,new", [("/login.html", "/login"), ("/platform.html", "/platform"), ("/blog/average-beats-peak.html", "/blog/average-beats-peak"), ("/index.html", "/"), ("/demo.html", "/demo"), ("/workspace.html", "/workspace")])
+def test_the_old_html_address_moves_for_good_to_the_clean_one(old, new):
+    out = {}
+    res = web.application({"REQUEST_METHOD": "GET", "PATH_INFO": old, "QUERY_STRING": "role=media&plan=sx_idea", "REMOTE_ADDR": "127.0.0.1"}, lambda status, headers: out.update(status=status, headers=dict(headers)))
+    assert out["status"].startswith("301") and out["headers"]["Location"] == new + "?role=media&plan=sx_idea" and b"".join(res) == b""
+
+
+@pytest.mark.parametrize("path", ["/nonexistent", "/web", "/dashboard/login", "/blog", "/login/extra", "/../web", "/%2e%2e/web", "/missing.html"])
+def test_a_clean_address_that_is_not_a_page_is_not_found_and_cannot_leave_the_site_folder(path):
+    out = {}
+    res = web.application({"REQUEST_METHOD": "GET", "PATH_INFO": path, "QUERY_STRING": "", "REMOTE_ADDR": "127.0.0.1"}, lambda status, headers: out.update(status=status, headers=dict(headers)))
+    assert out["status"].startswith("404") and b"".join(res) == b"Not found", path
+
+
+def test_no_internal_link_or_canonical_address_still_ends_in_dot_html():
+    for path in [DASH / p for p in PAGES] + POSTS + [DASH / n for n in ("site.js", "tech.js", "stax9.js", "login.html", "apply.html", "workspace.html", "privacy.html", "terms.html")]:
+        html = text(path)
+        for m in re.finditer(r"""(?:href|src|action)=["']([^"']+)["']|(?:location\.href\s*=|location\.replace\()\s*["']([^"']+)["']""", html):
+            target = m.group(1) or m.group(2)
+            if target.startswith(("http://", "https://", "mailto:", "#", "data:")) and "stataxis.org" not in target:
+                continue
+            assert ".html" not in target.split("?")[0].split("#")[0], f"{path.name}: {target}"
+        assert not re.search(r"https://www\.stataxis\.org/[^\"'\s]*\.html", html), path.name

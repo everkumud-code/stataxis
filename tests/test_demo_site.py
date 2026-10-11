@@ -75,7 +75,7 @@ def test_a_demo_token_is_useless_against_the_real_api_and_the_real_data(secret, 
 
 
 def test_the_demo_page_is_the_real_workspace_with_a_banner_and_no_way_to_leave_the_demo_data():
-    status, body, headers = call("GET", "/demo.html")
+    status, body, headers = call("GET", "/demo")
     assert status == 200 and b"/demo-api/" in body and b"invented sample channels" in body and b"read-only" not in body[:0] and headers["Cache-Control"] == "no-store"
     assert b"STATAXIS" in body and b"market.js" in body and b"me.js" in body and body.count(b"<head>") == 1
     status, text, _ = call("GET", "/demo-api/not-a-route", None)

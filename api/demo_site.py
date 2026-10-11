@@ -38,9 +38,9 @@ INJECT = r"""<script>/* STAXIS demo: this page runs the real workspace on invent
     document.title = "Demo — StatAxis workspace";
     var b = document.createElement("div");
     b.style.cssText = "background:#0b2a44;border-bottom:1px solid #159de8;color:#dff1ff;padding:10px 18px;font:14px/1.45 system-ui,sans-serif;display:flex;gap:14px;flex-wrap:wrap;align-items:center;justify-content:space-between";
-    b.innerHTML = '<span><b>DEMO</b> · This is the real StatAxis workspace running on <b>invented sample channels</b>. Nothing here is a real channel or a real measurement, and nothing can be changed.</span><a href="/apply.html" style="color:#021018;background:#159de8;padding:8px 14px;border-radius:6px;text-decoration:none;font-weight:600">Apply for access</a>';
+    b.innerHTML = '<span><b>DEMO</b> · This is the real StatAxis workspace running on <b>invented sample channels</b>. Nothing here is a real channel or a real measurement, and nothing can be changed.</span><a href="/apply" style="color:#021018;background:#159de8;padding:8px 14px;border-radius:6px;text-decoration:none;font-weight:600">Apply for access</a>';
     document.body.insertBefore(b, document.body.firstChild);
-    var out = document.getElementById("signout"); if (out) { out.textContent = "Apply for access"; out.onclick = function () { location.href = "/apply.html"; }; }
+    var out = document.getElementById("signout"); if (out) { out.textContent = "Apply for access"; out.onclick = function () { location.href = "/apply"; }; }
     var pw = document.getElementById("chpw"); if (pw) pw.hidden = true;
     window.signOut = function () { sessionStorage.removeItem("stataxis_token"); location.reload(); };
   });
