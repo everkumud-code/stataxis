@@ -15,6 +15,8 @@ A finding is never an opinion. Each one is a rule applied to measured numbers; i
 
 from __future__ import annotations
 
+from api.ttl_cache import ttl_cache
+
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any
@@ -247,6 +249,7 @@ def briefing_as_report(b: dict[str, Any]) -> dict[str, Any]:
 
 
 # -------------------------------------------------------------------------------------------- the briefing
+@ttl_cache()
 def briefing(session: Session, *, persona: str, days: int = 7, segment: str | None = None, language: str | None = None, channel_ids: list[int] | None = None, now: datetime | None = None, limit: int = 8) -> dict[str, Any]:
     if persona not in PERSONAS:
         raise ValueError("persona must be one of: " + ", ".join(PERSONAS))

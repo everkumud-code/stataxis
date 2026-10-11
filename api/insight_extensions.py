@@ -15,9 +15,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 from urllib.parse import parse_qs
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
+from api.ttl_cache import ttl_cache
 from collector.storage import Channel, Observation, Video
 from metrics.eligibility import analysis_observation_clause
 
@@ -68,55 +69,53 @@ def _terms(titles: list[str], limit: int = 8) -> list[dict[str, Any]]:
     return [{"term": term, "mentions": count} for term, count in counter.most_common(limit)]
 
 
-def _rows(session: Session, channel_ids: list[int], start: datetime, end: datetime) -> list[tuple[Observation, Video, Channel]]:
+def _newest_per_video(session: Session, channel_ids: list[int], start: datetime, end: datetime) -> tuple[dict[tuple[int, int], int | None], dict[int, int]]:
+    """For each video seen in the window: its newest view count and how many observations it has in the window. Counted in the database, not by loading every row."""
     if not channel_ids:
-        return []
-    stmt = (
-        select(Observation, Video, Channel)
-        .join(Video, Video.id == Observation.video_id)
-        .join(Channel, Channel.id == Observation.channel_id)
-        .where(Observation.channel_id.in_(channel_ids), Observation.observed_at >= start, Observation.observed_at <= end, analysis_observation_clause())
-        .order_by(Observation.channel_id.asc(), Observation.video_id.asc(), Observation.observed_at.asc(), Observation.id.asc())
-    )
-    return list(session.execute(stmt))
+        return {}, {}
+    window = (Observation.channel_id.in_(channel_ids), Observation.observed_at >= start, Observation.observed_at <= end, analysis_observation_clause())
+    agg = select(Observation.channel_id.label("c"), Observation.video_id.label("v"), func.count().label("n"), func.max(Observation.observed_at).label("m")).where(*window).group_by(Observation.channel_id, Observation.video_id).subquery()
+    stmt = (select(Observation.channel_id, Observation.video_id, Observation.view_count, agg.c.n)
+            .join(agg, and_(Observation.channel_id == agg.c.c, Observation.video_id == agg.c.v, Observation.observed_at == agg.c.m))
+            .order_by(Observation.channel_id.asc(), Observation.video_id.asc()))
+    views: dict[tuple[int, int], int | None] = {}
+    rows_per_video: dict[int, int] = {}
+    for channel_id, video_id, view_count, n in session.execute(stmt):
+        views[(channel_id, video_id)] = view_count
+        rows_per_video[video_id] = rows_per_video.get(video_id, 0) + int(n)
+    return views, rows_per_video
 
 
+@ttl_cache()
 def build_what_changed(session: Session, *, channel_id: int | None = None, hours: int = 24, as_of: datetime | None = None) -> dict[str, Any]:
     hours = max(1, min(int(hours), 168))
     as_of = _utc(as_of or datetime.now(UTC))
     current_start = as_of - timedelta(hours=hours)
     previous_start = current_start - timedelta(hours=hours)
     channel_ids = [channel_id] if channel_id is not None else list(session.execute(select(Channel.id).where(Channel.active.is_(True))).scalars())
-    current_rows = _rows(session, channel_ids, current_start, as_of)
-    previous_rows = _rows(session, channel_ids, previous_start, current_start - timedelta(microseconds=1))
+    latest, current_rows_per_video = _newest_per_video(session, channel_ids, current_start, as_of)
+    previous_latest, previous_rows_per_video = _newest_per_video(session, channel_ids, previous_start, current_start - timedelta(microseconds=1))
+    titles_by_id: dict[int, str | None] = {}
+    video_ids = list(current_rows_per_video)
+    for i in range(0, len(video_ids), 500):
+        for vid, title in session.execute(select(Video.id, Video.title).where(Video.id.in_(video_ids[i:i + 500]))):
+            titles_by_id[vid] = title
 
-    latest: dict[tuple[int, int], Observation] = {}
-    first: dict[tuple[int, int], Observation] = {}
-    for observation, _video, _channel in current_rows:
-        key = (observation.channel_id, observation.video_id)
-        latest[key] = observation
-        first.setdefault(key, observation)
-    previous_latest: dict[tuple[int, int], Observation] = {}
-    for observation, _video, _channel in previous_rows:
-        previous_latest[(observation.channel_id, observation.video_id)] = observation
-
-    videos_by_id = {video.id: video for _obs, video, _channel in current_rows}
     changes: list[dict[str, Any]] = []
-    for key, observation in latest.items():
-        prior = previous_latest.get(key)
-        delta = None if prior is None or observation.view_count is None or prior.view_count is None else observation.view_count - prior.view_count
+    for key, view_count in latest.items():
+        prior_views = previous_latest.get(key)
+        delta = None if key not in previous_latest or view_count is None or prior_views is None else view_count - prior_views
         if delta is not None and delta != 0:
-            video = videos_by_id[key[1]]
-            changes.append({"channel_id": key[0], "video_id": video.id, "title": video.title, "view_delta": delta})
+            changes.append({"channel_id": key[0], "video_id": key[1], "title": titles_by_id.get(key[1]), "view_delta": delta})
     changes.sort(key=lambda item: abs(item["view_delta"]), reverse=True)
 
-    current_titles = [video.title for _obs, video, _channel in current_rows if video.title]
+    current_titles = [title for vid, n in current_rows_per_video.items() if (title := titles_by_id.get(vid)) for _ in range(n)]   # one title per observation, as before
     sentiment = _sentiment(" ".join(current_titles))
     narrative_terms = _terms(current_titles)
     current_views = [item["view_delta"] for item in changes if item["view_delta"] is not None]
     total_delta = sum(current_views) if current_views else None
-    previous_count = len(previous_rows)
-    current_count = len(current_rows)
+    previous_count = sum(previous_rows_per_video.values())
+    current_count = sum(current_rows_per_video.values())
     coverage = current_count / max(previous_count, current_count, 1)
     confidence = min(1.0, 0.35 + 0.45 * min(1.0, current_count / 100) + 0.20 * coverage)
 

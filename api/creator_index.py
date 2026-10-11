@@ -13,6 +13,8 @@ and says so. It is never shown as more certain than the data allows: every row c
 
 from __future__ import annotations
 
+from api.ttl_cache import ttl_cache
+
 from collections import defaultdict
 from datetime import datetime, timedelta
 from statistics import median
@@ -65,6 +67,7 @@ def _first_last(session: Session, video_ids: list[int], since: datetime) -> dict
     return out
 
 
+@ttl_cache()
 def creator_index(session: Session, *, segment: str | None = None, language: str | None = None, days: int = 30, channel_ids: list[int] | None = None, now: datetime | None = None, with_authenticity: bool = True) -> dict[str, Any]:
     if not 14 <= int(days) <= 90:
         raise ValueError("days must be between 14 and 90")

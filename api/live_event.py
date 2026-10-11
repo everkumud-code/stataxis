@@ -10,6 +10,8 @@ or mixed, not how the audience feels (STAXIS cannot read live chat). Every row s
 
 from __future__ import annotations
 
+from api.ttl_cache import ttl_cache
+
 from datetime import datetime, timedelta
 from statistics import median
 from typing import Any
@@ -41,6 +43,7 @@ def _series(samples: list[tuple[datetime, int]], grid: list[datetime]) -> list[i
     return out
 
 
+@ttl_cache(scale=0.2)   # a live screen: a few seconds is enough
 def live_event_compare(session: Session, *, terms: list[str] | None = None, channel_ids: list[int] | None = None, minutes: int = 60, segment: str | None = None, language: str | None = None,
                        stx_period: str = "7d", now: datetime | None = None) -> dict[str, Any]:
     if not 10 <= int(minutes) <= 180:

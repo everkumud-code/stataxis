@@ -6,6 +6,8 @@ Nothing here is invented. Every figure comes from the collected observations, ev
 
 from __future__ import annotations
 
+from api.ttl_cache import ttl_cache
+
 import math
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
@@ -47,6 +49,7 @@ def _videos_in(session: Session, channel_ids: list[int], start: datetime, end: d
 
 
 # --------------------------------------------------------------------------------------------- weekly views
+@ttl_cache()
 def weekly_views(session: Session, *, start_date: str, end_date: str, segment: str | None = None, language: str | None = None, channel_ids: list[int] | None = None,
                  target: dict[str, Any] | None = None, profiles: dict[int, dict[str, Any]] | None = None, known_only: bool = False, now: datetime | None = None) -> dict[str, Any]:
     start_day, end_day = parse_day(start_date, "from"), parse_day(end_date, "to")
@@ -96,6 +99,7 @@ def weekly_views(session: Session, *, start_date: str, end_date: str, segment: s
 
 
 # --------------------------------------------------------------------------------------------- prime time
+@ttl_cache()
 def prime_time(session: Session, *, start_date: str, end_date: str, language: str | None = None, segment: str | None = None, channel_ids: list[int] | None = None,
                target: dict[str, Any] | None = None, profiles: dict[int, dict[str, Any]] | None = None, known_only: bool = False,
                slots: list[tuple[int, int]] | None = None, top: int = 5, now: datetime | None = None) -> dict[str, Any]:
