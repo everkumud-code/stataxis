@@ -180,6 +180,22 @@ class User(Base):
     purpose_of_use: Mapped[str | None] = mapped_column(Text, nullable=True)
     requested_plan: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)  # set for accounts made or reset by an administrator: the first thing they do is choose their own password
+
+
+class UserPref(Base):
+    """What one person chose to see: who they are in the market, which screens they want, their languages and groups, where to land, and a few profile details."""
+    __tablename__ = "stx_user_prefs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("stx_users.id"), unique=True, index=True)
+    persona: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    views_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    languages_json: Mapped[str] = mapped_column(Text, default="[]")
+    segments_json: Mapped[str] = mapped_column(Text, default="[]")
+    start_view: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    job_title: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
 class PackageConfig(Base):
@@ -230,6 +246,7 @@ def create_database(url: str):
             "organization": "VARCHAR(255)",
             "purpose_of_use": "TEXT",
             "requested_plan": "VARCHAR(32)",
+            "must_change_password": "BOOLEAN DEFAULT FALSE",
         }
         for name, definition in additions.items():
             _add_column_if_missing(connection, "stx_users", name, definition, columns)

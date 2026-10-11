@@ -15,7 +15,7 @@ from collector.storage import User
 
 def payload(user: User) -> dict[str, Any]:
     return {"id": user.id, "name": user.full_name, "email": user.email, "mobile": user.mobile, "organization": user.organization, "plan": user.plan, "requested_plan": user.requested_plan,
-            "approval_status": user.approval_status, "active": user.active, "is_admin": user.is_admin, "created_at": user.created_at.isoformat() if user.created_at else None}
+            "approval_status": user.approval_status, "active": user.active, "is_admin": user.is_admin, "must_change_password": bool(user.must_change_password), "created_at": user.created_at.isoformat() if user.created_at else None}
 
 
 def seats_used(session: Session, organization: str | None, plan: str, exclude_user_id: int | None = None) -> int:
@@ -105,10 +105,10 @@ def create_user(session: Session, *, email: str, name: str, organization: str, m
     check_seat(session, organization, code)
     temp = _temp_password()
     user = User(email=email, password_hash=hash_password(temp), plan=code, requested_plan=code, is_admin=False, active=True, approval_status="approved", full_name=name.strip(),
-                organization=organization.strip(), mobile=(mobile or "").strip() or None)
+                organization=organization.strip(), mobile=(mobile or "").strip() or None, must_change_password=True)
     session.add(user)
     session.commit()
-    return {**payload(user), "temporary_password": temp, "note": "Shown once. Give it to the user and ask them to change it at once (Change password in the workspace)."}
+    return {**payload(user), "temporary_password": temp, "note": "Shown once. Give it to the user: they must choose their own password the first time they sign in with it."}
 
 
 def rename_login(session: Session, user_id: int, new_id: str) -> dict[str, Any]:
@@ -128,5 +128,6 @@ def reset_password(session: Session, user_id: int) -> dict[str, Any]:
     user = _get(session, user_id)
     temp = _temp_password()
     user.password_hash = hash_password(temp)
+    user.must_change_password = True
     session.commit()
-    return {**payload(user), "temporary_password": temp, "note": "Shown once. Give it to the user and ask them to change it at once."}
+    return {**payload(user), "temporary_password": temp, "note": "Shown once. Give it to the user: they must choose their own password the first time they sign in with it."}

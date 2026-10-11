@@ -21,6 +21,7 @@
   loadMine();
   const SP = JSON.parse(sessionStorage.getItem("sx_market") || "{}");
   const keep = (k, v) => { SP[k] = v; try { sessionStorage.setItem("sx_market", JSON.stringify(SP)); } catch { /* storage blocked */ } };
+  window.__sxMarket = {SP, keep};   /* used by me.js to start the briefing on the person's own role */
   const num = v => v == null || v === "" ? "—" : Number(v).toLocaleString("en-IN", {maximumFractionDigits: 1});
   const MULTI = new Set(["channels", "states", "ages"]);
   /* The values of a form, with the choose-several fields (channels, places, age groups) joined with commas so the API gets one value for each */
@@ -388,7 +389,7 @@
         const ch = c.channel, ok = c.status === "approved", wait = c.status === "pending", no = c.status === "rejected";
         return `<section class="card" style="margin-top:14px"><div class="head"><h2>${esc(ch.name)} ${ok ? chip("Yours", "green") : wait ? chip("Waiting for proof") : chip("Declined", "red")} ${ch.tracked ? chip("Tracked") : chip("Not tracked yet")}</h2></div>
           <p class="muted">${esc(ch.handle || ch.youtube_channel_id)} · ${esc(ch.language === "unknown" ? "" : ch.language)}${ok ? ` · mapped ${c.method === "code" ? "by the code in the description" : "by an administrator"}` : ""}${no && c.note ? ` · ${esc(c.note)}` : ""}</p>
-          ${wait ? `<div class="card" style="border-color:#159de8;margin:10px 0"><p style="margin:0 0 6px">Your code</p><code style="font-size:20px;user-select:all">${esc(c.code)}</code><p class="muted" style="margin:8px 0 0">${esc(d.help)}</p></div>` : ""}
+          ${wait ? `<div class="card" style="border-color:#159de8;margin:10px 0"><p style="margin:0 0 6px">Your code</p><code class="allow-copy" style="font-size:20px;user-select:all">${esc(c.code)}</code><p class="muted" style="margin:8px 0 0">${esc(d.help)}</p></div>` : ""}
           ${ok && !ch.tracked ? `<p class="muted">This channel is yours, but StatAxis is not collecting it yet (collection uses YouTube quota). An administrator switches it on.</p>` : ""}
           <div class="btnrow">${wait ? `<button class="btn primary" type="button" data-verify="${esc(c.id)}">Verify now</button>` : ""}${ok && ch.tracked ? `<button class="btn" type="button" data-open="creators">Open my IFX Score</button><button class="btn" type="button" data-open="authenticity">My authenticity record</button>` : ""}<button class="btn" type="button" data-drop="${esc(c.id)}">Remove</button></div></section>`;
       }).join("");
@@ -492,7 +493,7 @@
       <label>Organisation<input type="text" name="organization" required></label><label>Mobile<input type="text" name="mobile"></label><label>Package<select name="plan" id="ucplan"></select></label><button class="btn primary" type="submit">Create</button></form></section>`;
     let plans = [];
     const say = (t, ok) => { const m = $("#umsg", el); m.hidden = !t; m.className = "msg " + (ok ? "ok" : "bad"); m.textContent = t || ""; };
-    const secret = (what, d) => { say("", true); const m = $("#umsg", el); m.hidden = false; m.className = "msg ok"; m.innerHTML = `${esc(what)} <strong>${esc(d.email)}</strong>: temporary password <code style="user-select:all">${esc(d.temporary_password)}</code><br><span class="muted">${esc(d.note)}</span>`; };
+    const secret = (what, d) => { say("", true); const m = $("#umsg", el); m.hidden = false; m.className = "msg ok"; m.innerHTML = `${esc(what)} <strong>${esc(d.email)}</strong>: temporary password <code class="allow-copy" style="user-select:all">${esc(d.temporary_password)}</code><br><span class="muted">${esc(d.note)}</span>`; };
     /* the privileges of one person: tick a tool to allow it, un-tick to switch it off; no tick of yours means the package decides */
     const privileges = async uid => {
       const box = $("#upriv", el);
@@ -520,7 +521,7 @@
         const d = await post("/api/v1/admin/users/list", {q}); plans = d.plans;
         $("#ucplan", el).innerHTML = plans.map(p => `<option value="${esc(p.code)}">${esc(p.name)}${p.max_seats ? " (" + p.max_seats + " seats)" : ""}</option>`).join("");
         $("#uout", el).innerHTML = `<section class="card" style="margin-top:14px">${table([
-          {h: "Person", html: 1, v: u => `<strong>${esc(u.name || u.email)}</strong><br><span class="muted">${esc(u.email)}</span>`}, {h: "Organisation", v: u => u.organization || "—"}, {h: "Status", html: 1, v: u => `${esc(u.approval_status)}${u.active ? "" : ' <span class="tag red">off</span>'}${u.is_admin ? ' <span class="tag">admin</span>' : ""}`},
+          {h: "Person", html: 1, v: u => `<strong>${esc(u.name || u.email)}</strong><br><span class="muted">${esc(u.email)}</span>`}, {h: "Organisation", v: u => u.organization || "—"}, {h: "Status", html: 1, v: u => `${esc(u.approval_status)}${u.active ? "" : ' <span class="tag red">off</span>'}${u.is_admin ? ' <span class="tag">admin</span>' : ""}${u.must_change_password ? ' <span class="tag" title="Signed in with a password an administrator made; they must choose their own first">temporary password</span>' : ""}`},
           {h: "Package", html: 1, v: u => u.is_admin ? "Admin" : `<select data-plan="${esc(u.id)}">${plans.map(p => `<option value="${esc(p.code)}"${p.code === u.plan ? " selected" : ""}>${esc(p.name)}</option>`).join("")}</select>${u.seats ? `<br><span class="muted">${u.seats.used}/${u.seats.max} seats used</span>` : ""}`},
           {h: "", html: 1, v: u => `<div class="btnrow"><button class="btn" type="button" data-active="${esc(u.id)}" data-to="${u.active ? 0 : 1}">${u.active ? "Switch off" : "Switch on"}</button><button class="btn" type="button" data-reset="${esc(u.id)}">Reset password</button><button class="btn" type="button" data-rename="${esc(u.id)}" data-cur="${esc(u.email)}">Change login ID</button>${u.is_admin ? "" : `<button class="btn primary" type="button" data-priv="${esc(u.id)}">Privileges</button>`}</div>`}], d.users, "No accounts match.")}</section>`;
         el.querySelectorAll("[data-priv]").forEach(b => b.onclick = () => privileges(+b.dataset.priv));

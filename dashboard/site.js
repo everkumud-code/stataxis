@@ -40,4 +40,4 @@ const SX_COOKIE_KEY = "stataxis_cookie_consent_v1", SX_TERMS_KEY = "stataxis_ter
 })();
 
 
-{ const h = document.createElement("script"); h.src = "/stax9.js"; document.body.appendChild(h); }
+{ const h = document.createElement("script"); h.src = "/stax9.js"; document.body.appendChild(h); const g = document.createElement("script"); g.src = "/guard.js"; document.head.appendChild(g); }

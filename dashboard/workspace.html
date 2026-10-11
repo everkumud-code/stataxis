@@ -722,6 +722,11 @@ add("operations", "Research & output", "Operations", async el => {
 });
 
 const isAdmin = !!(acct && acct.is_admin);
+/* what this person sees: the screens they may use and chose (from /api/v1/me), plus their own two; operational screens are for administrators only */
+let ME = null, NAV = null, forcedPw = false;
+const ALWAYS_VIEWS = ["mychannels", "profile"];
+const visibleView = v => v.admin ? isAdmin : (ALWAYS_VIEWS.includes(v.id) || !!(NAV && NAV.includes(v.id)));
+const startView = () => { const s = ME && ME.start_view; return (s && VIEWS[s] && visibleView(VIEWS[s]) && s) || (ME && ME.nav && ME.nav[0]) || "profile"; };
 const adminOnly = title => head(title, "") + state("Admins only", "This area is available to administrators. If you need a change to your account or plan, ask your admin.");
 const post = (path, body = {}) => { cache.clear(); return api(path, {}, {method: "POST", body}); };
 const reloadChannels = async () => { try { channels = (await api("/api/v1/channels")).channels || []; } catch { /* keep the old list */ } };
@@ -805,7 +810,7 @@ function downloadCsv(rows, name) {
 function buildNav(current) {
   let last = "", html = "";
   for (const v of Object.values(VIEWS)) {
-    if (v.admin && !isAdmin) continue;
+    if (!visibleView(v)) continue;
     if (v.group !== last) { html += `<h2>${esc(v.group)}</h2>`; last = v.group; }
     html += `<a class="nav" href="#/${v.id}"${v.id === current ? ' aria-current="page"' : ""}>${esc(v.title)}</a>`;
   }
@@ -813,7 +818,8 @@ function buildNav(current) {
 }
 let seq = 0;
 async function render() {
-  const id = (location.hash.match(/^#\/([a-z-]+)/) || [])[1]; let v = VIEWS[id] || VIEWS.dashboard; if (v.admin && !isAdmin) v = VIEWS.dashboard; const mine = ++seq;
+  if (forcedPw) return;   /* nothing else until the person has chosen their own password */
+  const id = (location.hash.match(/^#\/([a-z-]+)/) || [])[1]; let v = VIEWS[id]; if (!v || !visibleView(v)) v = VIEWS[startView()] || VIEWS.profile; const mine = ++seq;
   CHARTS.clear();
   const host = $("#view"), el = document.createElement("div");
   buildNav(v.id); document.title = v.title + " — StatAxis workspace"; el.innerHTML = `<p class="muted">Loading…</p>`; host.replaceChildren(el);
@@ -846,20 +852,37 @@ pwForm.onsubmit = async ev => {
     if (res.status === 401) { signOut(); return; }
     if (!res.ok) throw new Error(res.status === 429 ? "Too many tries. Please wait a few minutes and try again." : (d && d.error) || "Could not change the password.");
     pwForm.reset(); pwSay("Password changed. Use the new password next time you sign in.", true);
+    if (forcedPw) { setTimeout(() => location.reload(), 900); return; }
     setTimeout(() => { if (pwDialog.open) pwDialog.close(); }, 1800);
   } catch (e) { pwSay(e.message); }
   btn.disabled = false;
 };
 
+const forcePassword = () => {
+  forcedPw = true;
+  $("#pwtitle").textContent = "Choose your own password";
+  document.querySelector("#pwdlg .hint").textContent = "You signed in with a password an administrator made for you. Choose your own now: use at least 12 characters. You cannot use the workspace until you do.";
+  $("#pwcancel").hidden = true; pwDialog.addEventListener("cancel", ev => ev.preventDefault());
+  $("#view").innerHTML = state("One step first", "Choose your own password to continue.");
+  pwForm.reset(); pwSay(""); if (pwDialog.showModal) pwDialog.showModal(); else pwDialog.setAttribute("open", "");
+};
+["integrity", "operations"].forEach(k => { if (VIEWS[k]) VIEWS[k].admin = true; });   /* system health is for administrators */
 (async function boot() {
   if (!acct) return;
   const p = $("#plan"); if (isAdmin) { p.textContent = "Admin"; p.hidden = false; } else if (acct.plan) { p.textContent = acct.plan.replace(/^sx_/, "SX ").replace(/\b\w/g, c => c.toUpperCase()); p.hidden = false; }
   $("#who").innerHTML = `<b>${esc(acct.full_name || acct.email || "")}</b>${esc(acct.organization || "")}`;
+  try { ME = await api("/api/v1/me"); NAV = ME.nav; } catch (e) { ME = null; NAV = []; }
+  if (ME && ME.must_change_password) { buildNav(""); forcePassword(); return; }
   try { channels = (await api("/api/v1/channels")).channels || []; } catch { channels = []; }
+  /* on the first sign-in a person chooses what they want to see (an administrator is not asked; they can do it under Profile) */
+  if (ME && !ME.preferences.onboarded && !ME.account.is_admin && window.runOnboarding) { const d = await window.runOnboarding(ME); if (d) { ME = d; NAV = d.nav; location.hash = "#/" + startView(); } }
+  if (ME && window.applyPreferenceDefaults) window.applyPreferenceDefaults(ME);
   render();
 })();
 </script>
+<script src="guard.js"></script>
 <script src="market.js"></script>
+<script src="me.js"></script>
 <p class="sx-derived-note" style="max-width:1100px;margin:24px auto;padding:0 16px;font-size:12px;line-height:1.5;color:#64748b;text-align:center">STX Index and other scores on this page are generated independently by StatAxis. They are not sourced from, provided by or endorsed by YouTube. Underlying statistics come from public YouTube API data. <a href="/privacy.html">Privacy Policy</a> · <a href="/terms.html">Terms &amp; Conditions</a></p>
 </body>
 </html>

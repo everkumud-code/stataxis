@@ -32,7 +32,7 @@ def test_web_routes_live_export_and_live_paths_exactly(monkeypatch):
         start_response("418 I'm a teapot", [("Content-Type", "text/plain")])
         return [b"routed"]
 
-    monkeypatch.setattr(web, "_live_api", fake_live_api)
+    monkeypatch.setitem(web._routes, "live", fake_live_api)
 
     for path in (
         "/api/v1/audience/live/export",

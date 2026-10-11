@@ -92,6 +92,7 @@ def change_password(session: Session, user_id: int, current_password: str, new_p
     if current_password == new_password:
         raise ValueError("new password must be different from the current one")
     user.password_hash = hash_password(new_password)
+    user.must_change_password = False
     session.commit()
 
 
@@ -116,4 +117,4 @@ def policy_for_identity(identity: AuthIdentity) -> VideoAccessPolicy:
 def account_payload(user: User) -> dict:
     return {"id": user.id, "email": user.email, "plan": user.plan, "requested_plan": user.requested_plan,
             "approval_status": user.approval_status, "is_admin": user.is_admin, "active": user.active,
-            "full_name": user.full_name, "organization": user.organization}
+            "full_name": user.full_name, "organization": user.organization, "must_change_password": bool(getattr(user, "must_change_password", False))}

@@ -63,7 +63,7 @@ def test_the_other_original_pages_keep_their_words():
 
 
 def test_every_internal_link_and_script_lands_on_a_file():
-    served = {"/": "index.html", "/login": "login.html", "/admin": "admin.html", "/apply": "apply.html", "/workspace": "workspace.html"}
+    served = {"/": "index.html", "/login": "login.html", "/admin": "admin.html", "/apply": "apply.html", "/workspace": "workspace.html", "/demo.html": "workspace.html"}
     for page in [DASH / p for p in PAGES] + POSTS + [DASH / "site.js"]:
         for href in re.findall(r'(?:href|src)=["\'](/[^"\'#?]*)', text(page)):
             target = served.get(href) or href.lstrip("/")

@@ -12,6 +12,12 @@ from dotenv import load_dotenv
 
 from collector.youtube.quota import DEFAULT_BUDGET, QuotaGuardError
 
+# httpx logs every request URL at INFO level, and a YouTube request URL contains the API key: keep those lines out of every log
+import logging as _logging
+
+for _name in ("httpx", "httpcore"):
+    _logging.getLogger(_name).setLevel(_logging.WARNING)
+
 BASE_URL = "https://www.googleapis.com/youtube/v3"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_ROOT / ".env")
