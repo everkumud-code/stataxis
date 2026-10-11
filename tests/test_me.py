@@ -158,3 +158,19 @@ def test_the_http_routes_for_my_account(world):
     assert call("POST", "/api/v1/me/profile", u["idea"], {"full_name": ""})[0] == 400
     other = call("GET", "/api/v1/me", u["free"])[1]
     assert other["preferences"]["persona"] is None and other["account"]["full_name"] == "Free"   # one person's choices are not another's
+
+
+def test_an_administrator_is_not_on_the_users_list_and_cannot_be_reset_switched_off_or_renamed_from_it(world):
+    s, engine, u = world
+    emails = [x["email"] for x in user_admin.list_users(s)]
+    assert "boss@x.com" not in emails and {"free@x.com", "idea@x.com", "analyst@x.com"} <= set(emails)
+    assert user_admin.list_users(s, q="boss") == []
+    before = u["boss"].password_hash
+    for action in (lambda: user_admin.reset_password(s, u["boss"].id), lambda: user_admin.set_active(s, u["boss"].id, False, acting_user_id=u["free"].id), lambda: user_admin.rename_login(s, u["boss"].id, "newname"),
+                   lambda: user_admin.set_plan(s, u["boss"].id, "sx_free")):
+        with pytest.raises(ValueError, match="administrator"):
+            action()
+    s.refresh(u["boss"])
+    assert u["boss"].password_hash == before and u["boss"].email == "boss@x.com" and u["boss"].active is True and u["boss"].must_change_password in (False, None)
+    with pytest.raises(ValueError, match="own account"):
+        user_admin.set_active(s, u["boss"].id, False, acting_user_id=u["boss"].id)

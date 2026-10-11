@@ -39,7 +39,7 @@ def check_seat(session: Session, organization: str | None, plan: str, exclude_us
 
 
 def list_users(session: Session, *, q: str = "", plan: str = "", status: str = "") -> list[dict[str, Any]]:
-    query = session.query(User)
+    query = session.query(User).filter(User.is_admin.is_(False))   # administrator accounts are never in this list: nothing here can switch one off, reset it or rename it
     if q.strip():
         like = f"%{q.strip().lower()}%"
         query = query.filter(func.lower(User.email).like(like) | func.lower(func.coalesce(User.full_name, "")).like(like) | func.lower(func.coalesce(User.organization, "")).like(like))
@@ -64,11 +64,20 @@ def _get(session: Session, user_id: int) -> User:
     return user
 
 
-def set_plan(session: Session, user_id: int, plan: str) -> dict[str, Any]:
+ADMIN_NOT_HERE = "administrator accounts are not managed in this list; an administrator changes their own password under Profile"
+
+
+def _manageable(session: Session, user_id: int) -> User:
+    """A person on the Users list. An administrator is not one of them: this is how an administrator can never lock themselves out from here."""
     user = _get(session, user_id)
-    code = get_plan(plan).code.value
     if user.is_admin:
-        raise ValueError("an administrator's package cannot be changed")
+        raise ValueError(ADMIN_NOT_HERE)
+    return user
+
+
+def set_plan(session: Session, user_id: int, plan: str) -> dict[str, Any]:
+    user = _manageable(session, user_id)
+    code = get_plan(plan).code.value
     if code != user.plan:
         check_seat(session, user.organization, code, exclude_user_id=user.id)
     user.plan = code
@@ -81,8 +90,7 @@ def set_active(session: Session, user_id: int, active: bool, acting_user_id: int
     user = _get(session, user_id)
     if user.id == acting_user_id and not active:
         raise ValueError("you cannot switch off your own account")
-    if user.is_admin and not active and session.query(User).filter(User.is_admin.is_(True), User.active.is_(True), User.id != user.id).count() == 0:
-        raise ValueError("this is the last active administrator")
+    user = _manageable(session, user_id)
     if active:
         check_seat(session, user.organization, user.plan, exclude_user_id=user.id)
     user.active = bool(active)
@@ -114,7 +122,7 @@ def create_user(session: Session, *, email: str, name: str, organization: str, m
 def rename_login(session: Session, user_id: int, new_id: str) -> dict[str, Any]:
     """Change the ID a person signs in with. The password, package and privileges stay as they are."""
     from api.auth_service import clean_login_id
-    user = _get(session, user_id)
+    user = _manageable(session, user_id)
     new_id = clean_login_id(new_id)
     other = session.query(User).filter(User.email == new_id, User.id != user.id).one_or_none()
     if other is not None:
@@ -125,7 +133,7 @@ def rename_login(session: Session, user_id: int, new_id: str) -> dict[str, Any]:
 
 
 def reset_password(session: Session, user_id: int) -> dict[str, Any]:
-    user = _get(session, user_id)
+    user = _manageable(session, user_id)
     temp = _temp_password()
     user.password_hash = hash_password(temp)
     user.must_change_password = True

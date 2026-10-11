@@ -56,7 +56,8 @@ def test_an_admin_who_changed_their_login_id_does_not_get_a_second_admin_on_rest
     monkeypatch.setenv("STAXIS_ADMIN_PASSWORD", "a-valid-admin-password")
     assert bootstrap_admin(session) is True
     owner = session.query(User).filter_by(email="owner@example.com").one()
-    user_admin.rename_login(session, owner.id, "kumud")
+    owner.email = "kumud"   # the administrator's login ID was changed in the database (the Users list no longer offers this for administrators)
+    session.commit()
     assert bootstrap_admin(session) is False
     assert session.query(User).filter_by(is_admin=True).count() == 1
     assert login(session, "kumud", "a-valid-admin-password")["account"]["is_admin"] is True
