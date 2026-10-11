@@ -49,7 +49,7 @@ DESCRIPTIONS = {
     "changed": "The videos that moved, with the evidence attached.",
     "evaluate": "Check one public video and download its report.",
     "competition": "Channels, markets and periods compared without hiding uncertainty.",
-    "live": "The live audience of each channel right now, sampled every 30 seconds.",
+    "live": "The live audience of each channel right now, sampled every minute.",
     "research": "Tone and topics in titles, with the method and confidence stated.",
     "briefing": "Findings for your role, with what to do about them. Without the higher package a person sees the headlines only.",
     "weekly": "Views of every video uploaded in the chosen dates, per channel, with each channel's share, and a picture card to post.",

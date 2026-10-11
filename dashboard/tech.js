@@ -120,7 +120,7 @@
   if (acc && stage) {
     const items = $$("li", acc), cv = $("canvas", stage), tags = $(".vx-stage-tags", stage), sid = $(".vx-stage-id", stage), x = cv.getContext("2d");
     const NAMES = items.map(li => $("b", li).textContent);
-    const TAGS = [["Public YouTube data", "every few minutes", "live every 30 s"], ["Integrity checks", "Authenticity radar", "flags, not verdicts"], ["Weekly views", "Prime time", "STX · IFX Score"], ["Finding", "Evidence attached", "Confidence shown"],
+    const TAGS = [["Public YouTube data", "every few minutes", "live every minute"], ["Integrity checks", "Authenticity radar", "flags, not verdicts"], ["Weekly views", "Prime time", "STX · IFX Score"], ["Finding", "Evidence attached", "Confidence shown"],
       ["Media company", "Buyer · Campaign", "Creator · Audience"], ["Branded PDF", "Findings first", "Method last"], ["Plan the spend", "Choose the messenger", "Open the tool"], ["Reviewer decision", "Kept on record", "Shapes the next report"]];
     const POS = [[[56, 16], [10, 52], [52, 80]], [[58, 14], [8, 46], [54, 82]], [[10, 14], [56, 46], [20, 80]], [[8, 18], [54, 50], [14, 80]], [[56, 12], [6, 48], [52, 82]], [[10, 16], [54, 44], [18, 82]], [[8, 14], [52, 48], [12, 82]], [[54, 14], [6, 50], [48, 82]]];
     // each scene returns how bright a dot at (u, v) in 0..1 should be, and whether it is "hot" (blue) at time t
