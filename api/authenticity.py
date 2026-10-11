@@ -119,8 +119,8 @@ def scan(session: Session, *, days: int = 7, segment: str | None = None, languag
         top_ids[c.id] = vs[:4]
     vid_to_channel = {v.id: c for c, vs in ((c, top_ids[c.id]) for c in channels) for v in vs}
     if vid_to_channel:
-        obs_rows = session.execute(select(Observation).where(Observation.video_id.in_(list(vid_to_channel)), Observation.observed_at >= since, Observation.view_count.is_not(None))
-                                   .order_by(Observation.video_id, Observation.observed_at)).scalars().all()
+        obs_rows = session.execute(select(Observation.video_id, Observation.channel_id, Observation.observed_at, Observation.view_count, Observation.like_count, Observation.comment_count, Observation.concurrent_viewers).where(Observation.video_id.in_(list(vid_to_channel)), Observation.observed_at >= since, Observation.view_count.is_not(None))
+                                   .order_by(Observation.video_id, Observation.observed_at)).all()   # plain rows: building a full object for each of 100,000 samples was most of the time
         grouped: dict[int, list[Observation]] = defaultdict(list)
         for o in obs_rows:
             grouped[o.video_id].append(o)
@@ -131,8 +131,8 @@ def scan(session: Session, *, days: int = 7, segment: str | None = None, languag
 
     # --- live level: spikes and flat lines on streams of the last 24 hours
     if ids:
-        live_rows = session.execute(select(Observation).where(Observation.channel_id.in_(ids), Observation.is_live.is_(True), Observation.concurrent_viewers.is_not(None),
-                                                              Observation.observed_at >= now - timedelta(hours=24)).order_by(Observation.video_id, Observation.observed_at)).scalars().all()
+        live_rows = session.execute(select(Observation.video_id, Observation.channel_id, Observation.observed_at, Observation.view_count, Observation.like_count, Observation.comment_count, Observation.concurrent_viewers).where(Observation.channel_id.in_(ids), Observation.is_live.is_(True), Observation.concurrent_viewers.is_not(None),
+                                                              Observation.observed_at >= now - timedelta(hours=24)).order_by(Observation.video_id, Observation.observed_at)).all()
         live_group: dict[int, list[Observation]] = defaultdict(list)
         for o in live_rows:
             live_group[o.video_id].append(o)

@@ -173,6 +173,8 @@ input[type=number],input[type=text]{min-width:0}
   .row2{grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.langrow td{background:#0b2032;color:#9fb0c4;padding:7px 10px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;border-top:1px solid #1d3550}.langrow td span{margin-left:8px;opacity:.7;letter-spacing:0;text-transform:none}
+.langhead{flex-basis:100%;margin:8px 0 2px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#7d8ba0}
 </style>
 </head>
 <body>
@@ -284,10 +286,28 @@ const evidence = text => `<div class="evidence"><strong>Evidence.</strong> ${esc
 const retry = () => `<button class="btn" data-retry type="button">Try again</button>`;
 const errCard = e => state("This section could not load", friendly(e), retry(), "err");
 
-function table(cols, rows, empty = "No rows to show.") {
+/* Language order everywhere: Hindi, then English, then the other languages A to Z, then channels with no language set. */
+const LANG_FIRST = ["Hindi", "English"];
+const langRank = l => { const i = LANG_FIRST.indexOf(l); return i >= 0 ? i : (!l || l === "unknown" ? 99 : 10); };
+const langName = l => (!l || l === "unknown") ? "Language not set" : l;
+const byLanguage = (a, b) => langRank(a.language) - langRank(b.language) || String(a.language || "").localeCompare(String(b.language || "")) || String(a.name || "").localeCompare(String(b.name || ""));
+/* rows in language order, each language keeping its own order (rank) inside */
+const groupByLanguage = rows => rows.map((r, i) => [r, i]).sort((a, b) => langRank(a[0].language) - langRank(b[0].language) || String(a[0].language || "").localeCompare(String(b[0].language || "")) || a[1] - b[1]).map(x => x[0]);
+/* <option>s for a list of channels, one <optgroup> per language; isSelected(channel) says which are chosen */
+const optsByLanguage = (chs, isSelected) => { const out = []; let last = null;
+  [...chs].sort(byLanguage).forEach(c => { if (c.language !== last) { if (last !== null) out.push("</optgroup>"); out.push(`<optgroup label="${esc(langName(c.language))}">`); last = c.language; } out.push(`<option value="${esc(c.id)}"${isSelected(c) ? " selected" : ""}>${esc(c.name)}</option>`); });
+  if (last !== null) out.push("</optgroup>"); return out.join(""); };
+/* group: row => language. The rows keep their own order inside each language; each language gets a heading with its count. */
+function table(cols, rows, empty = "No rows to show.", {group} = {}) {
   if (!rows.length) return `<p class="muted">${esc(empty)}</p>`;
-  return `<div class="wrap"><table class="tbl"><thead><tr>${cols.map(c => `<th class="${c.n ? "n" : ""}">${esc(c.h)}</th>`).join("")}</tr></thead><tbody>${
-    rows.map(r => `<tr>${cols.map(c => `<td class="${c.n ? "n" : ""}">${c.html ? c.v(r) : esc(c.v(r))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  let body;
+  if (group) {
+    const order = rows.map((r, i) => [r, i]).sort((a, b) => langRank(group(a[0])) - langRank(group(b[0])) || String(group(a[0]) || "").localeCompare(String(group(b[0]) || "")) || a[1] - b[1]).map(x => x[0]);
+    const counts = {}; order.forEach(r => { const k = group(r) || ""; counts[k] = (counts[k] || 0) + 1; });
+    let last = Symbol(); body = order.map(r => { const k = group(r) || ""; const head = k !== last ? `<tr class="langrow"><td colspan="${cols.length}"><b>${esc(langName(k))}</b> <span>${counts[k]} channel${counts[k] === 1 ? "" : "s"}</span></td></tr>` : ""; last = k;
+      return head + `<tr>${cols.map(c => `<td class="${c.n ? "n" : ""}">${c.html ? c.v(r) : esc(c.v(r))}</td>`).join("")}</tr>`; }).join("");
+  } else body = rows.map(r => `<tr>${cols.map(c => `<td class="${c.n ? "n" : ""}">${c.html ? c.v(r) : esc(c.v(r))}</td>`).join("")}</tr>`).join("");
+  return `<div class="wrap"><table class="tbl"><thead><tr>${cols.map(c => `<th class="${c.n ? "n" : ""}">${esc(c.h)}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
 const CHARTS = new Map();
 let chartSeq = 0;
@@ -352,7 +372,7 @@ function filterBar({period = true, stream = true, language = true, channel = fal
     ${language ? `<label>Language<select name="language"><option value="">All languages</option>${opts(langs.map(l => [l, l]), F.language)}</select></label>` : ""}
     ${period ? `<label>Period<select name="period">${opts(PERIODS, F.period)}</select></label>` : ""}
     ${stream ? `<label>Streams<select name="stream">${opts(SCOPES, F.stream)}</select></label>` : ""}
-    ${channel ? `<label>Channel<select name="channel">${opts(channels.map(c => [c.id, c.name]), F.channel)}</select></label>` : ""}
+    ${channel ? `<label>Channel<select name="channel">${optsByLanguage(channels, c => String(c.id) === String(F.channel))}</select></label>` : ""}
     <button class="btn primary" type="submit">Apply</button></form>`;
 }
 const head = (title, lede) => `<div class="head"><h1>${esc(title)}</h1></div><p class="lede">${esc(lede)}</p>`;
@@ -408,7 +428,7 @@ add("dashboard", "Intelligence", "Channel dashboard", async el => {
   let cmp = Array.isArray(F.cmp) ? F.cmp.map(Number).filter(id => channels.some(c => c.id === id)) : [];
   if (!cmp.length) cmp = channels.slice(0, 3).map(c => c.id);
   if (!cmp.includes(main)) cmp = [main, ...cmp].slice(0, 5);
-  el.insertAdjacentHTML("beforeend", `<form class="filters" data-filters><label>Channel<select name="channel">${opts(channels.map(c => [c.id, c.name]), F.channel)}</select></label>
+  el.insertAdjacentHTML("beforeend", `<form class="filters" data-filters><label>Channel<select name="channel">${optsByLanguage(channels, c => String(c.id) === String(F.channel))}</select></label>
     <label>Period<select name="days">${opts(DASH_DAYS, String(days))}</select></label><button class="btn primary" type="submit">Apply</button></form><div id="dsh"><p class="muted">Loading…</p></div>`);
   const ids = [...new Set([main, ...cmp])];
   const [ovs, trs, media, topics] = await Promise.all([
@@ -454,7 +474,7 @@ add("dashboard", "Intelligence", "Channel dashboard", async el => {
       <section class="card"><h2>STX trend</h2>${points.length >= 2 ? spark(points, "value", "STX (daily, confidence-adjusted)") : `<p class="muted">STX needs at least two days with two or more observations per video. It fills in as collection runs.</p>`}<p class="muted" style="margin:8px 0 0">${esc(((T[main] || {}).definition) || "")}</p></section>
       <section class="card"><h2>Key insights</h2>${insights.length ? `<ol class="ins">${insights.map(t => `<li>${esc(t)}</li>`).join("")}</ol>` : `<p class="muted">No insight is shown until there is enough stored history to support it.</p>`}</section></div>
     <section class="card" style="margin-top:14px"><h2>Compare channels</h2>
-      <div class="cmp" role="group" aria-label="Channels to compare">${channels.map(c => `<label><input type="checkbox" data-cmp value="${esc(c.id)}"${cmp.includes(c.id) ? " checked" : ""}> ${esc(c.name)}</label>`).join("")}</div>
+      <div class="cmp" role="group" aria-label="Channels to compare">${channels.map((c, i) => (i === 0 || channels[i - 1].language !== c.language ? `<div class="langhead">${esc(langName(c.language))}</div>` : "") + `<label><input type="checkbox" data-cmp value="${esc(c.id)}"${cmp.includes(c.id) ? " checked" : ""}> ${esc(c.name)}</label>`).join("")}</div>
       <div class="bars">
         ${hbars("STX (latest day)", rows.map(r => ({name: r.name, v: lastStx(r.t)})), v => dec(v))}
         ${hbars("Subscribers", rows.map(r => ({name: r.name, v: dv(r.o.subscribers)})), compact)}
@@ -874,6 +894,7 @@ const forcePassword = () => {
   try { ME = await api("/api/v1/me"); NAV = ME.nav; } catch (e) { ME = null; NAV = []; }
   if (ME && ME.must_change_password) { buildNav(""); forcePassword(); return; }
   try { channels = (await api("/api/v1/channels")).channels || []; } catch { channels = []; }
+  channels.sort(byLanguage);
   /* on the first sign-in a person chooses what they want to see (an administrator is not asked; they can do it under Profile) */
   if (ME && !ME.preferences.onboarded && !ME.account.is_admin && window.runOnboarding) { const d = await window.runOnboarding(ME); if (d) { ME = d; NAV = d.nav; location.hash = "#/" + startView(); } }
   if (ME && window.applyPreferenceDefaults) window.applyPreferenceDefaults(ME);

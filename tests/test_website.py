@@ -215,3 +215,9 @@ def test_no_internal_link_or_canonical_address_still_ends_in_dot_html():
                 continue
             assert ".html" not in target.split("?")[0].split("#")[0], f"{path.name}: {target}"
         assert not re.search(r"https://www\.stataxis\.org/[^\"'\s]*\.html", html), path.name
+
+
+def test_channels_are_listed_language_wise_in_pickers_tables_and_the_live_wall():
+    ws, market = text(DASH / "workspace.html"), text(DASH / "market.js")
+    assert "const LANG_FIRST" in ws and "optsByLanguage" in ws and "groupByLanguage" in ws and "langrow" in ws and "channels.sort(byLanguage)" in ws
+    assert market.count("optsByLanguage(") >= 2 and market.count("{group: r => r.language}") >= 3 and "groupByLanguage(d.channels)" in market
