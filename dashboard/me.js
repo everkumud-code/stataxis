@@ -73,7 +73,7 @@
         <p class="muted" style="margin-top:8px">Your login ID, organisation and package are changed by an administrator.</p></section>
       <section class="card" style="margin-top:14px"><h2>What I see</h2>
         <p>${persona ? `<b>${esc(persona)}</b> · ` : ""}${me.nav.length} screen${me.nav.length === 1 ? "" : "s"} in my menu${p.languages.length ? " · languages: " + esc(p.languages.join(", ")) : ""}${p.segments.length ? " · groups: " + esc(p.segments.map(s => (me.segments.find(x => x.id === s) || {}).label || s).join(", ")) : ""}</p>
-        <p class="muted">${me.nav.map(i => esc((me.views.find(v => v.id === i) || {}).label || i)).join(" · ")}</p>
+        <p class="muted">${me.nav.map(i => esc((me.views.find(v => v.id === i) || {}).label || i)).join(" · ")}</p>${me.menu_choices_on ? "" : `<p class="muted">Right now every screen you may use is shown to everyone. Your choices are saved and will apply again when packages are switched back on.</p>`}
         <div class="btnrow"><button class="btn primary" type="button" id="pfview">Change what I see</button></div></section>
       <section class="card" style="margin-top:14px"><h2>Security</h2><p class="muted">Use at least 12 characters. Nobody at StatAxis can read your password.</p><div class="btnrow"><button class="btn" type="button" id="pfpw">Change my password</button></div></section>`;
     const say = (t, ok) => { const m = el.querySelector("#pfmsg"); m.hidden = !t; m.className = "msg " + (ok ? "ok" : "bad"); m.textContent = t || ""; };

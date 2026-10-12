@@ -121,6 +121,26 @@ def deactivate_channel(session: Session, identity: AuthIdentity, channel_id: int
     return {"channel_id": channel.id, "name": channel.name, "active": False}
 
 
+def set_channel_active(session: Session, identity: AuthIdentity, channel_id: int, active: bool) -> dict[str, object]:
+    """Switch one channel on or off. Off means it is no longer collected and no longer shown anywhere; its history is kept, and switching it on again brings it back."""
+    require_admin(identity)
+    channel = session.get(Channel, int(channel_id))
+    if channel is None:
+        raise LookupError("channel not found")
+    channel.active = bool(active)
+    session.commit()
+    return {"channel_id": channel.id, "name": channel.name, "active": channel.active}
+
+
+def list_all_channels(session: Session, identity: AuthIdentity) -> list[dict[str, object]]:
+    """Every channel with its switch, on or off, so an off channel can be found and switched on again."""
+    require_admin(identity)
+    from collector.storage import effective_channel_language
+
+    return [{"id": c.id, "name": c.name, "youtube_channel_id": c.youtube_channel_id, "handle": c.handle, "language": effective_channel_language(session, c), "region": c.region, "network": c.network,
+             "segment": c.segment or "news", "active": bool(c.active)} for c in session.query(Channel).order_by(Channel.id).all()]
+
+
 def add_video(session: Session, identity: AuthIdentity, url: str, display_name: str, *, client: YouTubeClient | None = None) -> dict[str, object]:
     require_admin(identity)
     youtube_id = extract_youtube_video_id(url)

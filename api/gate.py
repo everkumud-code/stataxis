@@ -15,8 +15,8 @@ from api.auth_service import authenticate
 from collector.storage import User
 
 EXEMPT_UNTIL_PASSWORD_CHANGED = {("GET", "/api/v1/me")}
-ADMIN_ONLY_PREFIXES = ("/api/v1/operations/",)
-FEATURE_RULES = (("/api/v1/evaluate/", ["evaluate"]), ("/api/v1/audience/live", ["live"]), ("/api/v1/reports/export", ["data_export"]),
+ADMIN_ONLY_PREFIXES: tuple[str, ...] = ()
+FEATURE_RULES = (("/api/v1/operations/", ["operations", "integrity"]), ("/api/v1/evaluate/", ["evaluate"]), ("/api/v1/audience/live", ["live"]), ("/api/v1/reports/export", ["data_export"]),
                  ("/api/v1/insights/", ["overview", "changed", "research", "dashboard"]))   # these screens share one source: any of them is enough
 
 

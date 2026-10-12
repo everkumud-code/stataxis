@@ -198,6 +198,15 @@ class UserPref(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
+class AppSetting(Base):
+    """A switch an administrator can turn from the workspace, e.g. whether packages decide what a person may see."""
+    __tablename__ = "stx_settings"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+    updated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
 class PackageConfig(Base):
     """Reserved commercial package slot; intentionally empty until configured."""
     __tablename__ = "stx_package_configs"

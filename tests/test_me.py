@@ -174,3 +174,40 @@ def test_an_administrator_is_not_on_the_users_list_and_cannot_be_reset_switched_
     assert u["boss"].password_hash == before and u["boss"].email == "boss@x.com" and u["boss"].active is True and u["boss"].must_change_password in (False, None)
     with pytest.raises(ValueError, match="own account"):
         user_admin.set_active(s, u["boss"].id, False, acting_user_id=u["boss"].id)
+
+
+def test_with_packages_off_every_login_sees_every_screen_and_menu_choices_wait(world):
+    from api.auth_service import login
+    s, engine, u = world
+    me.set_preferences(s, u["analyst"], {"persona": "audience"})
+    assert len(me.nav_views(s, u["analyst"])) < 10 and feature_access.packages_enabled(s) is True
+    feature_access.set_packages_enabled(s, False, "boss@x.com")
+    everything = {v[0] for v in me.VIEWS}
+    for key in ("free", "idea", "analyst"):
+        assert set(me.nav_views(s, u[key])) == everything, key
+    payload = me.me_payload(s, u["free"])
+    assert payload["packages_enabled"] is False and payload["menu_choices_on"] is False and payload["preferences"]["persona"] is None
+    assert me.me_payload(s, u["analyst"])["preferences"]["persona"] == "audience"        # what they chose is kept
+    feature_access.set_user_feature(s, u["free"].id, "planner", False, "boss@x.com")        # a tick taken away for one person still holds
+    assert "planner" not in me.nav_views(s, u["free"]) and "market" in me.nav_views(s, u["free"])
+    gate = gate_application(lambda: Session(engine), _downstream)
+    assert _call(gate, "GET", "/api/v1/operations/collection", u["idea"]) == (200, b"passed") and _call(gate, "POST", "/api/v1/evaluate/youtube", u["free"])[0] == 200
+    u["free"].must_change_password = False
+    s.commit()
+    assert login(s, "idea@x.com", "x" * 14)["account"]["plan"] == "sx_idea"      # the record keeps the real package
+    from api.auth import verify_token
+    token = login(s, "idea@x.com", "x" * 14)["access_token"]
+    assert verify_token(token).plan == "sx_enterprise"                              # the session carries the top package while packages are off
+    feature_access.set_packages_enabled(s, True, "boss@x.com")
+    assert set(me.nav_views(s, u["free"])) == {"briefing", "overview", "market", "channel", "stx"}   # and everything is as before when they are back on
+
+
+def test_with_packages_off_there_are_no_seat_limits_and_new_logins_get_the_top_package(world):
+    s, _, u = world
+    feature_access.set_packages_enabled(s, False, "boss@x.com")
+    for i in range(3):
+        made = user_admin.create_user(s, email=f"seat{i}", name=f"Seat {i}", organization="Same Org", mobile="", plan="sx_analyst")
+        assert made["plan"] == "sx_enterprise"
+    feature_access.set_packages_enabled(s, True, "boss@x.com")
+    with pytest.raises(ValueError, match="seats"):
+        user_admin.create_user(s, email="seat9", name="Seat 9", organization="Other Org", mobile="", plan="sx_analyst") if user_admin.create_user(s, email="seat8", name="Seat 8", organization="Other Org", mobile="", plan="sx_analyst") else None

@@ -541,9 +541,13 @@
     if (!isAdmin) { el.innerHTML = adminOnly("Package access"); return; }
     el.innerHTML = head("Package access", "Which package is the lowest one that may use each tool. A change works at once for everyone.") + `<div id="xmsg" class="msg" hidden></div><div id="xout"><p class="muted">Loading…</p></div>`;
     const d = await post("/api/v1/admin/features/list", {});
-    $("#xout", el).innerHTML = `<section class="card">${table([{h: "Tool", html: 1, v: f => `<strong>${esc(f.label)}</strong>${f.changed ? ' <span class="tag">changed</span>' : ""}`},
+    $("#xout", el).innerHTML = `<section class="card" style="border-color:${d.packages_enabled ? "#20394e" : "#35d399"}"><h2>Packages are ${d.packages_enabled ? "ON" : "OFF"}</h2>
+      <p>${d.packages_enabled ? "A person's package decides what they may use, and seats are limited by package." : "Every login may use every screen and tool, whatever its package, with no seat limits. A tick you removed for one person still holds. Menu choices wait until packages are back on."}</p>
+      <div class="btnrow"><button class="btn primary" type="button" id="pkgtoggle">${d.packages_enabled ? "Switch packages off" : "Switch packages on"}</button></div></section>
+      <section class="card" style="margin-top:14px">${table([{h: "Tool", html: 1, v: f => `<strong>${esc(f.label)}</strong>${f.changed ? ' <span class="tag">changed</span>' : ""}`},
       {h: "Lowest package", html: 1, v: f => `<select data-feat="${esc(f.feature)}">${d.plans.map(p => `<option value="${esc(p.code)}"${p.code === f.min_plan ? " selected" : ""}>${esc(p.name)}</option>`).join("")}</select>`}, {h: "Starting choice", v: f => (d.plans.find(p => p.code === f.default) || {}).name}, {h: "Last changed by", v: f => f.updated_by || "—"}], d.features)}</section>
       <section class="card" style="margin-top:14px"><h2>Packages</h2>${table([{h: "Package", v: p => p.name}, {h: "Promise", v: p => p.promise}, {h: "Seats per organisation", n: 1, v: p => p.max_seats == null ? "No limit" : p.max_seats}], d.plans)}<p class="muted" style="margin-top:8px">A package with a seat limit cannot give another seat to an organisation that already uses them all (counted by organisation name).</p></section>`;
+    $("#pkgtoggle", el).onclick = async () => { const m = $("#xmsg", el); try { await post("/api/v1/admin/features/packages", {enabled: !d.packages_enabled}); cache.clear(); render(); } catch (e) { m.hidden = false; m.className = "msg bad"; m.textContent = e.message; } };
     $("#xout", el).querySelectorAll("[data-feat]").forEach(s => s.onchange = async () => { const m = $("#xmsg", el); try { await post("/api/v1/admin/features/set", {feature: s.dataset.feat, min_plan: s.value}); m.hidden = false; m.className = "msg ok"; m.textContent = "Saved. It applies now."; } catch (e) { m.hidden = false; m.className = "msg bad"; m.textContent = e.message; } });
   }, {admin: 1});
 

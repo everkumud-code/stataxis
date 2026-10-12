@@ -30,6 +30,10 @@ def seats_used(session: Session, organization: str | None, plan: str, exclude_us
 
 def check_seat(session: Session, organization: str | None, plan: str, exclude_user_id: int | None = None) -> None:
     """A package with a seat limit (SX Corporate: 5) cannot give another seat to an organisation that already uses them all."""
+    from api.feature_access import packages_enabled
+
+    if not packages_enabled(session):
+        return   # packages are off: no seat limits
     definition = get_plan(plan)
     if definition.max_seats is None:
         return
@@ -109,7 +113,10 @@ def create_user(session: Session, *, email: str, name: str, organization: str, m
         raise ValueError("name and organisation are required")
     if session.query(User).filter_by(email=email).one_or_none() is not None:
         raise ValueError("an account with this login ID already exists")
-    code = get_plan(plan).code.value
+    from api.feature_access import packages_enabled
+    from api.plans import SXPlan
+
+    code = get_plan(plan).code.value if packages_enabled(session) else SXPlan.ENTERPRISE.value   # packages off: a new login gets the top package
     check_seat(session, organization, code)
     temp = _temp_password()
     user = User(email=email, password_hash=hash_password(temp), plan=code, requested_plan=code, is_admin=False, active=True, approval_status="approved", full_name=name.strip(),

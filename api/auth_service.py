@@ -72,7 +72,10 @@ def login(session: Session, email: str, password: str) -> dict:
     if not user.is_admin and user.requested_plan:
         user.plan = user.requested_plan
         session.commit()
-    identity = AuthIdentity(user.id, user.email, user.plan, user.is_admin)
+    from api.feature_access import packages_enabled
+
+    effective_plan = user.plan if (user.is_admin or packages_enabled(session)) else SXPlan.ENTERPRISE.value   # packages off: the session carries the top package
+    identity = AuthIdentity(user.id, user.email, effective_plan, user.is_admin)
     return {"access_token": issue_token(identity), "token_type": "Bearer", "account": account_payload(user)}
 
 

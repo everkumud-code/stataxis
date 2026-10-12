@@ -764,24 +764,33 @@ add("adm-apps", "Admin", "Applications", async el => {
 
 add("adm-channels", "Admin", "Channels", async el => {
   if (!isAdmin) { el.innerHTML = adminOnly("Channels"); return; }
-  el.innerHTML = head("Channels", "Add, rename or remove the YouTube channels StatAxis monitors.") + `<section class="card"><h2>Add a YouTube channel</h2>
+  el.innerHTML = head("Channels", "Every channel StatAxis knows, grouped by language. Off channels are not collected and not shown; switch them on when the YouTube quota allows.") + `<section class="card"><h2>Add a YouTube channel</h2>
     <form class="chform" id="addch"><label>YouTube link<input type="url" name="url" required placeholder="https://www.youtube.com/@channel"></label>
     <label>Name to show<input type="text" name="display_name" required maxlength="120"></label><label>Language<input type="text" name="language" placeholder="Hindi"></label>
     <label>Market<input type="text" name="market" placeholder="News"></label><label>Region<input type="text" name="region" value="India"></label>
     <label>Group<select name="segment"><option value="news">News</option><option value="business">Business news</option><option value="print">Print media</option><option value="party">Political parties</option><option value="leader">Political leaders</option><option value="commentator">Political commentators</option><option value="creator">Creators &amp; influencers</option><option value="journalist">Independent journalists</option><option value="brand">Brands &amp; entertainment</option></select></label>
     <button class="btn primary" type="submit">Add</button></form><div id="addmsg" aria-live="polite"></div></section>
     <section class="card" style="margin-top:14px"><h2>Monitoring universe</h2><div id="chl"><p class="muted">Loading…</p></div></section>`;
-  const draw = () => { $("#chl", el).innerHTML = table([
-    {h: "Channel", html: 1, v: c => `<strong>${esc(c.name)}</strong><br><span class="muted">${esc(c.youtube_channel_id || "")}</span>`},
-    {h: "Language", v: c => c.language || "—"}, {h: "Region", v: c => c.region || "—"}, {h: "Network", v: c => c.network || "—"},
-    {h: "", html: 1, v: c => `<div class="btnrow"><button class="btn" type="button" data-adm="rename" data-id="${esc(c.id)}" data-name="${esc(c.name)}">Rename</button><button class="btn" type="button" data-adm="remove" data-id="${esc(c.id)}">Remove</button></div>`}
-  ], channels, "No active channels yet."); };
-  await reloadChannels(); draw();
+  let all = [], show = "all";
+  const say = (t, ok) => { const m = $("#addmsg", el); m.className = "msg " + (ok ? "ok" : "bad"); m.textContent = t || ""; };
+  const draw = () => {
+    const on = all.filter(c => c.active).length, rows = all.filter(c => show === "all" || (show === "on" ? c.active : !c.active));
+    $("#chl", el).innerHTML = `<div class="btnrow" style="margin-bottom:10px"><span class="muted" style="align-self:center">${on} on · ${all.length - on} off</span>${[["all", "All"], ["on", "On"], ["off", "Off"]].map(([k, l]) => `<button class="btn${show === k ? " primary" : ""}" type="button" data-show="${k}">${l}</button>`).join("")}</div>` + table([
+      {h: "Channel", html: 1, v: c => `<strong>${esc(c.name)}</strong><br><span class="muted">${esc(c.handle || c.youtube_channel_id || "")}</span>`},
+      {h: "Language", v: c => c.language || "—"}, {h: "Region", v: c => c.region || "—"}, {h: "Group", v: c => c.segment || "—"},
+      {h: "Collecting", html: 1, v: c => c.active ? '<span class="tag green">On</span>' : '<span class="tag">Off</span>'},
+      {h: "", html: 1, v: c => `<div class="btnrow"><button class="btn${c.active ? "" : " primary"}" type="button" data-onoff="${esc(c.id)}" data-to="${c.active ? 0 : 1}">${c.active ? "Switch off" : "Switch on"}</button><button class="btn" type="button" data-adm="rename" data-id="${esc(c.id)}" data-name="${esc(c.name)}">Rename</button></div>`}
+    ], rows, "No channels here.", {group: c => c.language});
+    $("#chl", el).querySelectorAll("[data-show]").forEach(b => b.onclick = () => { show = b.dataset.show; draw(); });
+    $("#chl", el).querySelectorAll("[data-onoff]").forEach(b => b.onclick = async () => { b.disabled = true; try { const r = await post("/api/v1/admin/channels/active", {channel_id: +b.dataset.onoff, active: b.dataset.to === "1"}); const c = all.find(x => x.id === r.channel_id); if (c) c.active = r.active; say(`${r.name} is ${r.active ? "on: collection starts at the next pass" : "off: no longer collected or shown"}.`, true); await reloadChannels(); draw(); } catch (e) { say(e.message); b.disabled = false; } });
+  };
+  const load = async () => { all = (await post("/api/v1/admin/channels/all", {})).channels; draw(); };
+  await reloadChannels(); await load();
   $("#addch", el).onsubmit = async ev => {
     ev.preventDefault(); const f = ev.target, fd = Object.fromEntries(new FormData(f)), msg = $("#addmsg", el), btn = f.querySelector("button");
     btn.disabled = true; msg.className = "msg"; msg.textContent = "Adding…";
     try { const d = await post("/api/v1/admin/channels", {url: fd.url, display_name: fd.display_name, language: fd.language, region: fd.region, market: fd.market, segment: fd.segment});
-      msg.className = "msg ok"; msg.textContent = "Added " + d.name; f.reset(); f.region.value = "India"; await reloadChannels(); draw();
+      msg.className = "msg ok"; msg.textContent = "Added " + d.name; f.reset(); f.region.value = "India"; await reloadChannels(); await load();
     } catch (e) { msg.className = "msg bad"; msg.textContent = e.message; }
     btn.disabled = false;
   };
@@ -886,7 +895,6 @@ const forcePassword = () => {
   $("#view").innerHTML = state("One step first", "Choose your own password to continue.");
   pwForm.reset(); pwSay(""); if (pwDialog.showModal) pwDialog.showModal(); else pwDialog.setAttribute("open", "");
 };
-["integrity", "operations"].forEach(k => { if (VIEWS[k]) VIEWS[k].admin = true; });   /* system health is for administrators */
 (async function boot() {
   if (!acct) return;
   const p = $("#plan"); if (isAdmin) { p.textContent = "Admin"; p.hidden = false; } else if (acct.plan) { p.textContent = acct.plan.replace(/^sx_/, "SX ").replace(/\b\w/g, c => c.toUpperCase()); p.hidden = false; }
@@ -896,7 +904,7 @@ const forcePassword = () => {
   try { channels = (await api("/api/v1/channels")).channels || []; } catch { channels = []; }
   channels.sort(byLanguage);
   /* on the first sign-in a person chooses what they want to see (an administrator is not asked; they can do it under Profile) */
-  if (ME && !ME.preferences.onboarded && !ME.account.is_admin && window.runOnboarding) { const d = await window.runOnboarding(ME); if (d) { ME = d; NAV = d.nav; location.hash = "#/" + startView(); } }
+  if (ME && ME.menu_choices_on && !ME.preferences.onboarded && !ME.account.is_admin && window.runOnboarding) { const d = await window.runOnboarding(ME); if (d) { ME = d; NAV = d.nav; location.hash = "#/" + startView(); } }
   if (ME && window.applyPreferenceDefaults) window.applyPreferenceDefaults(ME);
   render();
 })();

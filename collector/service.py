@@ -171,6 +171,13 @@ def _with_database_channels(session: Session, targets: list) -> list:
 
     from sqlalchemy.exc import SQLAlchemyError
 
+    try:
+        off = {youtube_id for (youtube_id,) in session.query(Channel.youtube_channel_id).filter(Channel.active.is_(False)).all()}
+        targets = [target for target in targets if target.channel_id not in off]   # switched off in the workspace: not collected, whatever the config file says
+    except SQLAlchemyError as exc:
+        session.rollback()
+        logger.warning("could not read which channels are switched off, using the configured ones: %s", type(exc).__name__)
+        return targets
     known = {target.channel_id for target in targets}
     try:
         rows = session.query(Channel).filter(Channel.active.is_(True)).order_by(Channel.id).all()

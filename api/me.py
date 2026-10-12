@@ -26,6 +26,7 @@ VIEWS: list[tuple[str, str, str]] = [
     ("research", "Research signals", "research"), ("evaluate", "Evaluate a video", "evaluate"), ("weekly", "Weekly report", "weekly"), ("primetime", "Prime time", "prime_time"),
     ("builder", "Report builder", "report_builder"), ("creators", "IFX Score", "creators"), ("planner", "Media planner", "planner"), ("authenticity", "Authenticity radar", "authenticity"),
     ("audience", "Audience (geography and age)", "audience"), ("liveevent", "Live event compare", "live_compare"),
+    ("operations", "Operations", "operations"), ("integrity", "Data integrity", "integrity"),
 ]
 VIEW_FEATURE = {vid: feature for vid, _label, feature in VIEWS}
 ALWAYS = ("mychannels", "profile")   # every login has these two
@@ -69,6 +70,8 @@ def nav_views(session: Session, user: User) -> list[str]:
     may = [vid for vid, _l, feature in VIEWS if feature in allowed]
     prefs = preferences(session, user)
     chosen = prefs["views"] if prefs["views"] is not None else (PERSONAS[prefs["persona"]][1] if prefs["persona"] in PERSONAS else None)
+    if not feature_access.packages_enabled(session):
+        chosen = None   # packages are off: everyone sees every screen they may use; what they chose is kept for when packages are back
     shown = [v for v in may if chosen is None or v in chosen]
     return shown or may   # never an empty list: if every choice is something the person may not use, they see what they may use
 
@@ -83,7 +86,8 @@ def me_payload(session: Session, user: User) -> dict[str, Any]:
     return {"account": {**account_payload(user), "job_title": prefs["job_title"], "mobile": user.mobile}, "features": sorted(allowed),
             "views": [{"id": vid, "label": label, "feature": feature, "allowed": feature in allowed} for vid, label, feature in VIEWS],
             "personas": [{"id": k, "label": label, "views": views} for k, (label, views) in PERSONAS.items()], "languages": LANGUAGES, "segments": [{"id": k, "label": v} for k, v in SEGMENT_CHOICES],
-            "preferences": prefs, "nav": nav, "always": list(ALWAYS), "start_view": start, "must_change_password": bool(user.must_change_password)}
+            "preferences": prefs, "nav": nav, "always": list(ALWAYS), "start_view": start, "must_change_password": bool(user.must_change_password),
+            "packages_enabled": feature_access.packages_enabled(session), "menu_choices_on": feature_access.packages_enabled(session)}
 
 
 def set_preferences(session: Session, user: User, body: dict[str, Any]) -> dict[str, Any]:

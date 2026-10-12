@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from api.errors import AuthenticationError, AuthorizationError
 from api.plans import SXPlan, all_plans, get_plan
-from collector.storage import FeatureAccess, User, UserFeatureOverride
+from collector.storage import AppSetting, FeatureAccess, User, UserFeatureOverride
 
 PLAN_ORDER = [plan.value for plan in SXPlan]
 FEATURES: dict[str, tuple[str, str]] = {
@@ -26,6 +26,8 @@ FEATURES: dict[str, tuple[str, str]] = {
     "competition": ("Competition between channels", SXPlan.INTELLIGENCE.value),
     "live": ("Live audience", SXPlan.INTELLIGENCE.value),
     "research": ("Research signals: tone and topics in titles", SXPlan.INTELLIGENCE.value),
+    "operations": ("Operations: how collection is running", SXPlan.CORPORATE.value),
+    "integrity": ("Data integrity checks", SXPlan.CORPORATE.value),
     "briefing": ("Briefing: findings for your role", SXPlan.FREE.value),
     "weekly": ("Weekly views report", SXPlan.IDEA.value),
     "prime_time": ("Prime-time audience report", SXPlan.IDEA.value),
@@ -38,6 +40,8 @@ FEATURES: dict[str, tuple[str, str]] = {
     "data_export": ("Excel data exports (machine-readable)", SXPlan.ANALYST.value),
 }
 DESCRIPTIONS = {
+    "operations": "How collection is running: channels tracked, last pass, readiness.",
+    "integrity": "Checks on the stored data: gaps and inconsistencies, with the evidence.",
     "overview": "The state of the market today: who leads, what changed, and where to look next.",
     "market": "Channels grouped by language and group, with period and share.",
     "channel": "One channel: audience, views, growth, rank and movement.",
@@ -62,6 +66,27 @@ DESCRIPTIONS = {
     "audience": "Audience geography and age, where a channel or a study supplied it.",
     "data_export": "Excel files with the raw numbers. These are machine-readable, unlike the branded PDF and picture cards.",
 }
+
+
+def packages_enabled(session: Session) -> bool:
+    """True when packages decide what a person may use. An administrator can switch packages off: then every login may use every screen (a tick an administrator un-ticked for one person still holds)."""
+    cached = session.info.get("_packages_enabled")
+    if cached is None:
+        row = session.get(AppSetting, "packages_enabled")
+        cached = True if row is None else row.value == "1"
+        session.info["_packages_enabled"] = cached
+    return cached
+
+
+def set_packages_enabled(session: Session, enabled: bool, by: str) -> dict[str, object]:
+    row = session.get(AppSetting, "packages_enabled")
+    if row is None:
+        row = AppSetting(key="packages_enabled")
+        session.add(row)
+    row.value, row.updated_by, row.updated_at = ("1" if enabled else "0"), by, datetime.now(UTC)
+    session.commit()
+    session.info.pop("_packages_enabled", None)
+    return {"packages_enabled": bool(enabled)}
 
 
 def plan_rank(plan: str) -> int:
@@ -96,6 +121,8 @@ def allowed(session: Session, feature: str, plan: str, is_admin: bool, user_id: 
     row = override_for(session, user_id, feature)
     if row is not None:
         return bool(row.allowed)
+    if not packages_enabled(session):
+        return True
     return plan_rank(plan) >= plan_rank(min_plan_for(session, feature))
 
 
