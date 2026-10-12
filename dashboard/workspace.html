@@ -17,7 +17,8 @@ a{color:var(--blue)}
 .skip:focus{left:8px}
 
 .top{height:60px;background:#071725;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 20px;position:sticky;top:0;z-index:30}
-.logo{font-weight:900;letter-spacing:.16em;font-size:17px}
+.logo{font-weight:900;letter-spacing:.16em;font-size:17px;color:inherit;text-decoration:none;display:block}
+.logo:hover{color:var(--gold)}
 .logo small{display:block;font-size:9px;font-weight:600;letter-spacing:.08em;color:var(--muted);margin-top:1px}
 .plan{border:1px solid #8b7131;color:var(--gold);padding:3px 10px;border-radius:99px;font-size:12px;font-weight:800}
 .who{margin-left:auto;color:var(--muted);font-size:13px;text-align:right;line-height:1.3}
@@ -29,6 +30,28 @@ a{color:var(--blue)}
 .btn[disabled]{opacity:.5;cursor:not-allowed}
 
 .layout{display:grid;grid-template-columns:252px minmax(0,1fr);min-height:calc(100vh - 60px)}
+.crumbbar{position:sticky;top:60px;z-index:25;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:8px 20px;background:#08192a;border-bottom:1px solid var(--line)}
+.crumbbar:empty{display:none}
+.crumbs{display:flex;align-items:center;gap:2px;flex-wrap:wrap;min-width:0}
+.crumbwrap{position:relative}
+.crumb{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border:0;border-radius:8px;background:transparent;color:#9eb2c2;font:inherit;font-size:13px;font-weight:700;text-decoration:none;cursor:pointer}
+.crumb:hover,.crumb[aria-expanded=true]{background:#0e2438;color:var(--text)}
+.crumb.here{color:var(--text)}
+.crumb svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.crumb .chev{margin:-3px 0 0 2px}
+.crumbsep{color:#3b5870;font-weight:700;user-select:none}
+.pop{position:absolute;left:0;top:calc(100% + 6px);z-index:60;min-width:260px;max-width:min(92vw,360px);max-height:min(70vh,520px);overflow:auto;padding:6px;background:#0a1c2e;border:1px solid #2a4a66;border-radius:12px;box-shadow:0 18px 40px #000a}
+.pop a{display:block;padding:8px 10px;border-radius:8px;color:#b9cbda;text-decoration:none;font-weight:650;font-size:13.5px}
+.pop a:hover,.pop a.on{background:#12304a;color:var(--text)}
+.pop a small{display:block;margin-top:1px;font-size:11.5px;font-weight:500;color:#7f9ab2}
+.pop a[aria-current=page]{box-shadow:inset 3px 0 0 var(--gold)}
+.pop h3{margin:8px 10px 3px;font-size:10.5px;letter-spacing:.07em;color:#5d7891;font-weight:800}
+.pop h3:first-child{margin-top:4px}
+.pop .none{padding:10px;color:var(--muted)}
+.jump{position:relative;margin-left:auto;flex:0 1 330px;min-width:200px}
+#jump{width:100%;padding:8px 12px 8px 34px;border:1px solid var(--line);border-radius:10px;background:#071a2b url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237f9ab2' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-4-4'/%3E%3C/svg%3E") no-repeat 10px 50%/16px;color:var(--text);font:inherit;font-size:13px}
+#jump:focus{outline:none;border-color:#159de8}
+.jump .pop{left:auto;right:0;width:min(92vw,400px)}
 .side{border-right:1px solid var(--line);padding:14px 10px 28px;position:sticky;top:60px;align-self:start;max-height:calc(100vh - 60px);overflow:auto;scrollbar-width:thin;scrollbar-color:#20394e transparent}
 #navfind{width:100%;margin:0 0 10px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#071a2b;color:var(--text);font:inherit;font-size:13px}
 #navfind:focus{outline:none;border-color:#159de8}
@@ -194,6 +217,8 @@ input[type=number],input[type=text]{min-width:0}
   .chform>*:first-child{grid-column:1/-1}
   .layout{grid-template-columns:minmax(0,1fr)}
   .menubtn{display:inline-flex;align-items:center;gap:7px}
+  .crumbbar{padding:6px 12px}
+  .jump{flex:1 1 100%;margin-left:0}
   .side{position:fixed;left:0;top:60px;bottom:0;width:min(86vw,330px);max-height:none;z-index:40;background:#071725;transform:translateX(-105%);transition:transform .25s ease;box-shadow:0 0 0 100vmax #0000;border-right:1px solid var(--line)}
   body.menu-open .side{transform:none;box-shadow:0 0 0 100vmax #000a}
   .navback{display:block;position:fixed;inset:60px 0 0 0;z-index:35;background:transparent}
@@ -213,7 +238,7 @@ input[type=number],input[type=text]{min-width:0}
 <a class="skip" href="#view">Skip to content</a>
 <header class="top">
   <button class="btn menubtn" id="menubtn" type="button" aria-controls="nav" aria-expanded="false">&#9776; Menu</button>
-  <div class="logo">STATAXIS<small>Intelligence workspace</small></div>
+  <a class="logo" href="#/" id="homelink" aria-label="StatAxis home: back to the start of the workspace">STATAXIS<small>Intelligence workspace</small></a>
   <span class="plan" id="plan" hidden></span>
   <div class="who" id="who"></div>
   <button class="btn" id="chpw" type="button">Change password</button>
@@ -231,6 +256,8 @@ input[type=number],input[type=text]{min-width:0}
     <div class="btnrow"><button class="btn" type="button" id="pwcancel">Cancel</button><button class="btn primary" type="submit" id="pwsave">Change password</button></div>
   </form>
 </dialog>
+
+<nav class="crumbbar" id="crumbs" aria-label="You are here"></nav>
 
 <div class="layout">
   <nav class="side" id="nav" aria-label="Workspace sections"></nav>
@@ -894,7 +921,7 @@ const MENU_HINT = {
   "adm-users": "Create logins, reset passwords, tick privileges", "adm-apps": "People who asked for access", "adm-access": "Packages on or off, and who may use what", "adm-claims": "Who says which channel is theirs", "adm-packages": "Package names and prices",
   "adm-channels": "Every channel, with its On/Off switch", "adm-groups": "Which group each channel belongs to", "adm-audience": "Audience profiles supplied for channels", "adm-quota": "YouTube quota: what we use and what we need",
 };
-let navFilter = "";
+let navFilter = "", navOpen = null, navHere = null;
 const MENU_ICON = {
   "Start here": '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
   "Watch live": '<circle cx="12" cy="12" r="2"/><path d="M7.5 7.5a6.4 6.4 0 000 9M16.5 7.5a6.4 6.4 0 010 9M4.5 4.5a10.6 10.6 0 000 15M19.5 4.5a10.6 10.6 0 010 15"/>',
@@ -908,19 +935,24 @@ const MENU_ICON = {
   "More": '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
 };
 const MENU_LIVE = new Set(["live", "liveevent"]);   /* screens that show what is happening this minute */
-function buildNav(current, keepFocus = false) {
+function menuGroups() {
   const listed = new Set(MENU_LAYOUT.flatMap(([, ids]) => ids));
-  const groups = MENU_LAYOUT.map(([name, ids]) => [name, ids.map(id => VIEWS[id]).filter(v => v && visibleView(v))]);
+  const groups = MENU_LAYOUT.map(([name, ids]) => [name, ids.map(id => VIEWS[id]).filter(v => v && visibleView(v))]).filter(([, vs]) => vs.length);
   const rest = Object.values(VIEWS).filter(v => visibleView(v) && !listed.has(v.id));
   if (rest.length) groups.push(["More", rest]);
-  let closed = []; try { closed = JSON.parse(sessionStorage.getItem("sx_nav_closed") || "[]"); } catch { /* storage blocked */ }
+  return groups;
+}
+function buildNav(current, keepFocus = false) {
+  const groups = menuGroups();
+  const hereName = (groups.find(([, vs]) => vs.some(v => v.id === current)) || [])[0] || null;
+  if (hereName !== navHere) { navHere = hereName; navOpen = hereName; }   /* going to a screen in another group opens that group (and so closes the one before) */
   const q = navFilter.trim().toLowerCase(), label = v => MENU_LABEL[v.id] || v.title;
   let html = `<input id="navfind" type="search" placeholder="Find a screen…" aria-label="Find a screen" autocomplete="off" value="${esc(navFilter)}">`;
   let n = 0;
   for (const [name, views] of groups) {
     const vs = q ? views.filter(v => (label(v) + " " + (MENU_HINT[v.id] || "")).toLowerCase().includes(q)) : views;
     if (!vs.length) continue;
-    const here = vs.some(v => v.id === current), shut = !q && closed.includes(name) && !here, sid = "sub" + (n++);
+    const here = vs.some(v => v.id === current), shut = !q && navOpen !== name, sid = "sub" + (n++);
     html += `<div class="grp${shut ? " closed" : ""}${here ? " here" : ""}" data-grp="${esc(name)}"><button class="gh" type="button" aria-expanded="${!shut}" aria-controls="${sid}"><span class="gi"><svg viewBox="0 0 24 24" aria-hidden="true">${MENU_ICON[name] || MENU_ICON.More}</svg></span><span class="gt">${esc(name)}</span><span class="gc">${vs.length}</span><i class="chev"></i></button>` +
       `<div class="sub" id="${sid}"><div class="subin">` +
       vs.map(v => `<a class="nav" href="#/${v.id}" title="${esc(MENU_HINT[v.id] || "")}"${v.id === current ? ' aria-current="page"' : ""}><span>${esc(label(v))}</span>${MENU_LIVE.has(v.id) ? '<span class="tagon">LIVE</span>' : ""}<small>${esc(MENU_HINT[v.id] || "")}</small></a>`).join("") + `</div></div></div>`;
@@ -931,8 +963,10 @@ function buildNav(current, keepFocus = false) {
   find.oninput = () => { navFilter = find.value; buildNav(current, true); };
   if (keepFocus) { find.focus(); find.setSelectionRange(find.value.length, find.value.length); }
   nav.querySelectorAll(".gh").forEach(h => {
-    h.onclick = () => { const g = h.parentElement, name = g.dataset.grp; g.classList.toggle("closed"); h.setAttribute("aria-expanded", String(!g.classList.contains("closed")));
-      const set = new Set(closed); g.classList.contains("closed") ? set.add(name) : set.delete(name); closed = [...set]; try { sessionStorage.setItem("sx_nav_closed", JSON.stringify(closed)); } catch { /* storage blocked */ } };
+    h.onclick = () => {
+      const name = h.parentElement.dataset.grp; navOpen = navOpen === name ? null : name;   /* opening one closes the one that was open; tapping the open one closes it */
+      nav.querySelectorAll(".grp").forEach(g => { const shut = g.dataset.grp !== navOpen; g.classList.toggle("closed", shut); g.querySelector(".gh").setAttribute("aria-expanded", String(!shut)); });
+    };
   });
   /* arrow keys walk the menu: Down and Up move between the group headings and the screens that are showing */
   nav.onkeydown = ev => {
@@ -943,6 +977,60 @@ function buildNav(current, keepFocus = false) {
   };
   const cur = nav.querySelector('.nav[aria-current="page"]'); if (cur && !keepFocus && cur.scrollIntoView) cur.scrollIntoView({block: "nearest"});
 }
+/* The address bar: Home, then where you are (group, screen), each with a list to jump to a neighbour, and a box to go to any screen by name. It reads the same menu as the sidebar, so it only shows what this person may open. */
+const crumbLabel = v => MENU_LABEL[v.id] || v.title;
+const homeView = () => startView();
+let openPop = null;
+const closePop = () => { if (openPop) { openPop.remove(); openPop = null; document.querySelectorAll(".crumb[aria-expanded=true]").forEach(b => b.setAttribute("aria-expanded", "false")); } };
+const popLink = (v, cur, extra = "") => `<a href="#/${v.id}"${v.id === cur ? ' aria-current="page"' : ""}${extra}>${esc(crumbLabel(v))}<small>${esc(MENU_HINT[v.id] || "")}</small></a>`;
+function buildCrumbs(view) {
+  const bar = $("#crumbs"), groups = menuGroups(), home = homeView(), here = view && view.id;
+  const g = groups.find(([, vs]) => vs.some(v => v.id === here));
+  const sep = '<span class="crumbsep" aria-hidden="true">/</span>';
+  const house = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>';
+  let html = `<div class="crumbs"><a class="crumb${here === home ? " here" : ""}" id="crumbhome" href="#/${esc(home)}" title="The start of the workspace">${house}Home</a>`;
+  if (g) html += sep + `<span class="crumbwrap"><button class="crumb" type="button" data-pop="groups" aria-expanded="false" aria-haspopup="true">${esc(g[0])}<i class="chev"></i></button></span>` +
+    sep + `<span class="crumbwrap"><button class="crumb here" type="button" data-pop="screens" aria-expanded="false" aria-haspopup="true" aria-current="page">${esc(crumbLabel(view))}<i class="chev"></i></button></span>`;
+  html += `</div><div class="jump"><input id="jump" type="search" placeholder="Go to any screen…   ( / )" aria-label="Go to any screen" autocomplete="off"></div>`;
+  bar.innerHTML = html;
+  const open = (wrap, inner) => { closePop(); const d = document.createElement("div"); d.className = "pop"; d.innerHTML = inner; wrap.append(d); openPop = d; return d; };
+  bar.querySelectorAll("[data-pop]").forEach(b => b.onclick = ev => {
+    ev.stopPropagation();
+    if (b.getAttribute("aria-expanded") === "true") { closePop(); return; }
+    const inner = b.dataset.pop === "groups"
+      ? groups.map(([name, vs]) => `<a href="#/${vs[0].id}"${name === g[0] ? ' aria-current="page"' : ""}>${esc(name)}<small>${vs.length} screen${vs.length === 1 ? "" : "s"}: ${esc(vs.slice(0, 3).map(crumbLabel).join(", "))}${vs.length > 3 ? "…" : ""}</small></a>`).join("")
+      : g[1].map(v => popLink(v, here)).join("");
+    const pop = open(b.parentElement, inner); b.setAttribute("aria-expanded", "true"); const cur = pop.querySelector("[aria-current]"); if (cur) cur.scrollIntoView({block: "nearest"});
+  });
+  /* go to any screen by name: the whole list when the box is empty, matches as you type, Enter opens the first (or the one you moved to) */
+  const box = $("#jump", bar), wrap = box.parentElement; let list = null, idx = -1;
+  const all = groups.flatMap(([name, vs]) => vs.map(v => ({v, group: name})));
+  const draw = () => {
+    const q = box.value.trim().toLowerCase();
+    const hits = q ? all.filter(({v, group}) => (crumbLabel(v) + " " + (MENU_HINT[v.id] || "") + " " + group + " " + v.id).toLowerCase().includes(q)) : all;
+    if (!list) { closePop(); list = document.createElement("div"); list.className = "pop"; wrap.append(list); openPop = list; }
+    let last = "", out = "";
+    hits.forEach(({v, group}) => { if (!q && group !== last) { out += `<h3>${esc(group.toUpperCase())}</h3>`; last = group; } out += popLink(v, here); });
+    list.innerHTML = out || `<div class="none">No screen matches “${esc(box.value)}”.</div>`;
+    idx = hits.length && q ? 0 : -1; mark();
+  };
+  const mark = () => { if (!list) return; const items = [...list.querySelectorAll("a")]; items.forEach((a, i) => a.classList.toggle("on", i === idx)); if (items[idx]) items[idx].scrollIntoView({block: "nearest"}); };
+  box.onfocus = draw; box.oninput = draw;
+  box.onkeydown = ev => {
+    const items = list ? [...list.querySelectorAll("a")] : [];
+    if (ev.key === "ArrowDown") { ev.preventDefault(); idx = Math.min(items.length - 1, idx + 1); mark(); }
+    else if (ev.key === "ArrowUp") { ev.preventDefault(); idx = Math.max(0, idx - 1); mark(); }
+    else if (ev.key === "Enter") { ev.preventDefault(); const a = items[Math.max(idx, 0)]; if (a) { location.hash = a.getAttribute("href"); box.value = ""; box.blur(); closePop(); list = null; } }
+    else if (ev.key === "Escape") { box.value = ""; box.blur(); closePop(); list = null; }
+  };
+  box.onblur = () => setTimeout(() => { if (document.activeElement !== box) { closePop(); list = null; } }, 180);
+}
+document.addEventListener("click", ev => { if (openPop && !ev.target.closest(".pop,.crumb,#jump")) closePop(); });
+document.addEventListener("keydown", ev => {
+  if (ev.key === "Escape") closePop();
+  if (ev.key === "/" && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) && !document.activeElement.isContentEditable) { const b = $("#jump"); if (b) { ev.preventDefault(); b.focus(); } }
+});
+window.addEventListener("hashchange", closePop);
 /* small screens: the menu opens as a drawer */
 (() => {
   const btn = $("#menubtn"), back = $("#navback"), set = on => { document.body.classList.toggle("menu-open", on); btn.setAttribute("aria-expanded", String(on)); };
@@ -957,7 +1045,7 @@ async function render() {
   const id = (location.hash.match(/^#\/([a-z-]+)/) || [])[1]; let v = VIEWS[id]; if (!v || !visibleView(v)) v = VIEWS[startView()] || VIEWS.profile; const mine = ++seq;
   CHARTS.clear();
   const host = $("#view"), el = document.createElement("div");
-  buildNav(v.id); document.title = v.title + " — StatAxis workspace"; el.innerHTML = `<p class="muted">Loading…</p>`; host.replaceChildren(el);
+  buildNav(v.id); buildCrumbs(v); document.title = v.title + " — StatAxis workspace"; el.innerHTML = `<p class="muted">Loading…</p>`; host.replaceChildren(el);
   try { await v.render(el); }
   catch (e) { if (mine !== seq) return; el.innerHTML = head(v.title, "") + errCard(e); }
   if (mine !== seq) return;
@@ -1007,7 +1095,7 @@ const forcePassword = () => {
   const p = $("#plan"); if (isAdmin) { p.textContent = "Admin"; p.hidden = false; } else if (acct.plan) { p.textContent = acct.plan.replace(/^sx_/, "SX ").replace(/\b\w/g, c => c.toUpperCase()); p.hidden = false; }
   $("#who").innerHTML = `<b>${esc(acct.full_name || acct.email || "")}</b>${esc(acct.organization || "")}`;
   try { ME = await api("/api/v1/me"); NAV = ME.nav; } catch (e) { ME = null; NAV = []; }
-  if (ME && ME.must_change_password) { buildNav(""); forcePassword(); return; }
+  if (ME && ME.must_change_password) { buildNav(""); $("#crumbs").innerHTML = ""; forcePassword(); return; }
   try { channels = (await api("/api/v1/channels")).channels || []; } catch { channels = []; }
   channels.sort(byLanguage);
   /* on the first sign-in a person chooses what they want to see (an administrator is not asked; they can do it under Profile) */

@@ -246,3 +246,12 @@ def test_the_workspace_menu_has_icons_counts_sub_menus_and_a_drawer_for_small_sc
     assert 'class="gh"' in html and "MENU_ICON" in html and ".grp.closed .sub{grid-template-rows:0fr}" in html     # group heading with icon and count, sub-menu that folds
     assert 'id="menubtn"' in html and "body.menu-open .side" in html and 'id="navback"' in html                   # the drawer on a phone
     assert "ArrowDown" in html and 'class="tagon">LIVE' in html and "aria-current" in html                        # keyboard walk, live tag, current screen
+
+
+def test_the_workspace_has_an_address_bar_the_name_leads_home_and_one_menu_group_is_open_at_a_time():
+    from pathlib import Path
+    html = (Path(__file__).resolve().parent.parent / "dashboard" / "workspace.html").read_text(encoding="utf-8")
+    assert '<a class="logo" href="#/" id="homelink"' in html                                                      # the StatAxis name goes to the start of the workspace
+    assert 'id="crumbs"' in html and "function buildCrumbs(view)" in html and 'id="jump"' in html                 # Home / group / screen, and a box to go anywhere
+    assert "buildNav(v.id); buildCrumbs(v);" in html and 'ev.key === "/"' in html                                 # drawn for every screen, "/" focuses the box
+    assert "navOpen = navOpen === name ? null : name" in html and "sx_nav_closed" not in html                      # opening a group closes the one that was open
