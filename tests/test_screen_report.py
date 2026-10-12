@@ -126,3 +126,19 @@ def test_every_block_has_its_own_pdf_and_post_image_and_nothing_says_branded_dow
     for text in (bar, market, html):
         assert "branded download" not in text.lower() and "Download branded" not in text and "Take this screen with you" not in text
     assert ".unitbar{" in html
+
+
+def test_downloads_carry_the_tagline_and_say_where_the_data_comes_from_without_claiming_an_endorsement():
+    from pathlib import Path
+
+    from api.report_pdf import YOUTUBE_NOTE, _mupdf, clean_screen, screen_pdf
+    assert "not endorsed by YouTube" in YOUTUBE_NOTE and "authoris" not in YOUTUBE_NOTE.lower()
+    doc = _mupdf().open(stream=screen_pdf(clean_screen(screen()), "a@b.c", protect=False), filetype="pdf")
+    text = " ".join(p.get_text() for p in doc)
+    assert "Stat the View. Axis the Viewpoint." in text and "Data via YouTube API Services" in text and "Digital Media Intelligence" not in text
+    root = Path(__file__).resolve().parent.parent / "dashboard"
+    for name in ("reportbar.js", "market.js"):
+        js = (root / name).read_text(encoding="utf-8")
+        assert "Stat the View. Axis the Viewpoint." in js and "Digital Media Intelligence" not in js and "Not endorsed by YouTube" in js
+    bar = (root / "reportbar.js").read_text(encoding="utf-8")
+    assert "roundRect" not in bar and "(?![a-z])" in bar       # the risk label pill is gone from the post image, and so are the radar's risk words

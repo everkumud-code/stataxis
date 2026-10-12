@@ -55,7 +55,7 @@
       x.restore();
       x.drawImage(lg, 44, 28, 300, 75);
     } else { x.fillStyle = "#e1b94f"; x.font = "800 34px Manrope, Inter, system-ui, sans-serif"; x.fillText("STATAXIS", 50, 70); }
-    x.fillStyle = "#7f9ab2"; x.font = "500 20px Manrope, Inter, system-ui, sans-serif"; x.textAlign = "right"; x.fillText("Digital Media Intelligence", W - 50, 66); x.textAlign = "left";
+    x.fillStyle = "#7f9ab2"; x.font = "500 20px Manrope, Inter, system-ui, sans-serif"; x.textAlign = "right"; x.fillText("Stat the View. Axis the Viewpoint.", W - 50, 66); x.textAlign = "left";
     x.fillStyle = "#e8f1f8"; x.font = "800 38px Manrope, Inter, system-ui, sans-serif"; x.fillText(title.slice(0, 48), 50, 150);
     x.fillStyle = "#9db3c6"; x.font = "500 22px Manrope, Inter, system-ui, sans-serif"; x.fillText(subtitle.slice(0, 80), 50, 188);
     const max = Math.max(...rows.map(r => r.value), 1), left = 330, bar = W - left - 190;
@@ -68,7 +68,7 @@
     x.fillStyle = "#e1b94f"; x.fillRect(50, H - 92, W - 100, 2);
     x.fillStyle = "#7f9ab2"; x.font = "500 18px Manrope, Inter, system-ui, sans-serif"; x.fillText(footer.slice(0, 80), 50, H - 62);
     x.textAlign = "right"; x.fillStyle = "#e1b94f"; x.fillText("Downloaded " + window.sxDownloadedAt(), W - 50, H - 62); x.textAlign = "left"; x.fillStyle = "#7f9ab2";
-    x.fillText("Measured by STAXIS from public YouTube data. Not TV ratings.  stataxis.org   |   Stat the View. Axis the Viewpoint.", 50, H - 32);
+    x.fillText("Data via YouTube API Services. Not endorsed by YouTube. Not TV ratings.   stataxis.org", 50, H - 32);
     return c;
   }
   function saveCanvas(canvas, name) { canvas.toBlob(b => { const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = name.replace(/\.png$/, "") + "-downloaded-" + window.sxFileStamp() + ".png"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }, "image/png"); }

@@ -261,6 +261,7 @@ def _add_notice_sheet(workbook: Workbook) -> None:
     notes = workbook.create_sheet("Notes")
     notes.append(["Downloaded at", ist_stamp()])
     notes.append([])
+    notes.append(["Data source", "Data via YouTube API Services. StatAxis is an independent service and is not endorsed by YouTube."])
     notes.append(["Data notice"])
     notes.append([DERIVED_METRICS_NOTICE])
     notes.column_dimensions["A"].width = 120

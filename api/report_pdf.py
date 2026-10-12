@@ -27,6 +27,7 @@ GOLD = colors.HexColor("#b8923a")
 GREY = colors.HexColor("#5b6b7b")
 LINE = colors.HexColor("#d5dde5")
 BAND = colors.HexColor("#eef3f7")
+YOUTUBE_NOTE = "Data via YouTube API Services. StatAxis is an independent service and is not endorsed by YouTube."
 
 
 # ---------------------------------------------------------------------------------------------- brand: the logo, drawn on every page as a watermark
@@ -157,13 +158,16 @@ def _decorate(canvas: Any, document: Any, downloaded: str, data_note: str, who: 
     canvas.drawString(31 * mm, ph - 10.5 * mm, "STATAXIS")
     canvas.setFillColor(colors.white)
     canvas.setFont("Helvetica", 8)
-    canvas.drawRightString(pw - 16 * mm, ph - 7.5 * mm, "Digital Media Intelligence")
+    canvas.drawRightString(pw - 16 * mm, ph - 7.5 * mm, "Stat the View. Axis the Viewpoint.")
     canvas.setFillColor(colors.HexColor("#e1b94f"))
     canvas.setFont("Helvetica-Bold", 8)
     canvas.drawRightString(pw - 16 * mm, ph - 12 * mm, f"Downloaded {downloaded}")
     canvas.setFillColor(GREY)
     canvas.setFont("Helvetica", 7.5)
-    canvas.drawString(16 * mm, 9 * mm, f"Downloaded {downloaded}{who}" + (f"  |  {data_note}" if data_note else "") + "  |  STATAXIS - Stat the View. Axis the Viewpoint.")
+    canvas.drawString(16 * mm, 9 * mm, f"Downloaded {downloaded}{who}" + (f"  |  {data_note}" if data_note else "") + "  |  STATAXIS")
+    canvas.setFont("Helvetica", 6.8)
+    canvas.drawString(16 * mm, 5.5 * mm, YOUTUBE_NOTE)
+    canvas.setFont("Helvetica", 7.5)
     canvas.drawRightString(pw - 16 * mm, 9 * mm, f"Page {document.page}")
     canvas.setStrokeColor(GOLD)
     canvas.setLineWidth(0.6)

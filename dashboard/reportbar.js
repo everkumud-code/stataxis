@@ -84,8 +84,7 @@
     if (!card) return {title: view.title, sub: filtersLine(screen), id: view.id, blocks: capture(screen)};
     const title = unitTitle(card), blocks = capture(card);
     if (blocks[0] && blocks[0].t === "h" && blocks[0].text.startsWith(title)) blocks.shift();
-    const h = card.querySelector("h2, h3, h4"), tag = h ? [...h.querySelectorAll(".tag")].map(t => clean(t.textContent)).filter(Boolean).join("  ·  ") : "";
-    return {title, tag, sub: [view.title, filtersLine(screen)].filter(Boolean).join("  |  "), id: `${view.id}-${slug(title)}`, blocks};
+    return {title, sub: [view.title, filtersLine(screen)].filter(Boolean).join("  |  "), id: `${view.id}-${slug(title)}`, blocks};
   }
 
   /* ---------- PDF ---------- */
@@ -130,7 +129,7 @@
     }
     return null;
   }
-  async function postPng(title, subtitle, blocks, tag = "") {
+  async function postPng(title, subtitle, blocks) {
     const W = 1080, P = 56, c0 = document.createElement("canvas"), m = c0.getContext("2d");
     m.font = `800 46px ${FONT}`; const titleLines = wrap(m, title, W - 2 * P).slice(0, 2);
     m.font = `500 22px ${FONT}`; const subLines = wrap(m, subtitle, W - 2 * P).slice(0, 2);
@@ -140,12 +139,12 @@
     if (!chart) {
       for (const b of blocks) {
         if (b.t === "table") { for (const r of b.rows.slice(0, 6)) body.push({text: r.filter(Boolean).join("  ·  "), kind: "p"}); continue; }
-        if (b.t === "p" || b.t === "h") body.push({text: b.text, kind: b.t});
+        if ((b.t === "p" || b.t === "h") && !/^(review now|check|nothing unusual)(?![a-z])/i.test(b.text)) body.push({text: b.text, kind: b.t});   /* the radar's risk labels stay on the screen; they are not for a post */
       }
       m.font = `600 ${fs}px ${FONT}`;
       body = body.flatMap(l => wrap(m, l.text, W - 2 * P).slice(0, l.kind === "h" ? 1 : 3).map((t, i) => ({text: t, kind: l.kind, first: i === 0}))).slice(0, 14);
     }
-    const top = 150 + titleLines.length * 56 + subLines.length * 30 + 34 + (tag ? 56 : 0), rowH = 70;
+    const top = 150 + titleLines.length * 56 + subLines.length * 30 + 34 , rowH = 70;
     const H = Math.max(1080, top + (chart ? 40 + chart.rows.length * rowH : body.length * lh + 20) + 130);
     c0.width = W; c0.height = H; const x = c0.getContext("2d");
     x.fillStyle = "#061322"; x.fillRect(0, 0, W, H);
@@ -155,15 +154,11 @@
       for (let r = -10; r <= 10; r++) for (let k = -4; k <= 4; k++) x.drawImage(lg, k * 420 + (r % 2) * 210 - 150, r * 150 - 38, 300, 75);
       x.restore(); x.drawImage(lg, P, 36, 300, 75);
     } else { x.fillStyle = "#e1b94f"; x.font = `800 34px ${FONT}`; x.fillText("STATAXIS", P, 80); }
-    x.fillStyle = "#7f9ab2"; x.font = `500 20px ${FONT}`; x.textAlign = "right"; x.fillText("Digital Media Intelligence", W - P, 76); x.textAlign = "left";
+    x.fillStyle = "#7f9ab2"; x.font = `500 20px ${FONT}`; x.textAlign = "right"; x.fillText("Stat the View. Axis the Viewpoint.", W - P, 76); x.textAlign = "left";
     let y = 170;
     x.fillStyle = "#e8f1f8"; x.font = `800 46px ${FONT}`; titleLines.forEach(t => { x.fillText(t, P, y); y += 56; });
     x.fillStyle = "#9db3c6"; x.font = `500 22px ${FONT}`; subLines.forEach(t => { y += 4; x.fillText(t, P, y + 6); y += 26; });
     y += 34;
-    if (tag) {
-      x.font = `800 22px ${FONT}`; const w = x.measureText(tag).width + 36; x.strokeStyle = "#e1b94f"; x.lineWidth = 2; x.beginPath(); x.roundRect(P, y - 6, w, 40, 20); x.stroke();
-      x.fillStyle = "#e1b94f"; x.fillText(tag, P + 18, y + 22); y += 62;
-    }
     if (chart) {
       x.fillStyle = "#7f9ab2"; x.font = `700 20px ${FONT}`; x.fillText(String(chart.caption || "").toUpperCase().slice(0, 40), P, y); y += 22;
       const max = Math.max(...chart.rows.map(r => r.value), 1), left = 360, bar = W - left - P - 190;
@@ -181,6 +176,7 @@
     }
     x.fillStyle = "#e1b94f"; x.fillRect(P, H - 96, W - 2 * P, 2);
     x.fillStyle = "#7f9ab2"; x.font = `500 18px ${FONT}`; x.fillText("Measured by STAXIS from public YouTube data. Not TV ratings.", P, H - 62);
+    x.fillText("Data via YouTube API Services. Not endorsed by YouTube.", P, H - 32);
     x.textAlign = "right"; x.fillStyle = "#e1b94f"; x.fillText(window.sxDownloadedAt(), W - P, H - 62); x.fillStyle = "#7f9ab2"; x.fillText("stataxis.org", W - P, H - 32); x.textAlign = "left";
     return c0;
   }
@@ -190,7 +186,7 @@
       await settle(screen, say);
       const s = scopeOf(view, screen, card);
       if (!s.blocks.length) throw new Error("There is nothing here to put in a post yet.");
-      const canvas = await postPng(s.title, s.sub, s.blocks, s.tag), name = `stataxis-${s.id}-post-downloaded-${window.sxFileStamp()}.png`;
+      const canvas = await postPng(s.title, s.sub, s.blocks), name = `stataxis-${s.id}-post-downloaded-${window.sxFileStamp()}.png`;
       await new Promise(res => canvas.toBlob(b => { save(b, name); res(); }, "image/png"));
       say(`Saved ${name}  ·  ${window.sxDownloadedAt()}`, true);
     } catch (e) { say(e.message); }
