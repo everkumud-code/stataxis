@@ -91,6 +91,13 @@ a{color:var(--blue)}
 .head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;margin-bottom:6px}
 .head h1{margin:0;font-size:26px;line-height:1.15;letter-spacing:-.01em}
 .reportbar{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;justify-content:space-between;margin:28px 0 6px;padding:14px 18px;border:1px solid var(--line);border-top:2px solid #b8923a;border-radius:10px;background:var(--panel)}
+.unitbar{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center;margin-top:14px;padding-top:10px;border-top:1px dashed #20394e}
+.unitbar .msg{margin:0 auto 0 0;font-size:12px}
+.ub,.reportbar .btn{display:inline-flex;align-items:center;gap:7px}
+.ub{border:1px solid var(--line);background:#091a29;color:#b9cbda;border-radius:8px;padding:5px 11px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
+.ub:hover{border-color:var(--gold);color:var(--gold)}
+.ub svg,.reportbar .btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.reportbar .btnrow{display:flex;gap:8px;flex-wrap:wrap}
 .reportbar b{display:block;font-size:14px}.reportbar span{color:var(--muted);font-size:12.5px}.reportbar .msg{flex-basis:100%;margin:0}
 .lede{color:var(--muted);margin:4px 0 16px;max-width:75ch}
 .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 18px}
@@ -915,7 +922,7 @@ const MENU_HINT = {
   briefing: "What the data says this week, written for your role", overview: "The market today at a glance", live: "Who is live right now and how many are watching", liveevent: "Up to 30 channels on one live event, side by side",
   primetime: "Which channel owns each evening hour", stream: "Live, replay, video and Shorts audiences compared", market: "Every channel ranked by views gained", channel: "One channel: audience, momentum, content",
   dashboard: "One channel in depth, with the market beside it", competition: "Who leads, who is climbing, how far behind", stx: "The STX Index and the signals behind it", content: "The videos that moved most", trends: "How a channel's audience moved over time",
-  changed: "What moved since the last period", research: "Tone and topics in video titles", planner: "Where to place your ad spots and what each costs", weekly: "Views of the week's uploads, per channel", builder: "Build a branded PDF report",
+  changed: "What moved since the last period", research: "Tone and topics in video titles", planner: "Where to place your ad spots and what each costs", weekly: "Views of the week's uploads, per channel", builder: "Build a PDF report",
   evaluate: "Check one public video and read its STX", audience: "Where viewers live and how old they are, where known", creators: "The IFX Score for creators and journalists", authenticity: "Viewership that looks too good or too still",
   mychannels: "Map your own channels to your login", profile: "Your details, your menu, your password", operations: "How collection is running", integrity: "Checks on the stored data",
   "adm-users": "Create logins, reset passwords, tick privileges", "adm-apps": "People who asked for access", "adm-access": "Packages on or off, and who may use what", "adm-claims": "Who says which channel is theirs", "adm-packages": "Package names and prices",
@@ -1049,7 +1056,7 @@ async function render() {
   try { await v.render(el); }
   catch (e) { if (mine !== seq) return; el.innerHTML = head(v.title, "") + errCard(e); }
   if (mine !== seq) return;
-  if (window.addReportBar) window.addReportBar(host, el, v);   /* one-tap branded report under every screen */
+  if (window.addReportBar) window.addReportBar(host, el, v);   /* downloads under every screen, and under every block on it */
   el.querySelectorAll("[data-retry]").forEach(b => b.onclick = () => { cache.clear(); render(); });
   const f = el.querySelector("[data-filters]");
   if (f) f.onsubmit = ev => { ev.preventDefault(); const fd = new FormData(f); for (const [k, val] of fd.entries()) F[k] = val; saveF(); render(); };

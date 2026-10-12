@@ -342,7 +342,7 @@
       `<div class="btnrow" id="bp" style="margin:10px 0">${PERSONAS.map(([k, l]) => `<button class="btn${f.persona === k ? " primary" : ""}" type="button" data-p="${k}">${esc(l)}</button>`).join("")}</div>
       <form class="card" id="bf2" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><label>Period<br><select name="days">${opt([["7", "Last 7 days"], ["14", "Last 14 days"], ["28", "Last 28 days"]], f.days)}</select></label>
       <label>Category<br><select name="segment">${opt(SEGMENTS, f.segment)}</select></label><label>Language<br><select name="language">${opt(LANGS, f.language)}</select></label>
-      ${filterFields(f, {place: false, age: false, known: false})}<button class="btn primary" type="submit">Update</button><button class="btn" type="button" id="bpdf">Download branded brief (PDF)</button></form><div id="bmsg2" class="msg" hidden></div><div id="bout2"></div>`;
+      ${filterFields(f, {place: false, age: false, known: false})}<button class="btn primary" type="submit">Update</button><button class="btn" type="button" id="bpdf">Download this brief (PDF)</button></form><div id="bmsg2" class="msg" hidden></div><div id="bout2"></div>`;
     const read = () => { const v = formValues($("#bf2", el)); v.persona = f.persona; Object.assign(f, v); keep("brief", f); return v; };
     const run = async () => {
       const v = read(), out = $("#bout2", el); out.innerHTML = `<p class="muted">Working it out…</p>`;

@@ -114,3 +114,15 @@ def test_the_workspace_puts_the_report_bar_under_every_screen_and_stamps_csv_and
     assert "Downloaded at (Indian time)" in html and "-downloaded-" in html
     assert "/api/v1/market/screen-report.pdf" in bar and "sxDownloadedAt" in bar and "sxFileStamp" in bar
     assert 'x.fillText("Downloaded " + window.sxDownloadedAt()' in market and "-downloaded-" in market
+
+
+def test_every_block_has_its_own_pdf_and_post_image_and_nothing_says_branded_download():
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent / "dashboard"
+    bar, market, html = (root / "reportbar.js").read_text(encoding="utf-8"), (root / "market.js").read_text(encoding="utf-8"), (root / "workspace.html").read_text(encoding="utf-8")
+    assert "function addUnitBars(view, screen)" in bar and "MutationObserver" in bar and 'className = "unitbar"' in bar          # each card (each channel, slot, group) gets its own buttons as it appears
+    assert "async function postPng(" in bar and "image/png" in bar and "-post-downloaded-" in bar                        # an image to post, with the time of download in the file name
+    assert "Download post image" in bar and "Download PDF" in bar
+    for text in (bar, market, html):
+        assert "branded download" not in text.lower() and "Download branded" not in text and "Take this screen with you" not in text
+    assert ".unitbar{" in html
