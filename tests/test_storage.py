@@ -182,3 +182,14 @@ def test_create_database_keeps_sqlite_engine_options_unchanged(monkeypatch) -> N
     storage.create_database("sqlite:///:memory:")
 
     assert calls == [(("sqlite:///:memory:",), {"future": True})]
+
+
+def test_observation_counters_hold_a_streams_billions_of_views():
+    from sqlalchemy import BigInteger
+
+    from collector.storage import Observation, _widen_observation_counters, create_database
+    for name in ("view_count", "like_count", "comment_count"):
+        assert isinstance(Observation.__table__.c[name].type, BigInteger)
+    engine = create_database("sqlite://")
+    with engine.begin() as connection:
+        _widen_observation_counters(connection)   # nothing to do (and nothing to break) outside PostgreSQL

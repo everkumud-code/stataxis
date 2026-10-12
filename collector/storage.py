@@ -75,9 +75,9 @@ class Observation(Base):
     video_id: Mapped[int] = mapped_column(ForeignKey("stx_videos.id"), index=True)
     channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    view_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    like_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    comment_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    view_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)   # a stream that has been live for years passes 2.1 billion views
+    like_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    comment_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     concurrent_viewers: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_live: Mapped[bool] = mapped_column(Boolean, default=False)
     classification: Mapped[str] = mapped_column(String(32), default="UNKNOWN", index=True)
@@ -238,6 +238,16 @@ def _add_column_if_missing(connection, table: str, name: str, definition: str, k
             raise
 
 
+def _widen_observation_counters(connection) -> None:
+    """Databases made before the counters were 64-bit hold them as 32-bit numbers: a channel's year-round live stream (billions of views) could not be stored at all. Widen them once (PostgreSQL; SQLite does not care)."""
+    if connection.dialect.name != "postgresql":
+        return
+    types = {item["name"]: str(item["type"]).upper() for item in inspect(connection).get_columns("stx_observations")}
+    narrow = [name for name in ("view_count", "like_count", "comment_count") if types.get(name) == "INTEGER"]
+    if narrow:
+        connection.execute(text("ALTER TABLE stx_observations " + ", ".join(f"ALTER COLUMN {name} TYPE BIGINT" for name in narrow)))
+
+
 def create_database(url: str):
     if url.startswith(("postgres://", "postgresql://")):
         url = "postgresql+psycopg://" + url.split("://", 1)[1]
@@ -264,6 +274,7 @@ def create_database(url: str):
         for name, definition in {"avatar_url": "VARCHAR(1000)", "handle": "VARCHAR(255)", "segment": "VARCHAR(32) DEFAULT 'news'"}.items():
             _add_column_if_missing(connection, "stx_channels", name, definition, channel_columns)
         connection.execute(text("UPDATE stx_channels SET segment='news' WHERE segment IS NULL"))
+        _widen_observation_counters(connection)
         video_columns = {item["name"] for item in inspect(connection).get_columns("stx_videos")}
         for name, definition in {"thumbnail_url": "VARCHAR(1000)", "category_id": "VARCHAR(32)", "topic": "VARCHAR(64)", "live_started_at": "TIMESTAMP WITH TIME ZONE", "live_ended_at": "TIMESTAMP WITH TIME ZONE"}.items():
             _add_column_if_missing(connection, "stx_videos", name, definition, video_columns)
