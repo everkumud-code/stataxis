@@ -255,3 +255,13 @@ def test_the_workspace_has_an_address_bar_the_name_leads_home_and_one_menu_group
     assert 'id="crumbs"' in html and "function buildCrumbs(view)" in html and 'id="jump"' in html                 # Home / group / screen, and a box to go anywhere
     assert "buildNav(v.id); buildCrumbs(v);" in html and 'ev.key === "/"' in html                                 # drawn for every screen, "/" focuses the box
     assert "navOpen = navOpen === name ? null : name" in html and "sx_nav_closed" not in html                      # opening a group closes the one that was open
+
+
+def test_every_time_on_screen_is_indian_time() -> None:
+    import re as _re
+    for name in ("workspace.html", "market.js"):
+        text = (DASH / name).read_text(encoding="utf-8")
+        for line in text.splitlines():
+            for call in _re.findall(r"toLocale(?:Time|Date)?String\(([^;]*)", line):
+                if '"en-IN"' in call and ("hour" in call or "day" in call or "dateStyle" in call or "TimeString" in line or "DateString" in line):
+                    assert "Asia/Kolkata" in line or "IST_ZONE" in line, (name, line.strip()[:120])

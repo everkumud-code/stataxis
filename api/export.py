@@ -11,7 +11,7 @@ from openpyxl import Workbook
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
-from api.stamps import file_stamp, ist_stamp
+from api.stamps import file_stamp, ist_cell, ist_stamp
 from api.access import UserRole, plan_video_access_policy, require_capability, video_access_policy
 from api.plans import SXPlan, get_plan
 from api.live_monitor import live_audience_window
@@ -75,7 +75,7 @@ def export_observations_xlsx(session: Session, filters: ObservationExportFilters
     data = workbook.active
     data.title = "StatAxis Data"
     data.append([
-        "Observed At", "Video ID", "YouTube Video ID", "Title", "Channel", "Language",
+        "Observed At (IST)", "Video ID", "YouTube Video ID", "Title", "Channel", "Language",
         "Region", "Classification", "Live", "Views", "Likes", "Comments",
         "Concurrent Viewers", "Source",
     ])
@@ -83,7 +83,7 @@ def export_observations_xlsx(session: Session, filters: ObservationExportFilters
     for observation, video, channel in rows:
         video_ids.add(video.id)
         data.append([
-            observation.observed_at, video.id, video.youtube_video_id, video.title,
+            ist_cell(observation.observed_at), video.id, video.youtube_video_id, video.title,
             channel.name, channel.language, channel.region, observation.classification,
             observation.is_live, observation.view_count, observation.like_count,
             observation.comment_count, observation.concurrent_viewers, observation.source,
@@ -93,7 +93,7 @@ def export_observations_xlsx(session: Session, filters: ObservationExportFilters
     intelligence = workbook.create_sheet("StatAxis Intelligence")
     intelligence.append([
         "Video ID", "YouTube Video ID", "Title", "STX Index", "Confidence",
-        "Available Signals", "Generated At", "StatAxis View", "Signal Contributions",
+        "Available Signals", "Generated At (IST)", "StatAxis View", "Signal Contributions",
     ])
     if video_ids:
         stmt = (
@@ -113,7 +113,7 @@ def export_observations_xlsx(session: Session, filters: ObservationExportFilters
             contributions = json.loads(record.contributions_json)
             intelligence.append([
                 video.id, video.youtube_video_id, video.title, record.score,
-                record.confidence, record.available_signals, record.generated_at,
+                record.confidence, record.available_signals, ist_cell(record.generated_at),
                 view.get("view", view.get("summary", "")), json.dumps(contributions, sort_keys=True),
             ])
     _format_sheet(intelligence)
@@ -140,7 +140,7 @@ def export_live_stats_xlsx(
     channels.title = "Channels"
     channels.append([
         "Rank", "Market", "Channel", "Language", "All Avg", "All Peak", "Primary Avg", "Primary Peak",
-        "Secondary Avg", "Secondary Peak", "Share % (All Avg)", "Streams Seen", "Coverage %", "Peak At (UTC)",
+        "Secondary Avg", "Secondary Peak", "Share % (All Avg)", "Streams Seen", "Coverage %", "Peak At (IST)",
     ])
     for item in payload["channels"]:
         feeds = item["feeds"]
@@ -148,7 +148,7 @@ def export_live_stats_xlsx(
             item["rank"], item["market_label"], item["name"], item["language"],
             feeds["all"]["average"], feeds["all"]["peak"], feeds["primary"]["average"], feeds["primary"]["peak"],
             feeds["secondary"]["average"], feeds["secondary"]["peak"], item.get("share_percent"),
-            item["streams_seen"], item["coverage_percent"], item["peak_at"],
+            item["streams_seen"], item["coverage_percent"], ist_cell(item["peak_at"]),
         ])
     _format_sheet(channels)
     markets = workbook.create_sheet("Markets")
@@ -157,8 +157,8 @@ def export_live_stats_xlsx(
         markets.append([item["label"], item["channel_count"], item["average"], item["peak"], item["headline"]])
     _format_sheet(markets)
     notes = workbook.create_sheet("Method")
-    notes.append(["Window start (UTC)", payload["start_at"]])
-    notes.append(["Window end (UTC)", payload["end_at"]])
+    notes.append(["Window start (IST)", ist_cell(payload["start_at"])])
+    notes.append(["Window end (IST)", ist_cell(payload["end_at"])])
     notes.append(["Grid seconds", payload["bucket_seconds"]])
     notes.append(["Primary threshold (hours live)", payload["primary_min_live_hours"]])
     notes.append(["Method", payload["method"]])
@@ -180,10 +180,10 @@ def export_live_audience_xlsx(
 
     timeline = workbook.active
     timeline.title = "Second-by-Second"
-    timeline.append(["Observed At", "Hindi", "English", "Regional", "Unknown", "Total Concurrent"])
+    timeline.append(["Observed At (IST)", "Hindi", "English", "Regional", "Unknown", "Total Concurrent"])
     for point in payload["timeline"]:
         timeline.append([
-            point["observed_at"], point.get("Hindi", 0), point.get("English", 0),
+            ist_cell(point["observed_at"]), point.get("Hindi", 0), point.get("English", 0),
             point.get("Regional", 0), point.get("Unknown", 0), point.get("total_concurrent", 0),
         ])
     _format_sheet(timeline)
@@ -198,18 +198,18 @@ def export_live_audience_xlsx(
     _format_sheet(markets)
 
     channels = workbook.create_sheet("Channels")
-    channels.append(["Channel ID", "Channel", "Language Group", "Language", "Current Concurrent", "Peak Concurrent", "Latest Observed At"])
+    channels.append(["Channel ID", "Channel", "Language Group", "Language", "Current Concurrent", "Peak Concurrent", "Latest Observed At (IST)"])
     for item in payload["channels"]:
         channels.append([
             item["channel_id"], item["name"], item["language_group"], item["language"],
-            item["current_concurrent"], item["peak_concurrent"], item["observed_at"],
+            item["current_concurrent"], item["peak_concurrent"], ist_cell(item["observed_at"]),
         ])
     _format_sheet(channels)
 
     summary = workbook.create_sheet("Summary")
     summary.append(["Metric", "Value"])
-    summary.append(["Window Start", payload["start_at"]])
-    summary.append(["Window End", payload["end_at"]])
+    summary.append(["Window Start (IST)", ist_cell(payload["start_at"])])
+    summary.append(["Window End (IST)", ist_cell(payload["end_at"])])
     summary.append(["Peak Concurrent", payload["overall"]["peak_concurrent"]])
     summary.append(["Current Concurrent", payload["overall"]["current_concurrent"]])
     summary.append(["Observed Seconds", payload["overall"]["observed_seconds"]])

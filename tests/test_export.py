@@ -56,6 +56,10 @@ def test_export_contains_two_sheets_and_latest_intelligence() -> None:
     assert workbook["StatAxis Data"].max_row == 2
     assert workbook["StatAxis Intelligence"].cell(2, 4).value == 72.5
     assert workbook["StatAxis Intelligence"].cell(2, 8).value == "Positive evidence"
+    # every time in the workbook is Indian time and says so: 10:00 UTC is 3:30 pm in India
+    data = workbook["StatAxis Data"]
+    assert data.cell(1, 1).value == "Observed At (IST)" and data.cell(2, 1).value == datetime(2026, 9, 14, 15, 30)
+    assert workbook["StatAxis Intelligence"].cell(1, 7).value == "Generated At (IST)" and workbook["StatAxis Intelligence"].cell(2, 7).value == datetime(2026, 9, 14, 15, 30)
 
 
 def test_filtered_observations_rejects_more_than_export_cap() -> None:
@@ -83,3 +87,11 @@ def test_export_response_returns_400_for_oversized_report(monkeypatch) -> None:
     assert status == 400
     assert headers == {"Content-Type": "application/json"}
     assert body.decode() == '{"error": "report has more than 50000 rows; narrow the date range or add filters"}'
+
+
+def test_ist_cell_turns_any_kind_of_time_into_indian_time_without_a_zone() -> None:
+    from api.stamps import ist_cell
+    assert ist_cell(datetime(2026, 10, 12, 11, 45, tzinfo=UTC)) == datetime(2026, 10, 12, 17, 15)
+    assert ist_cell(datetime(2026, 10, 12, 11, 45)) == datetime(2026, 10, 12, 17, 15)                  # the database keeps naive times as UTC
+    assert ist_cell("2026-10-12T11:45:00+00:00") == datetime(2026, 10, 12, 17, 15) and ist_cell("2026-10-12T11:45:00Z") == datetime(2026, 10, 12, 17, 15)
+    assert ist_cell(None) is None and ist_cell("") is None and ist_cell("not a time") == "not a time" and ist_cell(7) == 7

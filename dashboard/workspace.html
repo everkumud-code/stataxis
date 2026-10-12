@@ -283,7 +283,8 @@ const dec = (n, d = 1) => n == null || !isFinite(n) ? "—" : Number(n).toLocale
 /* Confidence arrives on two scales today: 0-100 (STX Index) and 0-1 (what-changed).
    The smallest possible STX confidence is 5, so anything <= 1 is a fraction. */
 const pct = c => c == null || !isFinite(c) ? "—" : Math.round(c <= 1 ? c * 100 : c) + "%";
-const when = iso => { if (!iso) return "—"; const d = new Date(iso); return isNaN(d) ? "—" : d.toLocaleString("en-IN", {dateStyle: "medium", timeStyle: "short"}); };
+const IST_ZONE = {timeZone: "Asia/Kolkata"};   /* every time shown anywhere is Indian time, whatever the clock of the device says */
+const when = iso => { if (!iso) return "—"; const d = new Date(iso); return isNaN(d) ? "—" : d.toLocaleString("en-IN", {dateStyle: "medium", timeStyle: "short", ...IST_ZONE}) + " IST"; };
 const signed = n => n == null ? "—" : (n > 0 ? "+" : "") + whole(n);
 
 /* ---------- session ---------- */
@@ -380,7 +381,7 @@ function table(cols, rows, empty = "No rows to show.", {group} = {}) {
 const CHARTS = new Map();
 let chartSeq = 0;
 const SKIP_KEYS = new Set(["observed_at", "total_concurrent", "value"]);
-const fullTime = d => isNaN(d) ? "" : d.toLocaleString("en-IN", {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
+const fullTime = d => isNaN(d) ? "" : d.toLocaleString("en-IN", {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", ...IST_ZONE}) + " IST";
 function spark(points, key = "value", label = "", {breakdown = false} = {}) {
   const pts = points.map(p => ({t: p.observed_at, v: Number(p[key]),
     parts: breakdown ? Object.entries(p).filter(([k, val]) => !SKIP_KEYS.has(k) && typeof val === "number").sort((a, b) => b[1] - a[1]) : []})).filter(p => isFinite(p.v));
@@ -390,7 +391,7 @@ function spark(points, key = "value", label = "", {breakdown = false} = {}) {
   const x = i => L + i / (pts.length - 1) * (W - L - R), y = v => T + (1 - (v - min) / rng) * (H - T - B);
   const line = pts.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.v).toFixed(1)).join(" ");
   const d0 = new Date(pts[0].t), d1 = new Date(pts[pts.length - 1].t), short = (d1 - d0) < 2 * 864e5;
-  const f = d => isNaN(d) ? "" : short ? d.toLocaleTimeString("en-IN", {hour: "2-digit", minute: "2-digit"}) : d.toLocaleDateString("en-IN", {day: "numeric", month: "short"});
+  const f = d => isNaN(d) ? "" : short ? d.toLocaleTimeString("en-IN", {hour: "2-digit", minute: "2-digit", ...IST_ZONE}) : d.toLocaleDateString("en-IN", {day: "numeric", month: "short", ...IST_ZONE});
   const id = "c" + (++chartSeq);
   CHARTS.set(id, {pts, W, H, L, R, T, B, x, y, label, idx: pts.length - 1});
   return `<div class="chart" data-chart="${id}" tabindex="0" aria-label="${esc(label)} chart. Move the pointer, or use the left and right arrow keys, to read the value at a time.">

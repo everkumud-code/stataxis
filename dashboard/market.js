@@ -10,7 +10,7 @@
   const opt = (list, cur) => list.map(([v, l]) => `<option value="${esc(v)}"${String(cur ?? "") === v ? " selected" : ""}>${esc(l)}</option>`).join("");
   const istDay = off => new Date(Date.now() + off * 864e5).toLocaleDateString("en-CA", {timeZone: "Asia/Kolkata"});
   const qs = o => Object.entries(o).filter(([, v]) => v !== "" && v != null && v !== false).map(([k, v]) => encodeURIComponent(k) + "=" + encodeURIComponent(v === true ? "1" : v)).join("&");
-  const fdate = s => { const d = new Date(s + "T00:00:00"); return isNaN(d) ? s : d.toLocaleDateString("en-IN", {day: "numeric", month: "short", year: "numeric"}); };
+  const fdate = s => { const d = new Date(s + "T00:00:00+05:30"); return isNaN(d) ? s : d.toLocaleDateString("en-IN", {day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata"}); };
   const AGES = ["13-17", "18-24", "25-34", "35-44", "45-54", "55-64", "65+"];
   const STATES = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya",
     "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh",
@@ -470,13 +470,13 @@
           {h: "Tone", html: 1, v: r => `<span class="tag ${toneCls[r.tone.label] || ""}" title="Score ${r.tone.score}; ${Math.round(r.tone.words_recognised * 100)}% of the title's words were recognised">${esc(r.tone.label)}</span>`}], d.channels, undefined, {group: r => r.language})}</section>
         ${d.not_live.length ? `<p class="muted" style="margin-top:8px">Not live right now: ${esc(d.not_live.join(", "))}</p>` : ""}
         <div class="btnrow" style="margin-top:12px"><button class="btn" type="button" id="lpng">Download picture card (PNG)</button></div>${method(d.method)}`;
-      $("#lpng", el).onclick = async () => saveCanvas(await cardPng(eventName() + " · viewers now", `${new Date(d.as_of).toLocaleTimeString("en-IN", {hour: "2-digit", minute: "2-digit"})} · ${s.channels_live} channels live`,
+      $("#lpng", el).onclick = async () => saveCanvas(await cardPng(eventName() + " · viewers now", `${new Date(d.as_of).toLocaleTimeString("en-IN", {hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata"})} IST · ${s.channels_live} channels live`,
         d.channels.slice(0, 10).map(r => ({label: r.name, value: r.live_now, text: whole(r.live_now) + "  ·  STX " + (r.stx ? dec(r.stx.score) : "—")})), {footer: "Average live viewers across each channel's live streams. Tone is read from stream titles."}), `stataxis-live-${eventName().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "event"}-${Date.now()}.png`);
     };
     const run = async () => {
       const v = read(), qv = {terms: v.terms, segment: v.segment, language: v.language, minutes: v.minutes, stx_period: v.stx_period, channels: v.channels};
       $("#lstat", el).textContent = "Updating…";
-      try { draw(await api("/api/v1/market/live-event", qv)); $("#lstat", el).textContent = "Updated " + new Date().toLocaleTimeString("en-IN") + (v.auto ? " · refreshing every 15 seconds" : " · automatic refresh is off"); }
+      try { draw(await api("/api/v1/market/live-event", qv)); $("#lstat", el).textContent = "Updated " + new Date().toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"}) + " IST" + (v.auto ? " · refreshing every 15 seconds" : " · automatic refresh is off"); }
       catch (e) { $("#lout", el).innerHTML = fail(e); wireUpgrade($("#lout", el)); $("#lstat", el).textContent = ""; }
       clearTimeout(timer);
       if (v.auto && el.isConnected) timer = setTimeout(() => { if (el.isConnected) { cache.clear(); run(); } }, 15000);
