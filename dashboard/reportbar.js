@@ -176,7 +176,7 @@
     }
     x.fillStyle = "#e1b94f"; x.fillRect(P, H - 96, W - 2 * P, 2);
     x.fillStyle = "#7f9ab2"; x.font = `500 18px ${FONT}`; x.fillText("Measured by STAXIS from public YouTube data. Not TV ratings.", P, H - 62);
-    x.fillText("Data via YouTube API Services. Not endorsed by YouTube.", P, H - 32);
+    x.fillText("Data via YouTube. Processed and evaluated by StatAxis.", P, H - 32);
     x.textAlign = "right"; x.fillStyle = "#e1b94f"; x.fillText(window.sxDownloadedAt(), W - P, H - 62); x.fillStyle = "#7f9ab2"; x.fillText("stataxis.org", W - P, H - 32); x.textAlign = "left";
     return c0;
   }

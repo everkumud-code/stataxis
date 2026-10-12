@@ -68,7 +68,7 @@
     x.fillStyle = "#e1b94f"; x.fillRect(50, H - 92, W - 100, 2);
     x.fillStyle = "#7f9ab2"; x.font = "500 18px Manrope, Inter, system-ui, sans-serif"; x.fillText(footer.slice(0, 80), 50, H - 62);
     x.textAlign = "right"; x.fillStyle = "#e1b94f"; x.fillText("Downloaded " + window.sxDownloadedAt(), W - 50, H - 62); x.textAlign = "left"; x.fillStyle = "#7f9ab2";
-    x.fillText("Data via YouTube API Services. Not endorsed by YouTube. Not TV ratings.   stataxis.org", 50, H - 32);
+    x.fillText("Data via YouTube. Processed and evaluated by StatAxis. Not TV ratings.   stataxis.org", 50, H - 32);
     return c;
   }
   function saveCanvas(canvas, name) { canvas.toBlob(b => { const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = name.replace(/\.png$/, "") + "-downloaded-" + window.sxFileStamp() + ".png"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }, "image/png"); }

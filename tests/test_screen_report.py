@@ -132,13 +132,13 @@ def test_downloads_carry_the_tagline_and_say_where_the_data_comes_from_without_c
     from pathlib import Path
 
     from api.report_pdf import YOUTUBE_NOTE, _mupdf, clean_screen, screen_pdf
-    assert "not endorsed by YouTube" in YOUTUBE_NOTE and "authoris" not in YOUTUBE_NOTE.lower()
+    assert YOUTUBE_NOTE == "Data via YouTube. Processed and evaluated by StatAxis." and "authoris" not in YOUTUBE_NOTE.lower() and "endorse" not in YOUTUBE_NOTE.lower()
     doc = _mupdf().open(stream=screen_pdf(clean_screen(screen()), "a@b.c", protect=False), filetype="pdf")
     text = " ".join(p.get_text() for p in doc)
-    assert "Stat the View. Axis the Viewpoint." in text and "Data via YouTube API Services" in text and "Digital Media Intelligence" not in text
+    assert "Stat the View. Axis the Viewpoint." in text and "Data via YouTube. Processed and evaluated by StatAxis." in text and "Digital Media Intelligence" not in text
     root = Path(__file__).resolve().parent.parent / "dashboard"
     for name in ("reportbar.js", "market.js"):
         js = (root / name).read_text(encoding="utf-8")
-        assert "Stat the View. Axis the Viewpoint." in js and "Digital Media Intelligence" not in js and "Not endorsed by YouTube" in js
+        assert "Stat the View. Axis the Viewpoint." in js and "Digital Media Intelligence" not in js and "Processed and evaluated by StatAxis." in js
     bar = (root / "reportbar.js").read_text(encoding="utf-8")
     assert "roundRect" not in bar and "(?![a-z])" in bar       # the risk label pill is gone from the post image, and so are the radar's risk words

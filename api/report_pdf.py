@@ -27,7 +27,7 @@ GOLD = colors.HexColor("#b8923a")
 GREY = colors.HexColor("#5b6b7b")
 LINE = colors.HexColor("#d5dde5")
 BAND = colors.HexColor("#eef3f7")
-YOUTUBE_NOTE = "Data via YouTube API Services. StatAxis is an independent service and is not endorsed by YouTube."
+YOUTUBE_NOTE = "Data via YouTube. Processed and evaluated by StatAxis."
 
 
 # ---------------------------------------------------------------------------------------------- brand: the logo, drawn on every page as a watermark
