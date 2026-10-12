@@ -31,7 +31,13 @@ a{color:var(--blue)}
 .layout{display:grid;grid-template-columns:230px minmax(0,1fr);min-height:calc(100vh - 60px)}
 .side{border-right:1px solid var(--line);padding:14px 10px;position:sticky;top:60px;align-self:start;max-height:calc(100vh - 60px);overflow:auto}
 .side h2{margin:14px 10px 6px;font-size:12px;font-weight:700;color:#5d7891;letter-spacing:.04em}
-.side h2:first-child{margin-top:4px}
+.side .grp:first-of-type h2{margin-top:6px}
+.side h2{display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;border-radius:6px}
+.side h2:hover{color:#9eb2c2}
+.side h2 i{font-style:normal;font-size:10px;opacity:.7}.side h2 i:before{content:"\25BE"}.grp.closed h2 i:before{content:"\25B8"}
+.grp.closed .nav{display:none}
+#navfind{width:100%;box-sizing:border-box;margin:2px 0 4px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#071a2b;color:var(--text);font:inherit;font-size:13px}
+#navfind:focus{outline:none;border-color:#159de8}
 .nav{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;color:#9eb2c2;text-decoration:none;font-weight:650}
 .nav:hover{background:#0e2438;color:var(--text)}
 .nav[aria-current="page"]{background:#10304a;color:var(--text);box-shadow:inset 3px 0 0 var(--gold)}
@@ -166,6 +172,9 @@ input[type=number],input[type=text]{min-width:0}
   .layout{grid-template-columns:minmax(0,1fr)}
   .side{position:static;max-height:none;display:flex;gap:4px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px}
   .side h2{display:none}
+  .grp{display:contents}
+  .grp.closed .nav{display:flex}
+  #navfind{display:none}
   .nav{white-space:nowrap}
   .main{padding:16px 14px 50px}
   .who{display:none}
@@ -836,14 +845,55 @@ function downloadCsv(rows, name) {
 }
 
 /* ---------- shell ---------- */
-function buildNav(current) {
-  let last = "", html = "";
-  for (const v of Object.values(VIEWS)) {
-    if (!visibleView(v)) continue;
-    if (v.group !== last) { html += `<h2>${esc(v.group)}</h2>`; last = v.group; }
-    html += `<a class="nav" href="#/${v.id}"${v.id === current ? ' aria-current="page"' : ""}>${esc(v.title)}</a>`;
+/* The menu is grouped by what a person is trying to do, not by how the screens were built. A screen that is not listed here still appears, under "More". */
+const MENU_LAYOUT = [
+  ["Start here", ["briefing", "overview"]],
+  ["Watch live", ["live", "liveevent", "primetime", "stream"]],
+  ["Know the market", ["market", "channel", "dashboard", "competition", "stx", "content", "trends", "changed", "research"]],
+  ["Plan and report", ["planner", "weekly", "builder", "evaluate", "audience"]],
+  ["Creators and trust", ["creators", "authenticity", "mychannels"]],
+  ["My account", ["profile"]],
+  ["System health", ["operations", "integrity"]],
+  ["People and access", ["adm-users", "adm-apps", "adm-access", "adm-claims", "adm-packages"]],
+  ["Channels and data", ["adm-channels", "adm-groups", "adm-audience", "adm-quota"]],
+];
+const MENU_LABEL = {evaluate: "Check a video", trends: "Audience over time", audience: "Audience: place and age", creators: "IFX Score (creators)"};
+const MENU_HINT = {
+  briefing: "What the data says this week, written for your role", overview: "The market today at a glance", live: "Who is live right now and how many are watching", liveevent: "Up to 30 channels on one live event, side by side",
+  primetime: "Which channel owns each evening hour", stream: "Live, replay, video and Shorts audiences compared", market: "Every channel ranked by views gained", channel: "One channel: audience, momentum, content",
+  dashboard: "One channel in depth, with the market beside it", competition: "Who leads, who is climbing, how far behind", stx: "The STX Index and the signals behind it", content: "The videos that moved most", trends: "How a channel's audience moved over time",
+  changed: "What moved since the last period", research: "Tone and topics in video titles", planner: "Where to place your ad spots and what each costs", weekly: "Views of the week's uploads, per channel", builder: "Build a branded PDF report",
+  evaluate: "Check one public video and read its STX", audience: "Where viewers live and how old they are, where known", creators: "The IFX Score for creators and journalists", authenticity: "Viewership that looks too good or too still",
+  mychannels: "Map your own channels to your login", profile: "Your details, your menu, your password", operations: "How collection is running", integrity: "Checks on the stored data",
+  "adm-users": "Create logins, reset passwords, tick privileges", "adm-apps": "People who asked for access", "adm-access": "Packages on or off, and who may use what", "adm-claims": "Who says which channel is theirs", "adm-packages": "Package names and prices",
+  "adm-channels": "Every channel, with its On/Off switch", "adm-groups": "Which group each channel belongs to", "adm-audience": "Audience profiles supplied for channels", "adm-quota": "YouTube quota: what we use and what we need",
+};
+let navFilter = "";
+function buildNav(current, keepFocus = false) {
+  const listed = new Set(MENU_LAYOUT.flatMap(([, ids]) => ids));
+  const groups = MENU_LAYOUT.map(([name, ids]) => [name, ids.map(id => VIEWS[id]).filter(v => v && visibleView(v))]);
+  const rest = Object.values(VIEWS).filter(v => visibleView(v) && !listed.has(v.id));
+  if (rest.length) groups.push(["More", rest]);
+  let closed = []; try { closed = JSON.parse(sessionStorage.getItem("sx_nav_closed") || "[]"); } catch { /* storage blocked */ }
+  const q = navFilter.trim().toLowerCase(), label = v => MENU_LABEL[v.id] || v.title;
+  let html = `<input id="navfind" type="search" placeholder="Find a screen…" aria-label="Find a screen" autocomplete="off" value="${esc(navFilter)}">`;
+  for (const [name, views] of groups) {
+    const vs = q ? views.filter(v => (label(v) + " " + (MENU_HINT[v.id] || "")).toLowerCase().includes(q)) : views;
+    if (!vs.length) continue;
+    const shut = !q && closed.includes(name) && !vs.some(v => v.id === current);
+    html += `<div class="grp${shut ? " closed" : ""}" data-grp="${esc(name)}"><h2 role="button" tabindex="0" aria-expanded="${!shut}">${esc(name)}<i></i></h2>` +
+      vs.map(v => `<a class="nav" href="#/${v.id}" title="${esc(MENU_HINT[v.id] || "")}"${v.id === current ? ' aria-current="page"' : ""}>${esc(label(v))}</a>`).join("") + `</div>`;
   }
-  $("#nav").innerHTML = html;
+  if (q && !/class="grp/.test(html)) html += `<p class="muted" style="padding:8px 12px">Nothing matches “${esc(navFilter)}”.</p>`;
+  const nav = $("#nav"); nav.innerHTML = html;
+  const find = $("#navfind", nav);
+  find.oninput = () => { navFilter = find.value; buildNav(current, true); };
+  if (keepFocus) { find.focus(); find.setSelectionRange(find.value.length, find.value.length); }
+  nav.querySelectorAll(".grp h2").forEach(h => {
+    const toggle = () => { const g = h.parentElement, name = g.dataset.grp; g.classList.toggle("closed"); h.setAttribute("aria-expanded", String(!g.classList.contains("closed")));
+      const set = new Set(closed); g.classList.contains("closed") ? set.add(name) : set.delete(name); closed = [...set]; try { sessionStorage.setItem("sx_nav_closed", JSON.stringify(closed)); } catch { /* storage blocked */ } };
+    h.onclick = toggle; h.onkeydown = ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); } };
+  });
 }
 let seq = 0;
 async function render() {

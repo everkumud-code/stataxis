@@ -177,7 +177,7 @@ def test_the_server_serves_the_stax9_artwork_with_the_right_type(name, kind):
 
 def test_the_main_menu_has_a_client_login_button_that_leads_to_the_workspace_for_a_signed_in_client():
     site, css = text(DASH / "site.js"), text(DASH / "tech.css")
-    assert site.count("data-client-login") >= 3 and 'href="/login"' in site and "Client login" in site and "My workspace" in site and '"/workspace"' in site
+    assert site.count("data-client-login") >= 3 and 'href="/login"' in site and "Enter StatAxis" in site and "Client login" not in site and "My workspace" in site and '"/workspace"' in site
     assert ".vx-menu a.login" in css
 
 
@@ -221,3 +221,20 @@ def test_channels_are_listed_language_wise_in_pickers_tables_and_the_live_wall()
     ws, market = text(DASH / "workspace.html"), text(DASH / "market.js")
     assert "const LANG_FIRST" in ws and "optsByLanguage" in ws and "groupByLanguage" in ws and "langrow" in ws and "channels.sort(byLanguage)" in ws
     assert market.count("optsByLanguage(") >= 2 and market.count("{group: r => r.language}") >= 3 and "groupByLanguage(d.channels)" in market
+
+
+def test_the_workspace_menu_is_grouped_by_task_and_lists_every_screen_once_with_a_hint():
+    from api import me
+    ws = text(DASH / "workspace.html")
+    layout = re.search(r"const MENU_LAYOUT = \[(.*?)\n\];", ws, re.S).group(1)
+    ids = re.findall(r'"([a-z\-]+)"', re.sub(r'\["[A-Za-z ]+", \[', "[", layout))
+    for vid, _label, _feature in me.VIEWS:
+        assert ids.count(vid) == 1, vid                                  # every screen a person may be given is in the menu exactly once
+    for always in me.ALWAYS:
+        assert ids.count(always) == 1, always
+    hints = re.search(r"const MENU_HINT = \{(.*?)\n\};", ws, re.S).group(1)
+    for vid in ids:
+        assert re.search(rf'(?:\b{re.escape(vid)}|"{re.escape(vid)}"): "', hints), f"no hint for {vid}"
+    for group in ("Start here", "Watch live", "Know the market", "Plan and report", "Creators and trust", "My account", "People and access"):
+        assert f'["{group}"' in layout, group
+    assert 'id="navfind"' in ws and "Find a screen" in ws
