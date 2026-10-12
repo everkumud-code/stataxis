@@ -100,6 +100,8 @@
     try {
       await settle(screen, say);
       const s = scopeOf(view, screen, card);
+      const lead = findingsOf(barsOf(s.blocks.filter(b => !b.m)));
+      if (lead.length) s.blocks.unshift({t: "h", text: "What stands out"}, ...lead.map(t => ({t: "p", text: "• " + t})));
       if (s.plain) s.blocks.unshift({t: "p", text: "About this report: " + s.plain});
       const res = await fetch("/api/v1/market/screen-report.pdf", {method: "POST", headers: {"Content-Type": "application/json", Authorization: "Bearer " + token()}, body: JSON.stringify({view: s.id, title: s.title, filters: s.sub, blocks: s.blocks})});
       if (!res.ok) { let m = "Could not make the PDF."; try { m = (await res.json()).error || m; } catch { /* not JSON */ } throw new Error(res.status === 429 ? "Too many in a short time. Wait a minute and try again." : m); }
@@ -164,13 +166,29 @@
     }
     return null;
   }
+  /* "What stands out": a few plain sentences worked out only from the figures shown (who leads, by how much, how the total is shared), so a reader gets a take-away and not just a table */
+  function findingsOf(chart) {
+    if (!chart) return [];
+    const have = chart.rows.filter(r => r.value != null && r.value > 0).sort((a, b) => b.value - a.value);
+    if (!have.length) return [];
+    const [top, next] = have, out = [`${top.label} leads with ${top.text}.`];
+    if (next) out.push(top.value >= 1.2 * next.value ? `That is about ${(top.value / next.value).toFixed(1)} times ${next.label}, the next one (${next.text}).` : `${next.label} is close behind at ${next.text}, so the lead is narrow.`);
+    const total = have.reduce((t, r) => t + r.value, 0);
+    if (have.length >= 3 && total > 0) out.push(`${top.label} holds ${Math.round(100 * top.value / total)}% of the total across these ${have.length}.`);
+    const missing = chart.rows.filter(r => r.value == null).length, zero = chart.rows.filter(r => r.value === 0).length;
+    if (missing > 0) out.push(`${missing} of ${chart.rows.length} do not have enough data yet; they will appear as it builds up.`);
+    else if (zero > 0) out.push(`${zero} of ${chart.rows.length} show 0 in this period.`);
+    return out.slice(0, 4);
+  }
   async function postPng(title, subtitle, blocks, plain = "") {
     const W = 1080, P = 56, c0 = document.createElement("canvas"), m = c0.getContext("2d");
     const result = blocks.filter(b => !b.m), kpis = result.filter(b => b.kpi && b.kpi.v).slice(0, 3).map(b => b.kpi);
     m.font = `800 46px ${FONT}`; const titleLines = wrap(m, title, W - 2 * P).slice(0, 2);
     m.font = `500 22px ${FONT}`; const subLines = wrap(m, subtitle, W - 2 * P).slice(0, 2);
     m.font = `500 27px ${FONT}`; const plainLines = plain ? wrap(m, plain, W - 2 * P).slice(0, 4) : [];
-    const chart = barsOf(result);
+    const chart = barsOf(result), finds = findingsOf(chart);
+    m.font = `500 25px ${FONT}`; const findLines = finds.map(f => wrap(m, f, W - 2 * P - 34).slice(0, 2));
+    const findH = finds.length ? 64 + findLines.reduce((t, l) => t + l.length * 33 + 10, 0) : 0;
     let body = [];   /* text lines when there is no table of numbers: {text, kind} */
     const few = result.filter(b => (b.t === "p" || b.t === "h") && !b.kpi).length <= 5, fs = few ? 36 : 28, lh = few ? 54 : 42;   /* a short note is set larger, like a poster */
     if (!chart) {
@@ -183,7 +201,7 @@
     }
     const rowH = 70, kpiH = kpis.length ? 150 : 0;
     const top = 150 + titleLines.length * 56 + subLines.length * 30 + 20 + plainLines.length * 38 + (plainLines.length ? 20 : 0) + kpiH;
-    const H = Math.max(1080, top + (chart ? 70 + chart.rows.length * rowH : body.length * lh + 20) + 130);
+    const H = Math.max(1080, top + (chart ? 70 + chart.rows.length * rowH + findH : body.length * lh + 20) + 130);
     c0.width = W; c0.height = H; const x = c0.getContext("2d");
     x.fillStyle = "#061322"; x.fillRect(0, 0, W, H);
     const lg = await logo();
@@ -220,6 +238,11 @@
         x.fillStyle = i === 0 ? "#e1b94f" : "#159de8"; x.fillRect(left, yy + 14, w, 38);
         x.fillStyle = "#e8f1f8"; x.font = `800 26px ${FONT}`; x.fillText(String(r.text).slice(0, 14), left + w + 14, yy + 44);
       });
+      if (finds.length) {
+        let fy = y + chart.rows.length * rowH + 24;
+        x.fillStyle = "#7f9ab2"; x.font = `700 20px ${FONT}`; x.fillText("WHAT STANDS OUT", P, fy + 14); fy += 44;
+        findLines.forEach(lines => { lines.forEach((t, k) => { x.font = `500 25px ${FONT}`; if (k === 0) { x.fillStyle = "#e1b94f"; x.fillText("•", P, fy + 24); } x.fillStyle = "#d6e4ef"; x.fillText(t, P + 28, fy + 24); fy += 33; }); fy += 10; });
+      }
     } else {
       body.forEach((l, i) => {
         x.fillStyle = l.kind === "h" ? "#e1b94f" : "#d6e4ef"; x.font = l.kind === "h" ? `800 ${fs}px ${FONT}` : `600 ${fs}px ${FONT}`;

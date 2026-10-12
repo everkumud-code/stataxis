@@ -150,3 +150,11 @@ def test_a_post_explains_itself_to_a_stranger_shows_the_result_and_leaves_the_me
     assert "const PLAIN = {" in bar and "STX is a score out of 100" in bar and "plainOf(view)" in bar                    # one plain sentence on what the screen is
     assert 'classList.contains("kpi")' in bar and "kpi: {l, v, s: note}" in bar and "out[k].m = 1" in bar                  # headline numbers kept, method text marked and left out of a post
     assert "About this report: " in bar and "!/weight|points/i.test(b.head[c])" in bar                                      # the PDF opens with it too; weights are never the bars
+
+
+def test_reports_say_what_stands_out_from_the_figures_alone():
+    from pathlib import Path
+    bar = (Path(__file__).resolve().parent.parent / "dashboard" / "reportbar.js").read_text(encoding="utf-8")
+    assert "function findingsOf(chart)" in bar and "WHAT STANDS OUT" in bar and '"What stands out"' in bar          # in the post image and at the top of the PDF
+    assert "leads with" in bar and "times" in bar and "holds" in bar and "do not have enough data yet" in bar          # who leads, by how much, the share, what is thin
+    assert "r.value == null" in bar and "show 0 in this period" in bar                                                # a zero is a zero, not missing data
