@@ -7,7 +7,7 @@ remain missing; no synthetic market data is generated.
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any, Iterable
 
 from sqlalchemy import select
@@ -48,6 +48,8 @@ def market_report(
     start_at = _period_start(as_of, period)
     previous_end = start_at
     previous_start = _period_start(previous_end, period)
+    if period.lower() == "today":   # today so far, against yesterday over the same stretch of the day (the day before it, whole, would make today look small)
+        previous_start, previous_end = start_at - timedelta(days=1), as_of - timedelta(days=1)
     channels = _eligible_channels(session, language=language, region=region, market=market, segment=segment)
     channel_ids = [channel.id for channel in channels]
 
@@ -330,7 +332,9 @@ def _scope_matches(row: dict[str, Any], stream_scope: str) -> bool:
 def _period_start(as_of: datetime, period: str) -> datetime:
     period = period.lower()
     if period not in PERIOD_DAYS: raise ValueError("period must be one of: 1h, 3h, 6h, today, 7d, week, 3w, month, quarter, year")
-    if period == "today": return as_of.replace(hour=0, minute=0, second=0, microsecond=0)
+    if period == "today":   # the day in India starts at midnight Indian time, which is 18:30 the evening before in UTC
+        ist = as_of.astimezone(timezone(timedelta(hours=5, minutes=30)))
+        return ist.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(UTC)
     return as_of - timedelta(days=float(PERIOD_DAYS[period]))
 
 

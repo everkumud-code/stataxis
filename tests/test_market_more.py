@@ -327,3 +327,13 @@ def test_ifx_has_twelve_parts_with_the_pillars_still_35_35_30_and_scores_the_new
     assert rows["Live"]["live_streams"] == 1 and rows["Live"]["live_peak_median"] == 9_000 and rows["Live"]["parts"]["live"] > rows["Small"]["parts"]["live"] and rows["Big"]["parts"]["live"] > rows["Live"]["parts"]["live"]
     assert "live" not in rows["Quiet"]["parts"] and rows["Quiet"]["live_streams"] == 0   # a creator who never went live is not marked down: the part is left out and the rest re-weighted
     assert set(out["part_labels"]) == set(ci.PARTS)
+
+
+def test_last_hour_is_the_sixty_minutes_before_now_and_today_starts_at_midnight_in_india():
+    from api.media_intelligence import _period_start
+    now = datetime(2026, 10, 12, 11, 45, tzinfo=UTC)                     # 5:15 pm in India
+    assert _period_start(now, "1h") == datetime(2026, 10, 12, 10, 45, tzinfo=UTC)          # 4:15 pm to 5:15 pm
+    assert _period_start(now, "3h") == datetime(2026, 10, 12, 8, 45, tzinfo=UTC)
+    assert _period_start(now, "today") == datetime(2026, 10, 11, 18, 30, tzinfo=UTC)       # 00:00 on 12 Oct in India
+    late = datetime(2026, 10, 12, 20, 0, tzinfo=UTC)                     # 1:30 am on 13 Oct in India: a new day there
+    assert _period_start(late, "today") == datetime(2026, 10, 12, 18, 30, tzinfo=UTC)
