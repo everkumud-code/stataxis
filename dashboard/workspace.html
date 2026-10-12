@@ -28,24 +28,47 @@ a{color:var(--blue)}
 .btn.primary:hover{background:var(--gold);border-color:var(--gold);color:#061322}
 .btn[disabled]{opacity:.5;cursor:not-allowed}
 
-.layout{display:grid;grid-template-columns:230px minmax(0,1fr);min-height:calc(100vh - 60px)}
-.side{border-right:1px solid var(--line);padding:14px 10px;position:sticky;top:60px;align-self:start;max-height:calc(100vh - 60px);overflow:auto}
-.side h2{margin:14px 10px 6px;font-size:12px;font-weight:700;color:#5d7891;letter-spacing:.04em}
-.side .grp:first-of-type h2{margin-top:6px}
-.side h2{display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;border-radius:6px}
-.side h2:hover{color:#9eb2c2}
-.side h2 i{font-style:normal;font-size:10px;opacity:.7}.side h2 i:before{content:"\25BE"}.grp.closed h2 i:before{content:"\25B8"}
-.grp.closed .nav{display:none}
-#navfind{width:100%;box-sizing:border-box;margin:2px 0 4px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#071a2b;color:var(--text);font:inherit;font-size:13px}
+.layout{display:grid;grid-template-columns:252px minmax(0,1fr);min-height:calc(100vh - 60px)}
+.side{border-right:1px solid var(--line);padding:14px 10px 28px;position:sticky;top:60px;align-self:start;max-height:calc(100vh - 60px);overflow:auto;scrollbar-width:thin;scrollbar-color:#20394e transparent}
+#navfind{width:100%;margin:0 0 10px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#071a2b;color:var(--text);font:inherit;font-size:13px}
 #navfind:focus{outline:none;border-color:#159de8}
-.nav{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;color:#9eb2c2;text-decoration:none;font-weight:650}
-.nav:hover{background:#0e2438;color:var(--text)}
-.nav[aria-current="page"]{background:#10304a;color:var(--text);box-shadow:inset 3px 0 0 var(--gold)}
-.nav .lock{color:var(--muted);font-size:11px;font-weight:600}
+.grp{margin:0 0 2px}
+.gh{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:0;border-radius:10px;background:transparent;color:#8aa3b8;font:inherit;font-size:12px;font-weight:800;letter-spacing:.02em;text-align:left;cursor:pointer;transition:background .15s,color .15s}
+.gh:hover{background:#0c2033;color:var(--text)}
+.gi{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#0b2236;border:1px solid #17334a;color:#6f9bbd;flex:none;transition:all .15s}
+.gi svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.gt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gc{font-size:10.5px;font-weight:800;color:#5d7891;background:#0b2236;border-radius:99px;padding:1px 7px}
+.chev{width:7px;height:7px;border-right:1.8px solid currentColor;border-bottom:1.8px solid currentColor;transform:rotate(45deg);margin:-3px 4px 0 2px;opacity:.7;transition:transform .2s}
+.grp.closed .chev{transform:rotate(-45deg);margin:0 2px 0 0}
+.grp.here .gi{background:#12304a;border-color:#2b5a80;color:var(--gold)}
+.grp.here>.gh{color:var(--text)}
+.sub{display:grid;grid-template-rows:1fr;transition:grid-template-rows .24s ease}
+.grp.closed .sub{grid-template-rows:0fr}
+.subin{overflow:hidden;min-height:0;margin-left:23px;padding-left:9px;border-left:1px solid #17334a}
+.grp.closed .subin{visibility:hidden;transition:visibility 0s .24s}
+.nav{position:relative;display:flex;align-items:center;gap:8px;padding:8px 10px;margin:1px 0;border-radius:8px;color:#9eb2c2;text-decoration:none;font-weight:650;font-size:13.5px;transition:background .15s,color .15s,padding .15s}
+.nav:before{content:"";width:5px;height:5px;border-radius:50%;background:#2a465d;flex:none;transition:background .15s,transform .15s}
+.nav:hover{background:#0e2438;color:var(--text);padding-left:13px}
+.nav:hover:before{background:var(--blue);transform:scale(1.4)}
+.nav[aria-current="page"]{background:linear-gradient(90deg,#123556,#0f2a44);color:var(--text);box-shadow:inset 3px 0 0 var(--gold)}
+.nav[aria-current="page"]:before{background:var(--gold);transform:scale(1.5)}
+.nav small{display:none}
+.nav[aria-current="page"]{flex-wrap:wrap}
+.nav[aria-current="page"] small{display:block;flex-basis:100%;margin:2px 0 0 13px;font-size:11.5px;font-weight:500;line-height:1.35;color:#8fb0c9}
+.nav>span:first-child{min-width:0}
+.nav .tagnew,.nav .tagon{margin-left:auto;font-size:9px;font-weight:800;letter-spacing:.05em;border-radius:99px;padding:0 6px;flex:none}
+.nav .tagon{color:#35d399;border:1px solid #1c5a47;display:inline-flex;align-items:center;gap:5px}
+.nav .tagon:before{content:"";width:6px;height:6px;border-radius:50%;background:#35d399;animation:livepulse 1.6s infinite}
+@keyframes livepulse{0%{box-shadow:0 0 0 0 #35d39988}70%{box-shadow:0 0 0 7px #35d39900}100%{box-shadow:0 0 0 0 #35d39900}}
+.menubtn{display:none}
+.navback{display:none}
 
 .main{padding:22px 26px 60px;max-width:1500px;width:100%}
 .head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;margin-bottom:6px}
 .head h1{margin:0;font-size:26px;line-height:1.15;letter-spacing:-.01em}
+.reportbar{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;justify-content:space-between;margin:28px 0 6px;padding:14px 18px;border:1px solid var(--line);border-top:2px solid #b8923a;border-radius:10px;background:var(--panel)}
+.reportbar b{display:block;font-size:14px}.reportbar span{color:var(--muted);font-size:12.5px}.reportbar .msg{flex-basis:100%;margin:0}
 .lede{color:var(--muted);margin:4px 0 16px;max-width:75ch}
 .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 18px}
 .filters label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
@@ -170,12 +193,12 @@ input[type=number],input[type=text]{min-width:0}
   .chform{grid-template-columns:1fr 1fr}
   .chform>*:first-child{grid-column:1/-1}
   .layout{grid-template-columns:minmax(0,1fr)}
-  .side{position:static;max-height:none;display:flex;gap:4px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px}
-  .side h2{display:none}
-  .grp{display:contents}
-  .grp.closed .nav{display:flex}
-  #navfind{display:none}
-  .nav{white-space:nowrap}
+  .menubtn{display:inline-flex;align-items:center;gap:7px}
+  .side{position:fixed;left:0;top:60px;bottom:0;width:min(86vw,330px);max-height:none;z-index:40;background:#071725;transform:translateX(-105%);transition:transform .25s ease;box-shadow:0 0 0 100vmax #0000;border-right:1px solid var(--line)}
+  body.menu-open .side{transform:none;box-shadow:0 0 0 100vmax #000a}
+  .navback{display:block;position:fixed;inset:60px 0 0 0;z-index:35;background:transparent}
+  body:not(.menu-open) .navback{display:none}
+  .logo small{display:none}
   .main{padding:16px 14px 50px}
   .who{display:none}
   .bar{grid-template-columns:110px 1fr 46px}
@@ -189,6 +212,7 @@ input[type=number],input[type=text]{min-width:0}
 <body>
 <a class="skip" href="#view">Skip to content</a>
 <header class="top">
+  <button class="btn menubtn" id="menubtn" type="button" aria-controls="nav" aria-expanded="false">&#9776; Menu</button>
   <div class="logo">STATAXIS<small>Intelligence workspace</small></div>
   <span class="plan" id="plan" hidden></span>
   <div class="who" id="who"></div>
@@ -210,6 +234,7 @@ input[type=number],input[type=text]{min-width:0}
 
 <div class="layout">
   <nav class="side" id="nav" aria-label="Workspace sections"></nav>
+  <div class="navback" id="navback"></div>
   <main class="main" id="view" tabindex="-1"></main>
 </div>
 
@@ -840,8 +865,9 @@ function downloadCsv(rows, name) {
   const cell = v => { let s = v == null ? "" : String(v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n]/.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s; };
   const head = ["Rank", "Channel", "Views gained", "Average concurrent", "Peak concurrent", "Views per minute", "STX (confidence-adjusted)", "STX raw", "STX confidence (0-100)", "Preliminary"];
   const body = rows.map(r => [r.rank, r.channel, r.view_delta, r.average_concurrent, r.peak_concurrent, r.view_velocity_per_minute, r.stx && r.stx.score != null ? stxShown(r.stx) : "", r.stx && r.stx.score, r.stx && r.stx.score != null ? Math.round(r.stx.confidence <= 1 ? r.stx.confidence * 100 : r.stx.confidence) : "", r.stx && r.stx.score != null ? (prelim(r.stx) ? "yes" : "no") : ""]);
-  const blob = new Blob(["\ufeff" + [head, ...body].map(r => r.map(cell).join(",")).join("\r\n")], {type: "text/csv;charset=utf-8"});
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  const when = window.sxDownloadedAt ? window.sxDownloadedAt() : new Date().toISOString(), stamp = window.sxFileStamp ? window.sxFileStamp() : Date.now();
+  const blob = new Blob(["\ufeff" + [head, ...body, [], ["Downloaded at (Indian time)", when]].map(r => r.map(cell).join(",")).join("\r\n")], {type: "text/csv;charset=utf-8"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name.replace(/\.csv$/, "") + "-downloaded-" + stamp + ".csv"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
 /* ---------- shell ---------- */
@@ -869,6 +895,19 @@ const MENU_HINT = {
   "adm-channels": "Every channel, with its On/Off switch", "adm-groups": "Which group each channel belongs to", "adm-audience": "Audience profiles supplied for channels", "adm-quota": "YouTube quota: what we use and what we need",
 };
 let navFilter = "";
+const MENU_ICON = {
+  "Start here": '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+  "Watch live": '<circle cx="12" cy="12" r="2"/><path d="M7.5 7.5a6.4 6.4 0 000 9M16.5 7.5a6.4 6.4 0 010 9M4.5 4.5a10.6 10.6 0 000 15M19.5 4.5a10.6 10.6 0 010 15"/>',
+  "Know the market": '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  "Plan and report": '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  "Creators and trust": '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+  "My account": '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>',
+  "System health": '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  "People and access": '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.4c2.2.7 3.5 2.6 3.5 5.6"/>',
+  "Channels and data": '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+  "More": '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+};
+const MENU_LIVE = new Set(["live", "liveevent"]);   /* screens that show what is happening this minute */
 function buildNav(current, keepFocus = false) {
   const listed = new Set(MENU_LAYOUT.flatMap(([, ids]) => ids));
   const groups = MENU_LAYOUT.map(([name, ids]) => [name, ids.map(id => VIEWS[id]).filter(v => v && visibleView(v))]);
@@ -877,24 +916,41 @@ function buildNav(current, keepFocus = false) {
   let closed = []; try { closed = JSON.parse(sessionStorage.getItem("sx_nav_closed") || "[]"); } catch { /* storage blocked */ }
   const q = navFilter.trim().toLowerCase(), label = v => MENU_LABEL[v.id] || v.title;
   let html = `<input id="navfind" type="search" placeholder="Find a screen…" aria-label="Find a screen" autocomplete="off" value="${esc(navFilter)}">`;
+  let n = 0;
   for (const [name, views] of groups) {
     const vs = q ? views.filter(v => (label(v) + " " + (MENU_HINT[v.id] || "")).toLowerCase().includes(q)) : views;
     if (!vs.length) continue;
-    const shut = !q && closed.includes(name) && !vs.some(v => v.id === current);
-    html += `<div class="grp${shut ? " closed" : ""}" data-grp="${esc(name)}"><h2 role="button" tabindex="0" aria-expanded="${!shut}">${esc(name)}<i></i></h2>` +
-      vs.map(v => `<a class="nav" href="#/${v.id}" title="${esc(MENU_HINT[v.id] || "")}"${v.id === current ? ' aria-current="page"' : ""}>${esc(label(v))}</a>`).join("") + `</div>`;
+    const here = vs.some(v => v.id === current), shut = !q && closed.includes(name) && !here, sid = "sub" + (n++);
+    html += `<div class="grp${shut ? " closed" : ""}${here ? " here" : ""}" data-grp="${esc(name)}"><button class="gh" type="button" aria-expanded="${!shut}" aria-controls="${sid}"><span class="gi"><svg viewBox="0 0 24 24" aria-hidden="true">${MENU_ICON[name] || MENU_ICON.More}</svg></span><span class="gt">${esc(name)}</span><span class="gc">${vs.length}</span><i class="chev"></i></button>` +
+      `<div class="sub" id="${sid}"><div class="subin">` +
+      vs.map(v => `<a class="nav" href="#/${v.id}" title="${esc(MENU_HINT[v.id] || "")}"${v.id === current ? ' aria-current="page"' : ""}><span>${esc(label(v))}</span>${MENU_LIVE.has(v.id) ? '<span class="tagon">LIVE</span>' : ""}<small>${esc(MENU_HINT[v.id] || "")}</small></a>`).join("") + `</div></div></div>`;
   }
-  if (q && !/class="grp/.test(html)) html += `<p class="muted" style="padding:8px 12px">Nothing matches “${esc(navFilter)}”.</p>`;
-  const nav = $("#nav"); nav.innerHTML = html;
+  if (q && !n) html += `<p class="muted" style="padding:8px 12px">Nothing matches “${esc(navFilter)}”.</p>`;
+  const nav = $("#nav"), top = nav.scrollTop; nav.innerHTML = html; nav.scrollTop = top;
   const find = $("#navfind", nav);
   find.oninput = () => { navFilter = find.value; buildNav(current, true); };
   if (keepFocus) { find.focus(); find.setSelectionRange(find.value.length, find.value.length); }
-  nav.querySelectorAll(".grp h2").forEach(h => {
-    const toggle = () => { const g = h.parentElement, name = g.dataset.grp; g.classList.toggle("closed"); h.setAttribute("aria-expanded", String(!g.classList.contains("closed")));
+  nav.querySelectorAll(".gh").forEach(h => {
+    h.onclick = () => { const g = h.parentElement, name = g.dataset.grp; g.classList.toggle("closed"); h.setAttribute("aria-expanded", String(!g.classList.contains("closed")));
       const set = new Set(closed); g.classList.contains("closed") ? set.add(name) : set.delete(name); closed = [...set]; try { sessionStorage.setItem("sx_nav_closed", JSON.stringify(closed)); } catch { /* storage blocked */ } };
-    h.onclick = toggle; h.onkeydown = ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); } };
   });
+  /* arrow keys walk the menu: Down and Up move between the group headings and the screens that are showing */
+  nav.onkeydown = ev => {
+    if (ev.key !== "ArrowDown" && ev.key !== "ArrowUp") return;
+    const items = [...nav.querySelectorAll("#navfind, .gh, .grp:not(.closed) .nav")], i = items.indexOf(document.activeElement);
+    if (i < 0) return;
+    ev.preventDefault(); (items[i + (ev.key === "ArrowDown" ? 1 : -1)] || items[i]).focus();
+  };
+  const cur = nav.querySelector('.nav[aria-current="page"]'); if (cur && !keepFocus && cur.scrollIntoView) cur.scrollIntoView({block: "nearest"});
 }
+/* small screens: the menu opens as a drawer */
+(() => {
+  const btn = $("#menubtn"), back = $("#navback"), set = on => { document.body.classList.toggle("menu-open", on); btn.setAttribute("aria-expanded", String(on)); };
+  btn.onclick = () => set(!document.body.classList.contains("menu-open"));
+  back.onclick = () => set(false);
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape") set(false); });
+  $("#nav").addEventListener("click", ev => { if (ev.target.closest("a.nav")) set(false); });
+})();
 let seq = 0;
 async function render() {
   if (forcedPw) return;   /* nothing else until the person has chosen their own password */
@@ -905,6 +961,7 @@ async function render() {
   try { await v.render(el); }
   catch (e) { if (mine !== seq) return; el.innerHTML = head(v.title, "") + errCard(e); }
   if (mine !== seq) return;
+  if (window.addReportBar) window.addReportBar(host, el, v);   /* one-tap branded report under every screen */
   el.querySelectorAll("[data-retry]").forEach(b => b.onclick = () => { cache.clear(); render(); });
   const f = el.querySelector("[data-filters]");
   if (f) f.onsubmit = ev => { ev.preventDefault(); const fd = new FormData(f); for (const [k, val] of fd.entries()) F[k] = val; saveF(); render(); };
@@ -961,6 +1018,7 @@ const forcePassword = () => {
 </script>
 <script src="guard.js"></script>
 <script src="market.js"></script>
+<script src="reportbar.js"></script>
 <script src="me.js"></script>
 <p class="sx-derived-note" style="max-width:1100px;margin:24px auto;padding:0 16px;font-size:12px;line-height:1.5;color:#64748b;text-align:center">STX Index and other scores on this page are generated independently by StatAxis. They are not sourced from, provided by or endorsed by YouTube. Underlying statistics come from public YouTube API data. <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms &amp; Conditions</a></p>
 </body>

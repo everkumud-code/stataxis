@@ -11,6 +11,7 @@ from openpyxl import Workbook
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
+from api.stamps import file_stamp, ist_stamp
 from api.access import UserRole, plan_video_access_policy, require_capability, video_access_policy
 from api.plans import SXPlan, get_plan
 from api.live_monitor import live_audience_window
@@ -245,7 +246,7 @@ def export_response(session: Session, role: UserRole | SXPlan | str, filters: Ob
 
     return 200, {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": "attachment; filename=stataxis-report.xlsx",
+        "Content-Disposition": f"attachment; filename=stataxis-report-downloaded-{file_stamp()}.xlsx",
     }, payload
 
 
@@ -258,6 +259,8 @@ DERIVED_METRICS_NOTICE = (
 
 def _add_notice_sheet(workbook: Workbook) -> None:
     notes = workbook.create_sheet("Notes")
+    notes.append(["Downloaded at", ist_stamp()])
+    notes.append([])
     notes.append(["Data notice"])
     notes.append([DERIVED_METRICS_NOTICE])
     notes.column_dimensions["A"].width = 120

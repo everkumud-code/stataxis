@@ -238,3 +238,11 @@ def test_the_workspace_menu_is_grouped_by_task_and_lists_every_screen_once_with_
     for group in ("Start here", "Watch live", "Know the market", "Plan and report", "Creators and trust", "My account", "People and access"):
         assert f'["{group}"' in layout, group
     assert 'id="navfind"' in ws and "Find a screen" in ws
+
+
+def test_the_workspace_menu_has_icons_counts_sub_menus_and_a_drawer_for_small_screens():
+    from pathlib import Path
+    html = (Path(__file__).resolve().parent.parent / "dashboard" / "workspace.html").read_text(encoding="utf-8")
+    assert 'class="gh"' in html and "MENU_ICON" in html and ".grp.closed .sub{grid-template-rows:0fr}" in html     # group heading with icon and count, sub-menu that folds
+    assert 'id="menubtn"' in html and "body.menu-open .side" in html and 'id="navback"' in html                   # the drawer on a phone
+    assert "ArrowDown" in html and 'class="tagon">LIVE' in html and "aria-current" in html                        # keyboard walk, live tag, current screen

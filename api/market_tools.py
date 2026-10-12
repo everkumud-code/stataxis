@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from api import audience as audience_mod
 from api.live_stats import live_window_stats
 from api.market_common import (
-    IST, ist_hours, ist_window, latest_observations, mean, now_utc, parse_day, parse_published, percentile_rank, pick_channels, rnd, stdev, today_ist, utc,
+    IST, channel_videos, ist_hours, ist_window, latest_observations, mean, now_utc, parse_day, parse_published, percentile_rank, pick_channels, rnd, stdev, today_ist, utc,
 )
 from collector.storage import ChannelStats, Observation, Video
 from metrics.markets import market_label
@@ -41,7 +41,9 @@ def _videos_in(session: Session, channel_ids: list[int], start: datetime, end: d
     out: list[Video] = []
     if not channel_ids:
         return out
-    for video in session.query(Video).filter(Video.channel_id.in_(channel_ids), Video.published_at.is_not(None)).all():
+    for video in channel_videos(session, channel_ids):
+        if video.published_at is None:
+            continue
         moment = parse_published(video.published_at)
         if moment is not None and start <= moment < end:
             out.append(video)
@@ -49,7 +51,7 @@ def _videos_in(session: Session, channel_ids: list[int], start: datetime, end: d
 
 
 # --------------------------------------------------------------------------------------------- weekly views
-@ttl_cache()
+@ttl_cache(stale=True)
 def weekly_views(session: Session, *, start_date: str, end_date: str, segment: str | None = None, language: str | None = None, channel_ids: list[int] | None = None,
                  target: dict[str, Any] | None = None, profiles: dict[int, dict[str, Any]] | None = None, known_only: bool = False, now: datetime | None = None) -> dict[str, Any]:
     start_day, end_day = parse_day(start_date, "from"), parse_day(end_date, "to")
@@ -99,7 +101,7 @@ def weekly_views(session: Session, *, start_date: str, end_date: str, segment: s
 
 
 # --------------------------------------------------------------------------------------------- prime time
-@ttl_cache()
+@ttl_cache(stale=True)
 def prime_time(session: Session, *, start_date: str, end_date: str, language: str | None = None, segment: str | None = None, channel_ids: list[int] | None = None,
                target: dict[str, Any] | None = None, profiles: dict[int, dict[str, Any]] | None = None, known_only: bool = False,
                slots: list[tuple[int, int]] | None = None, top: int = 5, now: datetime | None = None) -> dict[str, Any]:

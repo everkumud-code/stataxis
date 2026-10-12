@@ -66,11 +66,12 @@
       x.fillStyle = "#e8f1f8"; x.font = "800 26px Manrope, Inter, system-ui, sans-serif"; x.fillText(r.text || (compact(r.value) + unit), left + Math.max(4, bar * r.value / max) + 14, y + 42);
     });
     x.fillStyle = "#e1b94f"; x.fillRect(50, H - 92, W - 100, 2);
-    x.fillStyle = "#7f9ab2"; x.font = "500 18px Manrope, Inter, system-ui, sans-serif"; x.fillText(footer.slice(0, 110), 50, H - 62);
+    x.fillStyle = "#7f9ab2"; x.font = "500 18px Manrope, Inter, system-ui, sans-serif"; x.fillText(footer.slice(0, 80), 50, H - 62);
+    x.textAlign = "right"; x.fillStyle = "#e1b94f"; x.fillText("Downloaded " + window.sxDownloadedAt(), W - 50, H - 62); x.textAlign = "left"; x.fillStyle = "#7f9ab2";
     x.fillText("Measured by STAXIS from public YouTube data. Not TV ratings.  stataxis.org   |   Stat the View. Axis the Viewpoint.", 50, H - 32);
     return c;
   }
-  function saveCanvas(canvas, name) { canvas.toBlob(b => { const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }, "image/png"); }
+  function saveCanvas(canvas, name) { canvas.toBlob(b => { const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = name.replace(/\.png$/, "") + "-downloaded-" + window.sxFileStamp() + ".png"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }, "image/png"); }
   const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   async function downloadFile(path, params, fallbackName, msgEl) {
     try {

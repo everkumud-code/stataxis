@@ -48,25 +48,36 @@ def _utc(value: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
-def _sentiment(text: str) -> dict[str, Any]:
-    tokens = [t.lower() for t in TOKEN_RE.findall(text or "")]
-    pos = sum(t in POSITIVE for t in tokens)
-    neg = sum(t in NEGATIVE for t in tokens)
+def _sentiment_of(pos: int, neg: int, total: int) -> dict[str, Any]:
     scored = pos + neg
     score = 0.0 if not scored else (pos - neg) / scored
     label = "positive" if score > 0.15 else "negative" if score < -0.15 else "mixed/neutral"
-    coverage = min(1.0, scored / max(len(tokens), 1))
+    coverage = min(1.0, scored / max(total, 1))
     return {"label": label, "score": round(score, 3), "positive_terms": pos, "negative_terms": neg, "lexical_coverage": round(coverage, 3)}
 
 
+def _sentiment(text: str) -> dict[str, Any]:
+    tokens = [t.lower() for t in TOKEN_RE.findall(text or "")]
+    return _sentiment_of(sum(t in POSITIVE for t in tokens), sum(t in NEGATIVE for t in tokens), len(tokens))
+
+
 def _terms(titles: list[str], limit: int = 8) -> list[dict[str, Any]]:
+    return _weighted_language([(title, 1) for title in titles], limit)[1]
+
+
+def _weighted_language(titles: list[tuple[str, int]], limit: int = 8) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Sentiment and the most-mentioned terms of titles that each count as many times as they were observed. Each distinct title is read once."""
     counter: Counter[str] = Counter()
-    for title in titles:
+    pos = neg = total = 0
+    for title, times in titles:
         for token in TOKEN_RE.findall(title or ""):
             token = token.lower()
+            total += times
+            pos += times * (token in POSITIVE)
+            neg += times * (token in NEGATIVE)
             if token not in STOPWORDS and not token.isdigit():
-                counter[token] += 1
-    return [{"term": term, "mentions": count} for term, count in counter.most_common(limit)]
+                counter[token] += times
+    return _sentiment_of(pos, neg, total), [{"term": term, "mentions": count} for term, count in counter.most_common(limit)]
 
 
 def _newest_per_video(session: Session, channel_ids: list[int], start: datetime, end: datetime) -> tuple[dict[tuple[int, int], int | None], dict[int, int]]:
@@ -86,7 +97,7 @@ def _newest_per_video(session: Session, channel_ids: list[int], start: datetime,
     return views, rows_per_video
 
 
-@ttl_cache()
+@ttl_cache(stale=True)
 def build_what_changed(session: Session, *, channel_id: int | None = None, hours: int = 24, as_of: datetime | None = None) -> dict[str, Any]:
     hours = max(1, min(int(hours), 168))
     as_of = _utc(as_of or datetime.now(UTC))
@@ -109,9 +120,7 @@ def build_what_changed(session: Session, *, channel_id: int | None = None, hours
             changes.append({"channel_id": key[0], "video_id": key[1], "title": titles_by_id.get(key[1]), "view_delta": delta})
     changes.sort(key=lambda item: abs(item["view_delta"]), reverse=True)
 
-    current_titles = [title for vid, n in current_rows_per_video.items() if (title := titles_by_id.get(vid)) for _ in range(n)]   # one title per observation, as before
-    sentiment = _sentiment(" ".join(current_titles))
-    narrative_terms = _terms(current_titles)
+    sentiment, narrative_terms = _weighted_language([(title, n) for vid, n in current_rows_per_video.items() if (title := titles_by_id.get(vid))])   # a title counts once per observation
     current_views = [item["view_delta"] for item in changes if item["view_delta"] is not None]
     total_delta = sum(current_views) if current_views else None
     previous_count = sum(previous_rows_per_video.values())

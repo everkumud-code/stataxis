@@ -214,7 +214,7 @@ def _creators(session: Session, segment: str | None, language: str | None, now: 
 
 
 def _authenticity(session: Session, segment: str | None, language: str | None, now: datetime, channel_ids: list[int] | None = None) -> list[dict[str, Any]]:
-    scan = authenticity.scan(session, days=7, segment=segment, language=language, channel_ids=channel_ids, now=now, use_cache=False)
+    scan = authenticity.scan(session, days=7, segment=segment, language=language, channel_ids=channel_ids, now=now)
     s = scan["summary"]
     flagged = [c for c in scan["channels"] if c["risk"] in ("high", "review")]
     if not flagged:
@@ -249,7 +249,7 @@ def briefing_as_report(b: dict[str, Any]) -> dict[str, Any]:
 
 
 # -------------------------------------------------------------------------------------------- the briefing
-@ttl_cache()
+@ttl_cache(stale=True)
 def briefing(session: Session, *, persona: str, days: int = 7, segment: str | None = None, language: str | None = None, channel_ids: list[int] | None = None, now: datetime | None = None, limit: int = 8) -> dict[str, Any]:
     if persona not in PERSONAS:
         raise ValueError("persona must be one of: " + ", ".join(PERSONAS))

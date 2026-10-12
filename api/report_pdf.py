@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import re
 import secrets
 from datetime import datetime
 from io import BytesIO
@@ -14,7 +17,9 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+from api.stamps import file_stamp, ist_stamp
 
 NAVY = colors.HexColor("#061322")
 BLUE = colors.HexColor("#159de8")
@@ -52,16 +57,16 @@ def logo_png(ring: str = "#5f7f9c", ink: str = "#061322", gold: str = "#b8923a",
     return _LOGO_CACHE[key]
 
 
-def _watermark(canvas: Any) -> None:
+def _watermark(canvas: Any, size: tuple[float, float] = A4) -> None:
     """The logo, faint and tilted, repeated over the whole page so a screenshot or a crop still carries it."""
     img = ImageReader(BytesIO(logo_png()))
     canvas.saveState()
     canvas.setFillAlpha(0.075)
-    canvas.translate(A4[0] / 2, A4[1] / 2)
+    canvas.translate(size[0] / 2, size[1] / 2)
     canvas.rotate(32)
     w, h = 70 * mm, 70 * mm * 124 / 520
     for row in range(-6, 7):
-        for col in range(-3, 4):
+        for col in range(-5, 6):
             x = col * 105 * mm + (row % 2) * 52 * mm - w / 2
             y = row * 36 * mm - h / 2
             canvas.drawImage(img, x, y, w, h, mask="auto")
@@ -107,9 +112,10 @@ def report_title(r: dict[str, Any]) -> str:
 
 
 def filename(r: dict[str, Any]) -> str:
+    stamp = file_stamp()   # the download time is part of the name, so two downloads never overwrite each other
     if r.get("kind") == "briefing":
-        return f"stataxis-briefing-{r['persona']}-{r['from']}-to-{r['to']}.pdf"
-    return f"stataxis-{r['scope']}-{r['from']}-to-{r['to']}-{r['start_hour']:02d}-{r['end_hour']:02d}.pdf"
+        return f"stataxis-briefing-{r['persona']}-{r['from']}-to-{r['to']}-downloaded-{stamp}.pdf"
+    return f"stataxis-{r['scope']}-{r['from']}-to-{r['to']}-{r['start_hour']:02d}-{r['end_hour']:02d}-downloaded-{stamp}.pdf"
 
 
 def _bars(rows: list[dict[str, Any]], key: str, width: float, label: str) -> Drawing:
@@ -138,8 +144,36 @@ def _table(data: list[list[str]], widths: list[float], right_from: int = 2) -> T
     return t
 
 
+def _decorate(canvas: Any, document: Any, downloaded: str, data_note: str, who: str) -> None:
+    """The look every page of every report shares: watermark, the navy band with the mark, and a footer that says when it was downloaded."""
+    pw, ph = document.pagesize
+    _watermark(canvas, (pw, ph))
+    canvas.saveState()
+    canvas.setFillColor(NAVY)
+    canvas.rect(0, ph - 16 * mm, pw, 16 * mm, stroke=0, fill=1)
+    canvas.drawImage(ImageReader(BytesIO(logo_png(ring="#e8f0f8", ink="#e8f0f8", gold="#e1b94f", words=False, scale=2))), 16 * mm, ph - 14 * mm, 12 * mm, 12 * 124 / 150 * mm, mask="auto")
+    canvas.setFillColor(GOLD)
+    canvas.setFont("Helvetica-Bold", 13)
+    canvas.drawString(31 * mm, ph - 10.5 * mm, "STATAXIS")
+    canvas.setFillColor(colors.white)
+    canvas.setFont("Helvetica", 8)
+    canvas.drawRightString(pw - 16 * mm, ph - 7.5 * mm, "Digital Media Intelligence")
+    canvas.setFillColor(colors.HexColor("#e1b94f"))
+    canvas.setFont("Helvetica-Bold", 8)
+    canvas.drawRightString(pw - 16 * mm, ph - 12 * mm, f"Downloaded {downloaded}")
+    canvas.setFillColor(GREY)
+    canvas.setFont("Helvetica", 7.5)
+    canvas.drawString(16 * mm, 9 * mm, f"Downloaded {downloaded}{who}" + (f"  |  {data_note}" if data_note else "") + "  |  STATAXIS - Stat the View. Axis the Viewpoint.")
+    canvas.drawRightString(pw - 16 * mm, 9 * mm, f"Page {document.page}")
+    canvas.setStrokeColor(GOLD)
+    canvas.setLineWidth(0.6)
+    canvas.line(16 * mm, 13 * mm, pw - 16 * mm, 13 * mm)
+    canvas.restoreState()
+
+
 def report_pdf(r: dict[str, Any], protect: bool = True) -> bytes:
     buf = BytesIO()
+    downloaded = ist_stamp()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=16 * mm, rightMargin=16 * mm, topMargin=26 * mm, bottomMargin=18 * mm, title=report_title(r), author="STAXIS")
     ss = getSampleStyleSheet()
     h1 = ParagraphStyle("h1", parent=ss["Heading1"], fontName="Helvetica-Bold", fontSize=17, leading=21, textColor=NAVY, spaceAfter=2)
@@ -149,6 +183,11 @@ def report_pdf(r: dict[str, Any], protect: bool = True) -> bytes:
     filters = r.get("filters") or {}
     story.append(Paragraph(escape(report_title(r)), h1))
     story.append(Paragraph(escape(f"{_dates(r)}  |  Indian time  |  " + ("" if r.get("kind") == "briefing" else f"Genre: {r['genre'] or 'all genres'}  |  ") + f"Language: {filters.get('language') or 'all'}  |  Group: {filters.get('segment') or 'all'}"), body))
+    try:
+        as_of = ist_stamp(datetime.fromisoformat(r["generated_at"]))
+    except (KeyError, TypeError, ValueError):
+        as_of = downloaded
+    story.append(Paragraph(f"<font color='#b8923a'><b>Downloaded {escape(downloaded)}</b></font>  |  Data as of {escape(as_of)}", body))
     story.append(Spacer(1, 8))
     width = A4[0] - 32 * mm
     rows = r["rows"]
@@ -207,29 +246,119 @@ def report_pdf(r: dict[str, Any], protect: bool = True) -> bytes:
     story.append(Spacer(1, 4))
     story.append(Paragraph("Measured by STAXIS from public YouTube data. This is not TV ratings and not a statement about who watched; audiences of different channels overlap by an amount that is not visible here.", body))
 
+    who = f" for {r['prepared_for']}" if r.get("prepared_for") else ""
+
     def page(canvas: Any, document: Any) -> None:
-        _watermark(canvas)
-        canvas.saveState()
-        canvas.setFillColor(NAVY)
-        canvas.rect(0, A4[1] - 16 * mm, A4[0], 16 * mm, stroke=0, fill=1)
-        canvas.drawImage(ImageReader(BytesIO(logo_png(ring="#e8f0f8", ink="#e8f0f8", gold="#e1b94f", words=False, scale=2))), 16 * mm, A4[1] - 14 * mm, 12 * mm, 12 * 124 / 150 * mm, mask="auto")
-        canvas.setFillColor(GOLD)
-        canvas.setFont("Helvetica-Bold", 13)
-        canvas.drawString(31 * mm, A4[1] - 10.5 * mm, "STATAXIS")
-        canvas.setFillColor(colors.white)
-        canvas.setFont("Helvetica", 8)
-        canvas.drawRightString(A4[0] - 16 * mm, A4[1] - 10 * mm, "Digital Media Intelligence")
-        canvas.setFillColor(GREY)
-        canvas.setFont("Helvetica", 7.5)
-        generated = datetime.fromisoformat(r["generated_at"]).strftime("%d %b %Y %H:%M UTC")
-        who = f" for {r['prepared_for']}" if r.get("prepared_for") else ""
-        canvas.drawString(16 * mm, 9 * mm, f"Generated {generated}{who}  |  STATAXIS - Stat the View. Axis the Viewpoint.")
-        canvas.drawRightString(A4[0] - 16 * mm, 9 * mm, f"Page {document.page}")
-        canvas.setStrokeColor(GOLD)
-        canvas.setLineWidth(0.6)
-        canvas.line(16 * mm, 13 * mm, A4[0] - 16 * mm, 13 * mm)
-        canvas.restoreState()
+        _decorate(canvas, document, downloaded, f"Data as of {as_of}", who)
 
     doc.build(story, onFirstPage=page, onLaterPages=page)
     data = buf.getvalue()
     return protect_pdf(data, report_title(r)) if protect else data
+
+
+# ---------------------------------------------------------------------------------------------- a report of any screen
+MAX_BLOCKS, MAX_ROWS, MAX_COLS, MAX_IMAGES = 700, 500, 14, 4
+_FREE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def _txt(value: Any, limit: int) -> str:
+    return _FREE.sub("", value if isinstance(value, str) else ("" if value is None else str(value))).strip()[:limit]
+
+
+def clean_screen(payload: dict[str, Any]) -> dict[str, Any]:
+    """Check what the browser sent for a screen report and keep only what a report can hold: headings, text, tables and pictures, with sizes capped."""
+    blocks_in = payload.get("blocks")
+    if not isinstance(blocks_in, list) or not blocks_in:
+        raise ValueError("there is nothing on this screen to put in a report yet")
+    blocks: list[dict[str, Any]] = []
+    images = 0
+    for b in blocks_in[:MAX_BLOCKS]:
+        if not isinstance(b, dict):
+            continue
+        kind = b.get("t")
+        if kind in ("h", "p"):
+            text = _txt(b.get("text"), 1400)
+            if text:
+                blocks.append({"t": kind, "text": text})
+        elif kind == "table":
+            head = [_txt(c, 60) for c in (b.get("head") or [])[:MAX_COLS]] if isinstance(b.get("head"), list) else []
+            rows = []
+            for row in (b.get("rows") or [])[:MAX_ROWS] if isinstance(b.get("rows"), list) else []:
+                if isinstance(row, list):
+                    rows.append([_txt(c, 160) for c in row[:MAX_COLS]])
+            width = max([len(head)] + [len(r) for r in rows] or [0])
+            if width:
+                head = (head + [""] * width)[:width]
+                blocks.append({"t": "table", "head": head, "rows": [(r + [""] * width)[:width] for r in rows], "cut": bool(b.get("cut")) or len(b.get("rows") or []) > MAX_ROWS})
+        elif kind == "img" and images < MAX_IMAGES:
+            raw = b.get("data")
+            if isinstance(raw, str) and raw.startswith("data:image/png;base64,") and len(raw) < 700_000:
+                try:
+                    blocks.append({"t": "img", "bytes": base64.b64decode(raw.split(",", 1)[1], validate=True), "alt": _txt(b.get("alt"), 120)})
+                    images += 1
+                except (binascii.Error, ValueError):
+                    continue
+    if not blocks:
+        raise ValueError("there is nothing on this screen to put in a report yet")
+    return {"title": _txt(payload.get("title"), 140) or "Workspace screen", "filters": _txt(payload.get("filters"), 400), "view": re.sub(r"[^a-z0-9-]", "", _txt(payload.get("view"), 40).lower()) or "screen", "blocks": blocks}
+
+
+def screen_filename(screen: dict[str, Any]) -> str:
+    return f"stataxis-{screen['view']}-downloaded-{file_stamp()}.pdf"
+
+
+def screen_pdf(screen: dict[str, Any], prepared_for: str | None = None, protect: bool = True) -> bytes:
+    """A branded report of the screen a person is looking at: what they see (headings, figures, tables, pictures) on the StatAxis letterhead, with the time it was downloaded on every page."""
+    downloaded = ist_stamp()
+    wide = any(b["t"] == "table" and len(b["head"]) > 7 for b in screen["blocks"])
+    size = (A4[1], A4[0]) if wide else A4
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=size, leftMargin=16 * mm, rightMargin=16 * mm, topMargin=26 * mm, bottomMargin=18 * mm, title=screen["title"], author="STAXIS")
+    width = size[0] - 32 * mm
+    ss = getSampleStyleSheet()
+    h1 = ParagraphStyle("h1", parent=ss["Heading1"], fontName="Helvetica-Bold", fontSize=17, leading=21, textColor=NAVY, spaceAfter=2)
+    h2 = ParagraphStyle("h2", parent=ss["Heading2"], fontName="Helvetica-Bold", fontSize=11.5, leading=14, textColor=NAVY, spaceBefore=10, spaceAfter=4, keepWithNext=1)
+    body = ParagraphStyle("b", parent=ss["BodyText"], fontName="Helvetica", fontSize=8.8, leading=12, textColor=colors.HexColor("#2b3a49"), spaceAfter=2)
+    muted = ParagraphStyle("m", parent=body, fontSize=8, leading=10.5, textColor=GREY)
+    cell = ParagraphStyle("c", parent=body, fontSize=7.6, leading=9.4, spaceAfter=0)
+    cellh = ParagraphStyle("ch", parent=cell, fontName="Helvetica-Bold", textColor=colors.white)
+    story: list[Any] = [Paragraph(escape(screen["title"]), h1),
+                        Paragraph(f"<font color='#b8923a'><b>Downloaded {escape(downloaded)}</b></font>" + (f"  |  {escape(screen['filters'])}" if screen["filters"] else ""), muted), Spacer(1, 8)]
+    for b in screen["blocks"]:
+        if b["t"] == "h":
+            story.append(Paragraph(escape(b["text"]), h2))
+        elif b["t"] == "p":
+            story.append(Paragraph(escape(b["text"]), body))
+        elif b["t"] == "img":
+            try:
+                img = ImageReader(BytesIO(b["bytes"]))
+                iw, ih = img.getSize()
+                w = min(width, iw * 0.264583 * mm / 1.0)   # 96 dpi picture pixels to millimetres
+                story.append(Spacer(1, 4))
+                story.append(Image(BytesIO(b["bytes"]), width=w, height=w * ih / iw))
+            except Exception:   # a picture that cannot be read is left out; the figures stay
+                continue
+        else:
+            cols = len(b["head"])
+            weight = [max(4, min(34, max([len(b["head"][i])] + [len(r[i]) for r in b["rows"][:60]]))) for i in range(cols)]
+            total = float(sum(weight))
+            widths = [width * w / total for w in weight]
+            data = [[Paragraph(escape(c), cellh) for c in b["head"]]] + [[Paragraph(escape(c), cell) for c in r] for r in b["rows"]]
+            t = Table(data, colWidths=widths, repeatRows=1)
+            t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), NAVY), ("VALIGN", (0, 0), (-1, -1), "TOP"), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BAND]),
+                                   ("LINEBELOW", (0, 0), (-1, -1), 0.25, LINE), ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3), ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3)]))
+            story.append(Spacer(1, 3))
+            story.append(t)
+            if b.get("cut"):
+                story.append(Paragraph(f"The first {MAX_ROWS} rows are shown here; the screen has more.", muted))
+            story.append(Spacer(1, 4))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph(escape("This report shows the screen as it was on the screen when it was downloaded. Measured by STAXIS from public YouTube data. This is not TV ratings and not a statement about who watched."), muted))
+    who = f" for {prepared_for}" if prepared_for else ""
+
+    def page(canvas: Any, document: Any) -> None:
+        _decorate(canvas, document, downloaded, "Screen report", who)
+
+    doc.build(story, onFirstPage=page, onLaterPages=page)
+    data = buf.getvalue()
+    return protect_pdf(data, screen["title"]) if protect else data

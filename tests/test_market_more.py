@@ -1,5 +1,6 @@
 """Report builder with PDF, the creator index, package access and the admin user tools, on invented data in a scratch database."""
 import io
+import re
 import json
 from datetime import UTC, datetime, timedelta
 
@@ -123,7 +124,7 @@ def test_pdf_is_a_real_pdf_with_the_filters_the_table_and_the_method():
     report = build_report(s, start_date="2026-10-10", end_date="2026-10-10", start_hour=9, end_hour=12, scope="live", by_genre=True, now=NOW)
     pdf = report_pdf(report)
     assert pdf[:5] == b"%PDF-" and len(pdf) > 2000
-    assert filename(report) == "stataxis-live-2026-10-10-to-2026-10-10-09-12.pdf"
+    assert re.fullmatch(r"stataxis-live-2026-10-10-to-2026-10-10-09-12-downloaded-\d{8}-\d{4}\.pdf", filename(report))
     empty = report_pdf(build_report(s, start_date="2026-10-05", end_date="2026-10-05", scope="live", now=NOW))
     assert empty[:5] == b"%PDF-"
 

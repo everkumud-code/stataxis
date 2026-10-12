@@ -134,6 +134,7 @@ def test_the_pdf_is_branded_unreadable_by_machines_and_only_printable():
     # the plain version has real text; the protected one has none to lift
     plain_doc, doc = fitz.open(stream=plain, filetype="pdf"), fitz.open(stream=protected, filetype="pdf")
     assert "Alpha" in plain_doc[0].get_text() and "STATAXIS" in plain_doc[0].get_text()
+    assert "Downloaded " in plain_doc[0].get_text() and " IST" in plain_doc[0].get_text()   # every report says when it was downloaded
     assert b"/Encrypt" in protected and b"/Encrypt" not in plain and doc.authenticate("") > 0
     assert all(page.get_text().strip() == "" for page in doc) and all(page.get_images() for page in doc)
     assert doc.permissions & fitz.PDF_PERM_PRINT and not doc.permissions & fitz.PDF_PERM_COPY and not doc.permissions & fitz.PDF_PERM_MODIFY

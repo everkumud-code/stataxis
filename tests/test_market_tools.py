@@ -19,7 +19,7 @@ NOW = datetime(2026, 10, 12, 6, 0, tzinfo=UTC)  # 11:30 in India on 12 Oct
 @pytest.fixture(autouse=True)
 def secret(monkeypatch):
     monkeypatch.setenv("STAXIS_AUTH_SECRET", "test-secret")
-    authenticity._CACHE.clear()
+    authenticity.scan.cache_clear()
 
 
 def make_session():

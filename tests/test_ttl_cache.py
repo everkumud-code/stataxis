@@ -72,3 +72,59 @@ def test_a_bad_setting_means_off(monkeypatch):
     heavy(None)
     heavy(None)
     assert len(calls) == 2
+
+
+def test_two_databases_never_share_an_answer(monkeypatch):
+    """The public demo runs the same code on its own data: an answer worked out for the real data must not be handed to the demo, or the other way round."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    monkeypatch.setenv("STAXIS_RESULT_CACHE_SECONDS", "30")
+    calls = []
+
+    @ttl_cache()
+    def heavy(session, *, days=7):
+        calls.append(id(session.get_bind()))
+        return {"engine": id(session.get_bind())}
+
+    a, b = create_engine("sqlite://"), create_engine("sqlite://")
+    with Session(a) as sa, Session(b) as sb, Session(a) as sa2:
+        first, other, again = heavy(sa), heavy(sb), heavy(sa2)
+    assert first != other and first == again and len(calls) == 2
+
+
+def test_a_just_expired_answer_is_handed_out_at_once_while_it_is_refreshed_in_the_background(monkeypatch):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    monkeypatch.setenv("STAXIS_RESULT_CACHE_SECONDS", "0.1")
+    monkeypatch.setenv("STAXIS_RESULT_STALE_SECONDS", "30")
+    counter = {"n": 0}
+
+    @ttl_cache(stale=True)
+    def slow(session):
+        counter["n"] += 1
+        if counter["n"] > 1:
+            time.sleep(0.3)
+        return {"n": counter["n"]}
+
+    @ttl_cache()
+    def plain(session):
+        counter["n"] += 100
+        time.sleep(0.2)
+        return {"n": counter["n"]}
+
+    engine = create_engine("sqlite://")
+    with Session(engine) as s:
+        assert slow(s) == {"n": 1}
+        time.sleep(0.15)
+        t = time.time()
+        assert slow(s) == {"n": 1} and time.time() - t < 0.2     # the old answer, with no wait
+        assert slow(s) == {"n": 1}                                 # a second caller does not start a second refresh
+        deadline = time.time() + 3
+        while time.time() < deadline and slow(s) == {"n": 1}:
+            time.sleep(0.05)
+        assert slow(s) == {"n": 2} and counter["n"] == 2          # exactly one refresh ran
+        plain(s)
+        time.sleep(0.15)
+        t = time.time()
+        plain(s)
+        assert time.time() - t >= 0.2                              # an answer not marked stale=True is recalculated on the spot

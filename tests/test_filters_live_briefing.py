@@ -1,5 +1,6 @@
 """The common filters (category, language, time, place, age group, individual channel), the live event compare for up to 30 channels, and the role-based briefing."""
 import io
+import re
 import json
 from datetime import UTC, datetime, timedelta
 
@@ -206,7 +207,7 @@ def test_the_briefing_turns_into_a_branded_pdf_with_the_findings_first():
     b = briefing(s, persona="buyer", days=7, now=NOW)
     rep = briefing_as_report(b)
     rep["prepared_for"] = "buyer@agency.com"
-    assert filename(rep) == f"stataxis-briefing-buyer-{b['window']['from']}-to-{b['window']['to']}.pdf"
+    assert re.fullmatch(rf"stataxis-briefing-buyer-{b['window']['from']}-to-{b['window']['to']}-downloaded-\d{{8}}-\d{{4}}\.pdf", filename(rep))
     plain = _mupdf().open(stream=report_pdf(rep, protect=False), filetype="pdf")
     text = " ".join(p.get_text() for p in plain)
     assert "Briefing for media buyer" in text and b["findings"][0]["headline"][:30] in text and "For you:" in text and "Where to look next" in text

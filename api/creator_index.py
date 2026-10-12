@@ -24,7 +24,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from api import authenticity
-from api.market_common import latest_observations, mean, now_utc, parse_published, percentile_rank, pick_channels, rnd, stdev, utc
+from api.market_common import channel_videos, latest_observations, mean, now_utc, parse_published, percentile_rank, pick_channels, rnd, stdev, utc
 from api.market_tools import _subscribers
 from collector.storage import Observation, Video
 
@@ -67,7 +67,7 @@ def _first_last(session: Session, video_ids: list[int], since: datetime) -> dict
     return out
 
 
-@ttl_cache()
+@ttl_cache(stale=True)
 def creator_index(session: Session, *, segment: str | None = None, language: str | None = None, days: int = 30, channel_ids: list[int] | None = None, now: datetime | None = None, with_authenticity: bool = True) -> dict[str, Any]:
     if not 14 <= int(days) <= 90:
         raise ValueError("days must be between 14 and 90")
@@ -76,7 +76,7 @@ def creator_index(session: Session, *, segment: str | None = None, language: str
     since = now - timedelta(days=days)
     channels, languages = pick_channels(session, segment=segment, language=language, channel_ids=channel_ids)
     ids = [c.id for c in channels]
-    videos = session.query(Video).filter(Video.channel_id.in_(ids)).all() if ids else []
+    videos = channel_videos(session, ids) if ids else []
     mine = [v for v in videos if (m := parse_published(v.published_at)) and since <= m <= now]
     latest = latest_observations(session, [v.id for v in mine])
     mine = [v for v in mine if latest.get(v.id) and latest[v.id].classification not in LIVE_CLASSES and latest[v.id].view_count is not None]
@@ -145,7 +145,7 @@ def creator_index(session: Session, *, segment: str | None = None, language: str
         if typical is not None and len(r["_mviews"]) >= 5:
             r["hitrate"] = sum(1 for x in r["_mviews"] if x >= typical) / len(r["_mviews"])
     peers = {k: [r[k] for r in raw.values() if r[k] is not None] for k in PARTS}
-    risk = authenticity.scan(session, days=7, segment=segment, language=language, channel_ids=channel_ids, now=now, use_cache=False) if with_authenticity and ids else {"channels": []}
+    risk = authenticity.scan(session, days=7, segment=segment, language=language, channel_ids=channel_ids, now=now) if with_authenticity and ids else {"channels": []}
     risk_by = {r["channel_id"]: r for r in risk["channels"]}
     rows = []
     for c in channels:

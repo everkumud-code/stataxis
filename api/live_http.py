@@ -11,6 +11,7 @@ from api.feature_access import require_export
 from api.auth_service import authenticate, policy_for_identity
 from api.errors import AuthenticationError, AuthorizationError
 from api.export import export_live_audience_xlsx, export_live_stats_xlsx
+from api.stamps import file_stamp
 from api.live_monitor import live_audience_window, sample_live_url
 from api.live_stats import live_snapshot, live_window_stats
 
@@ -49,7 +50,7 @@ def live_application(session_factory: Callable[[], Any]):
                     session.close()
                 start_response("200 OK", [
                     ("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-                    ("Content-Disposition", "attachment; filename=stataxis-live-audience.xlsx"),
+                    ("Content-Disposition", f"attachment; filename=stataxis-live-audience-downloaded-{file_stamp()}.xlsx"),
                     ("Content-Length", str(len(body))),
                 ])
                 return [body]
@@ -105,7 +106,7 @@ def live_application(session_factory: Callable[[], Any]):
                         body = export_live_stats_xlsx(session, start_at=start_at, end_at=end_at, language=language, segment=segment, bucket_seconds=bucket)
                         start_response("200 OK", [
                             ("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-                            ("Content-Disposition", "attachment; filename=stataxis-live-feed-stats.xlsx"),
+                            ("Content-Disposition", f"attachment; filename=stataxis-live-feed-stats-downloaded-{file_stamp()}.xlsx"),
                             ("Content-Length", str(len(body))),
                         ])
                         return [body]

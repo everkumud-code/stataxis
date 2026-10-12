@@ -48,13 +48,13 @@ def _json(start_response: Callable[..., Any], status: int, payload: dict[str, An
     return [body]
 
 
-def _read_json(environ: dict[str, Any]) -> dict[str, Any]:
+def _read_json(environ: dict[str, Any], limit: int = 65_536) -> dict[str, Any]:
     try:
         length = int(environ.get("CONTENT_LENGTH") or "0")
     except ValueError as exc:
         raise ValueError("invalid content length") from exc
-    if length <= 0 or length > 65_536:
-        raise ValueError("request body must be between 1 and 65536 bytes")
+    if length <= 0 or length > limit:
+        raise ValueError(f"request body must be between 1 and {limit} bytes")
     try:
         payload = json.loads(environ["wsgi.input"].read(length).decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -130,6 +130,13 @@ def market_application(session_factory: Callable[[], Any]):
                         start_response("200 OK", [("Content-Type", "application/pdf"), ("Content-Disposition", f'attachment; filename="{filename(report)}"'), ("Content-Length", str(len(body))), ("Cache-Control", "no-store")])
                         return [body]
                     return _json(start_response, 200, report)
+                if (method, path) == ("POST", "/api/v1/market/screen-report.pdf"):
+                    # a branded PDF of the screen the person is looking at: any screen, one tap. The figures are what their browser shows them; the letterhead and the download time are ours.
+                    from api.report_pdf import clean_screen, screen_filename, screen_pdf
+                    screen = clean_screen(_read_json(environ, 1_600_000))
+                    body = screen_pdf(screen, user.email + (f" ({user.organization})" if user.organization else ""))
+                    start_response("200 OK", [("Content-Type", "application/pdf"), ("Content-Disposition", f'attachment; filename="{screen_filename(screen)}"'), ("Content-Length", str(len(body))), ("Cache-Control", "no-store")])
+                    return [body]
                 if (method, path) == ("GET", "/api/v1/market/creators"):
                     return _json(start_response, 200, creator_scores(session, segment=segment, language=language, days=_int(q.get("days"), "days", 30), channel_ids=cids))
                 if (method, path) == ("GET", "/api/v1/market/creator-index"):

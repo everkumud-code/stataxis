@@ -13,7 +13,6 @@ behind every flag, and keeps an admin's decision (cleared / watching / confirmed
 
 from __future__ import annotations
 
-import time
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from statistics import median
@@ -22,7 +21,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from api.market_common import latest_observations, mean, now_utc, parse_published, pick_channels, robust_z, rnd, stdev, utc
+from api.ttl_cache import ttl_cache
+from api.market_common import channel_videos, latest_observations, mean, now_utc, parse_published, pick_channels, robust_z, rnd, stdev, utc
 from collector.storage import AuthenticityReview, Observation, Video
 
 SIGNALS = {
@@ -38,8 +38,12 @@ METHOD = (
     "Each channel is compared with the other channels of the same group and with its own recent history. A flag is a pattern that is unusual, not proof of wrongdoing: "
     "public numbers cannot show who watched. Review the evidence, then mark the flag cleared, watching or confirmed."
 )
-_CACHE: dict[tuple, tuple[float, dict[str, Any]]] = {}
-CACHE_SECONDS = 600
+
+
+def _question(*, days: int = 7, segment: str | None = None, language: str | None = None, channel_ids: list[int] | None = None, now: datetime | None = None, use_cache: bool = True) -> tuple:
+    """What makes two scans the same question: the filters and the moment to the ten minutes (a briefing and the radar screen ask at slightly different instants)."""
+    moment = utc(now) if now else now_utc()
+    return (int(days), segment, language, tuple(sorted(channel_ids or [])), moment.replace(minute=moment.minute // 10 * 10, second=0, microsecond=0))
 
 
 def _series(rows: list[Observation]) -> list[tuple[datetime, Observation]]:
@@ -50,18 +54,16 @@ def _flag(code: str, severity: str, detail: str, evidence: dict[str, Any]) -> di
     return {"code": code, "title": SIGNALS[code], "severity": severity, "detail": detail, "evidence": evidence}
 
 
+@ttl_cache(scale=10, stale=True, key=_question)   # about 7 minutes fresh, then handed out stale while it is worked out again
 def scan(session: Session, *, days: int = 7, segment: str | None = None, language: str | None = None, channel_ids: list[int] | None = None, now: datetime | None = None, use_cache: bool = True) -> dict[str, Any]:
     if not 1 <= int(days) <= 28:
         raise ValueError("days must be between 1 and 28")
     days = int(days)
     now = utc(now) if now else now_utc()
-    key = (days, segment, language, tuple(sorted(channel_ids or [])), now.replace(minute=now.minute // 10 * 10, second=0, microsecond=0) if use_cache else now)
-    if use_cache and key in _CACHE and time.monotonic() - _CACHE[key][0] < CACHE_SECONDS:
-        return _CACHE[key][1]
     channels, languages = pick_channels(session, segment=segment, language=language, channel_ids=channel_ids)
     ids = [c.id for c in channels]
     since = now - timedelta(days=days)
-    videos = session.query(Video).filter(Video.channel_id.in_(ids)).all() if ids else []
+    videos = channel_videos(session, ids) if ids else []
     recent = [v for v in videos if (m := parse_published(v.published_at)) and m >= since]
     latest = latest_observations(session, [v.id for v in recent])
     by_channel: dict[int, list[Video]] = defaultdict(list)
@@ -166,8 +168,6 @@ def scan(session: Session, *, days: int = 7, segment: str | None = None, languag
     order = {"high": 0, "review": 1, "low": 2}
     out.sort(key=lambda r: (order[r["risk"]], -len(r["signals"]), r["name"].lower()))
     result = {"days": days, "filters": {"segment": segment, "language": language}, "method": METHOD, "summary": counts, "channels": out, "signals": SIGNALS, "generated_at": now.isoformat()}
-    if use_cache:
-        _CACHE[key] = (time.monotonic(), result)
     return result
 
 
@@ -245,5 +245,5 @@ def set_review(session: Session, *, channel_id: int, signal: str, status: str, n
     else:
         row.status, row.note, row.reviewed_by, row.reviewed_at = status, (note or "").strip() or None, by, datetime.now(UTC)
     session.commit()
-    _CACHE.clear()
+    scan.cache_clear()   # a decision changes what the radar shows
     return {"channel_id": channel_id, "signal": signal, "status": status, "note": row.note, "by": by}

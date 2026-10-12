@@ -66,37 +66,38 @@ def _load_streams(
     session: Session, *, start_at: datetime, end_at: datetime, language: str | None, segment: str | None, topic: str | None = None,
 ) -> tuple[dict[int, dict[str, _Stream]], dict[int, Channel], dict[int, str]]:
     segment_key = normalize_segment(segment) if segment else None
+    active = {c.id: c for c in session.query(Channel).filter(Channel.active.is_(True)).all()}   # a few dozen objects; the samples below are plain columns (there can be 100,000 of them)
     stmt = (
-        select(Observation, Channel, Video)
-        .join(Channel, Channel.id == Observation.channel_id)
+        select(Observation.channel_id, Observation.observed_at, Observation.concurrent_viewers, Video.youtube_video_id, Video.live_started_at, Video.topic)
         .join(Video, Video.id == Observation.video_id)
         .where(
             Observation.observed_at >= start_at - timedelta(seconds=FRESHNESS_SECONDS),
             Observation.observed_at <= end_at,
             Observation.is_live.is_(True),
             Observation.concurrent_viewers.is_not(None),
-            Channel.active.is_(True),
+            Observation.channel_id.in_(list(active)),
         )
         .order_by(Observation.observed_at.asc(), Observation.id.asc())
     )
     rows = list(session.execute(stmt).all())
-    languages = {channel.id: effective_channel_language(session, channel) for _, channel, _ in rows}
+    languages = {cid: effective_channel_language(session, active[cid]) for cid in {row.channel_id for row in rows}}
     target = language.strip().lower() if language else None
     streams: dict[int, dict[str, _Stream]] = defaultdict(dict)
     channels: dict[int, Channel] = {}
-    for observation, channel, video in rows:
+    for row in rows:
+        channel = active[row.channel_id]
         if target and language_group(languages[channel.id]).lower() != target and languages[channel.id].lower() != target:
             continue
         if segment_key and (channel.segment or "news") != segment_key:
             continue
-        if topic and (video.topic or "Other") != topic:
+        if topic and (row.topic or "Other") != topic:
             continue
         channels[channel.id] = channel
         stream = streams[channel.id].setdefault(
-            video.youtube_video_id,
-            _Stream(video.youtube_video_id, video.live_started_at and _utc(video.live_started_at), []),
+            row.youtube_video_id,
+            _Stream(row.youtube_video_id, row.live_started_at and _utc(row.live_started_at), []),
         )
-        stream.samples.append((_utc(observation.observed_at), int(observation.concurrent_viewers or 0)))
+        stream.samples.append((_utc(row.observed_at), int(row.concurrent_viewers or 0)))
     return streams, channels, languages
 
 
