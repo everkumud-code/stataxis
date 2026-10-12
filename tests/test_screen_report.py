@@ -141,4 +141,12 @@ def test_downloads_carry_the_tagline_and_say_where_the_data_comes_from_without_c
         js = (root / name).read_text(encoding="utf-8")
         assert "Stat the View. Axis the Viewpoint." in js and "Digital Media Intelligence" not in js and "Processed and evaluated by StatAxis." in js
     bar = (root / "reportbar.js").read_text(encoding="utf-8")
-    assert "roundRect" not in bar and "(?![a-z])" in bar       # the risk label pill is gone from the post image, and so are the radar's risk words
+    assert "(?![a-z])" in bar and "Weights and points are the method" in bar       # the radar's risk words stay out of a post, and so does the method (weights, points)
+
+
+def test_a_post_explains_itself_to_a_stranger_shows_the_result_and_leaves_the_method_out():
+    from pathlib import Path
+    bar = (Path(__file__).resolve().parent.parent / "dashboard" / "reportbar.js").read_text(encoding="utf-8")
+    assert "const PLAIN = {" in bar and "STX is a score out of 100" in bar and "plainOf(view)" in bar                    # one plain sentence on what the screen is
+    assert 'classList.contains("kpi")' in bar and "kpi: {l, v, s: note}" in bar and "out[k].m = 1" in bar                  # headline numbers kept, method text marked and left out of a post
+    assert "About this report: " in bar and "!/weight|points/i.test(b.head[c])" in bar                                      # the PDF opens with it too; weights are never the bars

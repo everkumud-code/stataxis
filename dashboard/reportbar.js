@@ -56,6 +56,13 @@
         if (c.nodeType === 3) { const t = clean(c.textContent); if (t) out.push({t: "p", text: t}); continue; }
         if (c.nodeType !== 1 || SKIP.has(c.tagName.toUpperCase()) || c.hasAttribute("data-noreport") || !shown(c)) continue;
         const tag = c.tagName;
+        if (c.classList.contains("kpi")) { const g = q => clean((c.querySelector(q) || {}).textContent), l = g(".l"), v = g(".v"), note = g(".s"); if (l || v) out.push({t: "p", text: `${l}: ${v}${note ? " — " + note : ""}`, kpi: {l, v, s: note}}); continue; }
+        if (tag === "DETAILS" || c.classList.contains("evidence")) {   /* how it was worked out: kept in the PDF, left out of a post */
+          const n0 = out.length;
+          if (tag === "DETAILS") walk(c); else { const t = clean(c.innerText || c.textContent); if (t) out.push({t: "p", text: t}); }
+          for (let k = n0; k < out.length; k++) out[k].m = 1;
+          continue;
+        }
         if (tag === "TABLE") { out.push(tableBlock(c)); continue; }
         if (tag === "CANVAS") { const d = pictureOf(c); if (d) out.push({t: "img", data: d}); continue; }
         if (tag === "H1") continue;   /* the report carries the screen's name as its own title */
@@ -81,10 +88,10 @@
   }
   /* one report: the whole screen, or one card of it (one channel, one slot, one group ...) */
   function scopeOf(view, screen, card) {
-    if (!card) return {title: view.title, sub: filtersLine(screen), id: view.id, blocks: capture(screen)};
+    if (!card) return {title: view.title, sub: filtersLine(screen), id: view.id, blocks: capture(screen), plain: plainOf(view)};
     const title = unitTitle(card), blocks = capture(card);
     if (blocks[0] && blocks[0].t === "h" && blocks[0].text.startsWith(title)) blocks.shift();
-    return {title, sub: [view.title, filtersLine(screen)].filter(Boolean).join("  |  "), id: `${view.id}-${slug(title)}`, blocks};
+    return {title, sub: [view.title, filtersLine(screen)].filter(Boolean).join("  |  "), id: `${view.id}-${slug(title)}`, blocks, plain: plainOf(view)};
   }
 
   /* ---------- PDF ---------- */
@@ -93,6 +100,7 @@
     try {
       await settle(screen, say);
       const s = scopeOf(view, screen, card);
+      if (s.plain) s.blocks.unshift({t: "p", text: "About this report: " + s.plain});
       const res = await fetch("/api/v1/market/screen-report.pdf", {method: "POST", headers: {"Content-Type": "application/json", Authorization: "Bearer " + token()}, body: JSON.stringify({view: s.id, title: s.title, filters: s.sub, blocks: s.blocks})});
       if (!res.ok) { let m = "Could not make the PDF."; try { m = (await res.json()).error || m; } catch { /* not JSON */ } throw new Error(res.status === 429 ? "Too many in a short time. Wait a minute and try again." : m); }
       const cd = res.headers.get("Content-Disposition") || "", name = (cd.match(/filename="([^"]+)"/) || [])[1] || `stataxis-${s.id}-downloaded-${window.sxFileStamp()}.pdf`;
@@ -115,37 +123,67 @@
     if (line) out.push(line);
     return out;
   }
-  /* the first table that has a column of numbers: its first text column becomes the labels, that column the bars */
+  /* A post is for someone who has never seen StatAxis: what this is in one plain sentence, the headline numbers, and one simple chart of the result itself
+     (never the method or the weights). The method stays in the PDF and on the screen. */
+  const PLAIN = {
+    briefing: "The week's most useful findings, in plain words, written for your role.",
+    overview: "The market today at a glance: who leads, what moved, what is live.",
+    market: "Every news channel ranked by how many views it gained in this period.",
+    channel: "One channel's audience, momentum and content in one place.",
+    dashboard: "One channel in depth, with the market beside it.",
+    stream: "Live, replay, video and Shorts audiences compared.",
+    content: "The videos that gained the most views.",
+    competition: "Who leads, who is climbing, and how far behind each channel is.",
+    trends: "How a channel's audience has moved over time.",
+    live: "How many people are watching each channel live right now.",
+    liveevent: "Channels compared on one live event, side by side.",
+    primetime: "Which channels draw the biggest live audiences in each evening hour.",
+    stx: "STX is a score out of 100 for how strongly a channel's audience is showing up. Higher means stronger. It blends audience size, growth, momentum and consistency.",
+    changed: "What moved since the last period, video by video.",
+    research: "The tone and the topics in video titles.",
+    evaluate: "One public video checked and scored.",
+    weekly: "How many views each channel's new videos of the week have collected.",
+    builder: "A ranking for the days, hours and genre chosen.",
+    creators: "The IFX Score rates creators and journalists out of 100 on Impact, Followership and eXposure.",
+    planner: "Where to place ad spots on live news, and roughly what each costs, from real audience numbers.",
+    authenticity: "Viewing patterns that look unusual, for a person to look at. A pattern is not proof of anything.",
+    audience: "Where viewers live and how old they are, shown only where a channel or a study has supplied it.",
+  };
+  const plainOf = view => PLAIN[view.id] || (typeof MENU_HINT !== "undefined" && MENU_HINT[view.id]) || "";
+  /* the first table that has a column of numbers worth drawing: its first text column labels the bars. Weights and points are the method, not the result, so they are never the bars. */
   function barsOf(blocks) {
     for (const b of blocks) {
-      if (b.t !== "table" || b.rows.length < 2) continue;
+      if (b.t !== "table" || b.m || b.rows.length < 2) continue;
       const rows = b.rows.slice(0, 10), cols = b.head.length;
-      const numeric = c => rows.filter(r => num(r[c]) != null && /\d/.test(r[c])).length >= Math.ceil(rows.length * 0.7);
+      const numeric = c => rows.filter(r => num(r[c]) != null && /\d/.test(r[c])).length >= Math.ceil(rows.length * 0.5);
       const rank = c => rows.every((r, i) => num(r[c]) === i + 1);
       let label = -1, value = -1;
       for (let c = 0; c < cols; c++) { if (label < 0 && !numeric(c)) label = c; }
-      for (let c = 0; c < cols; c++) { if (c !== label && numeric(c) && !rank(c)) { value = c; break; } }
-      if (label >= 0 && value >= 0) return {caption: b.head[value], rows: rows.map(r => ({label: r[label], value: Math.max(0, num(r[value]) || 0), text: r[value]}))};
+      for (let c = 0; c < cols; c++) { if (c !== label && numeric(c) && !rank(c) && !/weight|points/i.test(b.head[c])) { value = c; break; } }
+      if (label >= 0 && value >= 0) return {caption: /reading/i.test(b.head[value]) ? "Each one, out of 100" : b.head[value], rows: rows.map(r => ({label: r[label], value: num(r[value]) != null && /\d/.test(r[value]) ? Math.max(0, num(r[value])) : null, text: r[value]}))};
     }
     return null;
   }
-  async function postPng(title, subtitle, blocks) {
+  async function postPng(title, subtitle, blocks, plain = "") {
     const W = 1080, P = 56, c0 = document.createElement("canvas"), m = c0.getContext("2d");
+    const result = blocks.filter(b => !b.m), kpis = result.filter(b => b.kpi && b.kpi.v).slice(0, 3).map(b => b.kpi);
     m.font = `800 46px ${FONT}`; const titleLines = wrap(m, title, W - 2 * P).slice(0, 2);
     m.font = `500 22px ${FONT}`; const subLines = wrap(m, subtitle, W - 2 * P).slice(0, 2);
-    const chart = barsOf(blocks);
+    m.font = `500 27px ${FONT}`; const plainLines = plain ? wrap(m, plain, W - 2 * P).slice(0, 4) : [];
+    const chart = barsOf(result);
     let body = [];   /* text lines when there is no table of numbers: {text, kind} */
-    const few = blocks.filter(b => b.t === "p" || b.t === "h").length <= 5, fs = few ? 36 : 28, lh = few ? 54 : 42;   /* a short note is set larger, like a poster */
+    const few = result.filter(b => (b.t === "p" || b.t === "h") && !b.kpi).length <= 5, fs = few ? 36 : 28, lh = few ? 54 : 42;   /* a short note is set larger, like a poster */
     if (!chart) {
-      for (const b of blocks) {
+      for (const b of result) {
         if (b.t === "table") { for (const r of b.rows.slice(0, 6)) body.push({text: r.filter(Boolean).join("  ·  "), kind: "p"}); continue; }
-        if ((b.t === "p" || b.t === "h") && !/^(review now|check|nothing unusual)(?![a-z])/i.test(b.text)) body.push({text: b.text, kind: b.t});   /* the radar's risk labels stay on the screen; they are not for a post */
+        if ((b.t === "p" || b.t === "h") && !b.kpi && !/^(review now|check|nothing unusual)(?![a-z])/i.test(b.text)) body.push({text: b.text, kind: b.t});   /* the radar's risk labels stay on the screen; they are not for a post */
       }
       m.font = `600 ${fs}px ${FONT}`;
       body = body.flatMap(l => wrap(m, l.text, W - 2 * P).slice(0, l.kind === "h" ? 1 : 3).map((t, i) => ({text: t, kind: l.kind, first: i === 0}))).slice(0, 14);
     }
-    const top = 150 + titleLines.length * 56 + subLines.length * 30 + 34 , rowH = 70;
-    const H = Math.max(1080, top + (chart ? 40 + chart.rows.length * rowH : body.length * lh + 20) + 130);
+    const rowH = 70, kpiH = kpis.length ? 150 : 0;
+    const top = 150 + titleLines.length * 56 + subLines.length * 30 + 20 + plainLines.length * 38 + (plainLines.length ? 20 : 0) + kpiH;
+    const H = Math.max(1080, top + (chart ? 70 + chart.rows.length * rowH : body.length * lh + 20) + 130);
     c0.width = W; c0.height = H; const x = c0.getContext("2d");
     x.fillStyle = "#061322"; x.fillRect(0, 0, W, H);
     const lg = await logo();
@@ -158,13 +196,27 @@
     let y = 170;
     x.fillStyle = "#e8f1f8"; x.font = `800 46px ${FONT}`; titleLines.forEach(t => { x.fillText(t, P, y); y += 56; });
     x.fillStyle = "#9db3c6"; x.font = `500 22px ${FONT}`; subLines.forEach(t => { y += 4; x.fillText(t, P, y + 6); y += 26; });
-    y += 34;
+    y += 20;
+    if (plainLines.length) { x.fillStyle = "#c3d4e2"; x.font = `500 27px ${FONT}`; plainLines.forEach(t => { x.fillText(t, P, y + 22); y += 38; }); y += 20; }
+    if (kpis.length) {   /* the headline numbers, big */
+      const gap = 20, w = (W - 2 * P - gap * (kpis.length - 1)) / kpis.length;
+      kpis.forEach((k, i) => {
+        const left = P + i * (w + gap);
+        x.fillStyle = "#0b1f31"; x.strokeStyle = "#20394e"; x.lineWidth = 2; x.beginPath(); x.roundRect(left, y, w, 124, 14); x.fill(); x.stroke();
+        x.fillStyle = "#9db3c6"; x.font = `600 20px ${FONT}`; x.fillText(String(k.l).slice(0, 26), left + 20, y + 34);
+        x.fillStyle = i === 0 ? "#e1b94f" : "#e8f1f8"; x.font = `800 52px ${FONT}`; x.fillText(String(k.v).slice(0, 12), left + 20, y + 92);
+        if (k.s && k.s.length <= 36) { x.fillStyle = "#7f9ab2"; x.font = `500 16px ${FONT}`; x.fillText(String(k.s).slice(0, Math.floor(w / 9)), left + 20, y + 114); }
+      });
+      y += kpiH;
+    }
     if (chart) {
-      x.fillStyle = "#7f9ab2"; x.font = `700 20px ${FONT}`; x.fillText(String(chart.caption || "").toUpperCase().slice(0, 40), P, y); y += 22;
-      const max = Math.max(...chart.rows.map(r => r.value), 1), left = 360, bar = W - left - P - 190;
+      x.fillStyle = "#7f9ab2"; x.font = `700 20px ${FONT}`; x.fillText(String(chart.caption || "").toUpperCase().slice(0, 40), P, y + 20); y += 46;
+      const max = Math.max(...chart.rows.map(r => r.value || 0), 1), left = 360, bar = W - left - P - 190;
       chart.rows.forEach((r, i) => {
-        const yy = y + i * rowH, w = Math.max(5, bar * r.value / max);
+        const yy = y + i * rowH;
         x.fillStyle = "#e8f1f8"; x.font = `700 26px ${FONT}`; x.fillText(String(r.label).slice(0, 22), P, yy + 42);
+        if (r.value == null) { x.fillStyle = "#7f9ab2"; x.font = `500 22px ${FONT}`; x.fillText(String(r.text).slice(0, 30), left, yy + 42); return; }
+        const w = Math.max(5, bar * r.value / max);
         x.fillStyle = i === 0 ? "#e1b94f" : "#159de8"; x.fillRect(left, yy + 14, w, 38);
         x.fillStyle = "#e8f1f8"; x.font = `800 26px ${FONT}`; x.fillText(String(r.text).slice(0, 14), left + w + 14, yy + 44);
       });
@@ -186,7 +238,8 @@
       await settle(screen, say);
       const s = scopeOf(view, screen, card);
       if (!s.blocks.length) throw new Error("There is nothing here to put in a post yet.");
-      const canvas = await postPng(s.title, s.sub, s.blocks), name = `stataxis-${s.id}-post-downloaded-${window.sxFileStamp()}.png`;
+      const ch = (s.sub.match(/Channel: ([^|]+?)(?:\s*\||$)/) || [])[1], title = ch && !s.title.includes(ch) ? `${s.title} · ${ch}` : s.title;
+      const canvas = await postPng(title, s.sub, s.blocks, s.plain), name = `stataxis-${s.id}-post-downloaded-${window.sxFileStamp()}.png`;
       await new Promise(res => canvas.toBlob(b => { save(b, name); res(); }, "image/png"));
       say(`Saved ${name}  ·  ${window.sxDownloadedAt()}`, true);
     } catch (e) { say(e.message); }
