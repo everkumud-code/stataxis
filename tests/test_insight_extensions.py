@@ -30,3 +30,25 @@ def test_what_changed_is_evidence_first_and_deterministic():
     assert payload["narrative"]["method"] == "title_term_frequency"
     assert payload["evidence"]["missing_values_are_not_zero_filled"] is True
     assert payload["evidence"]["causality_inferred"] is False
+
+
+def test_tone_is_given_for_each_channel_and_a_switched_off_channel_is_left_out():
+    engine = create_database("sqlite:///:memory:")
+    now = datetime.now(UTC).replace(microsecond=0)
+    with Session(engine) as session:
+        made = {}
+        for key, title, active in (("up", "Strong growth and record profit", True), ("down", "Crisis deepens after scandal and loss", True), ("off", "Great victory", False)):
+            ch = Channel(youtube_channel_id=key, name=key.title() + " News", network="n", language="English", region="India", active=active)
+            session.add(ch)
+            session.flush()
+            v = Video(youtube_video_id="v-" + key, channel_id=ch.id, title=title)
+            session.add(v)
+            session.flush()
+            session.add_all([Observation(video_id=v.id, channel_id=ch.id, observed_at=now - timedelta(hours=h), view_count=100 + h, source="test", collector_version="test") for h in (20, 1)])
+            made[key] = ch.id
+        session.commit()
+        payload = build_what_changed(session, hours=24, as_of=now)
+    rows = {r["channel"]: r for r in payload["sentiment_by_channel"]}
+    assert set(rows) == {"Up News", "Down News"}                                                   # Off News is switched off: not read, not listed
+    assert rows["Up News"]["label"] == "positive" and rows["Down News"]["label"] == "negative"
+    assert rows["Up News"]["titles_read"] == 1 and rows["Up News"]["top_terms"]

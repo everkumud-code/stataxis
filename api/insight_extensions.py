@@ -121,6 +121,17 @@ def build_what_changed(session: Session, *, channel_id: int | None = None, hours
     changes.sort(key=lambda item: abs(item["view_delta"]), reverse=True)
 
     sentiment, narrative_terms = _weighted_language([(title, n) for vid, n in current_rows_per_video.items() if (title := titles_by_id.get(vid))])   # a title counts once per observation
+    names = {cid: name for cid, name in session.execute(select(Channel.id, Channel.name).where(Channel.id.in_(channel_ids)))} if channel_ids else {}
+    per_channel: dict[int, list[tuple[str, int]]] = {}
+    for (cid, vid) in latest:
+        if (title := titles_by_id.get(vid)):
+            per_channel.setdefault(cid, []).append((title, current_rows_per_video.get(vid, 1)))
+    by_channel = []
+    for cid, titled in per_channel.items():
+        tone, terms = _weighted_language(titled, 5)
+        by_channel.append({"channel_id": cid, "channel": names.get(cid, "?"), "label": tone["label"], "score": tone["score"], "positive_terms": tone["positive_terms"], "negative_terms": tone["negative_terms"],
+                           "lexical_coverage": tone["lexical_coverage"], "titles_read": len(titled), "top_terms": terms})
+    by_channel.sort(key=lambda r: r["channel"].lower())
     current_views = [item["view_delta"] for item in changes if item["view_delta"] is not None]
     total_delta = sum(current_views) if current_views else None
     previous_count = sum(previous_rows_per_video.values())
@@ -142,6 +153,7 @@ def build_what_changed(session: Session, *, channel_id: int | None = None, hours
         "changes": changes[:20],
         "sentiment": {**sentiment, "method": "lexical_title_sentiment", "confidence": round(confidence, 3)},
         "narrative": {"top_terms": narrative_terms, "method": "title_term_frequency", "confidence": round(confidence, 3)},
+        "sentiment_by_channel": by_channel,
         "evidence": {
             "channel_count": len(channel_ids),
             "current_observation_count": current_count,

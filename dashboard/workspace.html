@@ -770,7 +770,13 @@ add("research", "Research & output", "Research signals", async el => {
       <p class="muted">Score ${dec(d.sentiment.score, 2)} · word coverage ${pct(d.sentiment.lexical_coverage)} · confidence ${pct(d.sentiment.confidence)}</p><p class="muted">Method: ${esc(String(d.sentiment.method).replaceAll("_", " "))}.</p></section>
     <section class="card"><h2>Most repeated terms</h2>${terms.length ? `<div class="chips">${terms.map(t => `<span class="chip">${esc(t.term)}<b>${whole(t.mentions)}</b></span>`).join("")}</div>` : `<p class="muted">Not enough titles in this window.</p>`}
       <p class="muted">Method: ${esc(String(d.narrative.method).replaceAll("_", " "))}; confidence ${pct(d.narrative.confidence)}.</p></section></div>
-    ${evidence("Tone is counted from words in titles and is a rough guide, not a finding. No cause is inferred from either signal.")}`;
+    <section class="card" style="margin-top:14px"><h2>Tone, channel by channel</h2>${table([
+      {h: "Channel", html: 1, v: r => `<strong>${esc(r.channel)}</strong>`},
+      {h: "Tone", html: 1, v: r => `<span class="tag ${r.label === "positive" ? "green" : r.label === "negative" ? "red" : ""}">${esc(r.label === "mixed/neutral" ? "Mixed" : r.label[0].toUpperCase() + r.label.slice(1))}</span>`},
+      {h: "Score", n: 1, v: r => dec(r.score, 2)}, {h: "Positive words", n: 1, v: r => whole(r.positive_terms)}, {h: "Negative words", n: 1, v: r => whole(r.negative_terms)},
+      {h: "Words recognised", n: 1, v: r => pct(r.lexical_coverage)}, {h: "Titles read", n: 1, v: r => whole(r.titles_read)}, {h: "Most repeated terms", v: r => (r.top_terms || []).map(x => x.term).join(", ") || "—"}],
+      d.sentiment_by_channel || [], "No channel had titles to read in this window.")}</section>
+    ${evidence("Tone is counted from words in video and live-stream titles, not from viewers’ comments, and is a rough guide, not a finding. A channel whose titles contain few of the listed words shows a low ‘words recognised’ share and should be read as Mixed. No cause is inferred from either signal.")}`;
 });
 
 add("evaluate", "Research & output", "Evaluate & reports", async el => {
