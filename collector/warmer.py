@@ -66,8 +66,8 @@ def _token(engine: Any) -> str | None:
         return issue_token(AuthIdentity(admin.id, admin.email, admin.plan, True), ttl_seconds=3600)
 
 
-def warm_forever(engine: Any, stop: Event, *, quick_seconds: int = 60, slow_seconds: int = 300) -> None:
-    from api.ttl_cache import snapshot_seconds
+def warm_forever(engine: Any, stop: Event, *, quick_seconds: int = 100, slow_seconds: int = 420) -> None:
+    from api.ttl_cache import FORCE, snapshot_seconds
 
     if snapshot_seconds() <= 0:
         logger.info("warm-up loop off (STAXIS_SNAPSHOT_SECONDS is not set)")
@@ -92,12 +92,15 @@ def warm_forever(engine: Any, stop: Event, *, quick_seconds: int = 60, slow_seco
                     logger.warning("warm-up: no administrator account to ask as")
                 else:
                     began, bad = time.monotonic(), 0
+                    FORCE.on = True   # work every question out afresh and store it, whatever this process remembers
                     for path, query in due:
                         if stop.is_set():
                             break
                         status, _seconds = _call(web.application, token, path, query)
                         bad += status != 200
+                    FORCE.on = False
                     logger.info("warm-up counts questions=%d not_ok=%d seconds=%.1f", len(due), bad, time.monotonic() - began)
             except Exception as exc:   # never let the warm-up take the collector down
+                FORCE.on = False
                 logger.warning("warm-up failed: %s", type(exc).__name__)
         stop.wait(2.0)

@@ -352,3 +352,41 @@ def test_an_empty_planner_says_why_instead_of_a_bare_empty_table():
     assert out["channels"] == [] and out["data_since"].startswith("2026-10-12T00:00") and "only since 12 Oct 00:00 IST" in out["note"] and "20:00 to 22:00" in out["note"]
     full = media_plan(s, start_hour=0, end_hour=5, days=7, now=NOW)       # a window that has ended today is counted
     assert [r["name"] for r in full["channels"]] == ["Alpha"] and full["note"] is None
+
+
+def test_radar_notices_a_stream_whose_audience_never_dips_when_comparable_channels_do():
+    s = make_session()
+    start = NOW - timedelta(hours=5)
+    real = [channel(s, f"r{i}", f"Real {i}") for i in range(4)]
+    odd = channel(s, "o", "Level")
+
+    def stream(ch, key, values):
+        v = Video(youtube_video_id=key, channel_id=ch.id, title=key, live_started_at=start - timedelta(days=30))
+        s.add(v)
+        s.flush()
+        for i, val in enumerate(values):
+            s.add(Observation(video_id=v.id, channel_id=ch.id, observed_at=start + timedelta(seconds=60 * i), view_count=1, concurrent_viewers=val, is_live=True, classification="LIVE", source="test"))
+
+    n = 240   # four hours, one reading a minute
+    for k, ch in enumerate(real):   # a commercial break every twelve minutes: the audience falls 15% for three minutes
+        stream(ch, f"rs{k}", [int((9000 + 400 * k) * (0.85 if (i % 12) in (8, 9, 10) else 1.0)) + (i % 5) * 20 for i in range(n)])
+    stream(odd, "od", [9000 + (i % 7) * 25 - (i % 4) * 15 for i in range(n)])   # stays level all day
+    s.commit()
+    res = authenticity.scan(s, days=7, now=NOW, use_cache=False)
+    row, found = codes(res, "Level")
+    assert "no_ad_dips" in found
+    evidence = next(sig for sig in row["signals"] if sig["code"] == "no_ad_dips")["evidence"]
+    assert evidence["dips_per_hour"] <= 0.15 * evidence["peer_median_per_hour"] and evidence["peers"] == 4 and evidence["hours"] >= 3
+    for i in range(4):
+        assert "no_ad_dips" not in codes(res, f"Real {i}")[1]
+
+
+def test_dip_stats_counts_breaks_and_stays_quiet_on_short_or_small_streams():
+    from datetime import timedelta as td
+    from types import SimpleNamespace as NS
+    start = NOW - td(hours=6)
+    rows = lambda vals: [NS(observed_at=start + td(seconds=60 * i), concurrent_viewers=v) for i, v in enumerate(vals)]
+    broken = authenticity.dip_stats(rows([int(8000 * (0.85 if (i % 15) in (10, 11) else 1.0)) for i in range(240)]))
+    assert broken and 12 <= broken["dips"] <= 17 and 0.9 <= broken["per_hour"] <= 4.5          # about one break every quarter hour
+    assert authenticity.dip_stats(rows([8000] * 240))["dips"] == 0
+    assert authenticity.dip_stats(rows([8000] * 100)) is None and authenticity.dip_stats(rows([300] * 240)) is None   # too short, too small

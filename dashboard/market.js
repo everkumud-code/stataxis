@@ -131,6 +131,81 @@
     run(dateFilters(el, "primetime", "", run));
   });
 
+  /* ---------- a ready chart of one date and one time interval: All streams and Primary stream side by side, average and peak, the top eight channels ---------- */
+  const CMP_COLORS = ["#c00000", "#ff3fb4", "#92d050", "#1f9bd6", "#ffc000", "#7030a0", "#0b4f6c", "#a0501e"];
+  const kfmt = v => v == null ? "–" : v >= 1000 ? (v / 1000).toFixed(1) + "K" : String(Math.round(v));
+  const nth = n => n + (n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th");
+  const longDay = iso => { const d = new Date(iso + "T00:00:00+05:30"); return `${nth(+d.toLocaleDateString("en-GB", {day: "numeric", timeZone: "Asia/Kolkata"}))} ${d.toLocaleDateString("en-GB", {month: "long", year: "numeric", timeZone: "Asia/Kolkata"})}`; };
+  const cmpTitle = (all, v) => {
+    const days = all.from === all.to ? longDay(all.from) : `${longDay(all.from)} to ${longDay(all.to)}`, pad = h => String(h).padStart(2, "0") + ":00";
+    const who = v.language ? v.language + " " : "", seg = (SEGMENTS.find(([k]) => k && k === v.segment) || [])[1];
+    return `${days} | ${pad(all.start_hour)} - ${pad(all.end_hour)} Hrs | ${who}${seg && seg !== "News" ? seg : "News"} Channels`;
+  };
+  function wrapText(x, text, width) {
+    const out = []; let line = "";
+    for (const word of String(text).split(" ")) { const t = line ? line + " " + word : word; if (x.measureText(t).width > width && line) { out.push(line); line = word; } else line = t; }
+    if (line) out.push(line);
+    return out;
+  }
+  /* our reading of the two panels, from the numbers in them */
+  function cmpViewpoint(names, allBy, primBy, span) {
+    const byAvg = [...names].sort((a, b) => (allBy[b].average || 0) - (allBy[a].average || 0)), lead = byAvg[0], parts = [];
+    parts.push(`${lead} led ${span} with an average of ${kfmt(allBy[lead].average)} across all streams (peak ${kfmt(allBy[lead].peak)}).`);
+    const primLead = [...names].sort((a, b) => ((primBy[b] || {}).average || 0) - ((primBy[a] || {}).average || 0))[0];
+    if (primLead && primLead !== lead && (primBy[primLead] || {}).average) parts.push(`On the primary stream alone ${primLead} was ahead (${kfmt(primBy[primLead].average)}).`);
+    const spread = names.map(n => ({n, a: allBy[n].average || 0, p: (primBy[n] || {}).average || 0})).filter(r => r.a >= 1000 && r.p > 0 && r.a >= 2 * r.p).sort((a, b) => b.a / b.p - a.a / a.p)[0];
+    if (spread) parts.push(`${spread.n} drew much of its audience from secondary streams (${kfmt(spread.a)} across all streams against ${kfmt(spread.p)} on its primary stream).`);
+    parts.push("Averages describe the whole interval; peaks show what a channel can draw. Measured on YouTube, not on television.");
+    return parts.join(" ");
+  }
+  async function comparisonPng(all, prim, v) {
+    const rows = all.rows.slice(0, 8);
+    if (!rows.length) throw new Error("Nothing was measured in these hours with these filters, so there is no chart to draw.");
+    const names = rows.map(r => r.name), allBy = Object.fromEntries(all.rows.map(r => [r.name, r])), primBy = Object.fromEntries((prim.rows || []).map(r => [r.name, r]));
+    const colour = Object.fromEntries(names.map((n, i) => [n, CMP_COLORS[i % CMP_COLORS.length]]));
+    const W = 1600, P = 48, title = cmpTitle(all, v), span = all.from === all.to ? "the interval" : "the days";
+    const c = document.createElement("canvas"), m = c.getContext("2d"), FONT_ = "Manrope, Inter, system-ui, sans-serif";
+    m.font = `700 20px ${FONT_}`; const vpLines = wrapText(m, cmpViewpoint(names, allBy, primBy, span), W - 2 * P).slice(0, 4);
+    const H = 150 + 560 + 120 + 40 + vpLines.length * 30 + 130; c.width = W; c.height = H;
+    const x = c.getContext("2d"); x.fillStyle = "#ffffff"; x.fillRect(0, 0, W, H);
+    /* the letterhead strip */
+    x.fillStyle = "#061322"; x.fillRect(0, 0, W, 86);
+    const lg = await logo(); if (lg) x.drawImage(lg, P, 6, 296, 74);
+    x.fillStyle = "#9db3c6"; x.font = `500 20px ${FONT_}`; x.textAlign = "right"; x.fillText("Stat the View. Axis the Viewpoint.", W - P, 52); x.textAlign = "left";
+    x.fillStyle = "#061322"; x.font = `800 34px ${FONT_}`; x.textAlign = "center"; x.fillText(title, W / 2, 140); x.textAlign = "left";
+    const panels = [{label: "All Streams", by: allBy, left: P}, {label: "Primary Stream", by: primBy, left: W / 2 + 10}];
+    const panelW = W / 2 - P - 10, top = 190, height = 360;
+    const max = Math.max(...names.flatMap(n => [allBy[n].peak || 0, (primBy[n] || {}).peak || 0]), 1), step = (() => { const raw = max / 6, p = 10 ** Math.floor(Math.log10(raw)); return [1, 2, 2.5, 5, 10].map(f => f * p).find(s => s >= raw) || p * 10; })(), topVal = Math.ceil(max / step) * step;
+    x.save(); x.globalAlpha = 0.05; x.translate(W / 2, H / 2); x.rotate(-0.5); if (lg) for (let r = -6; r <= 6; r++) for (let k = -4; k <= 4; k++) x.drawImage(lg, k * 420 + (r % 2) * 210 - 150, r * 160 - 38, 300, 75); x.restore();
+    for (const pn of panels) {
+      const axisX = pn.left + 70, plotW = panelW - 70, baseY = top + height;
+      x.strokeStyle = "#d8dee4"; x.lineWidth = 1; x.fillStyle = "#4b5563"; x.font = `600 16px ${FONT_}`; x.textAlign = "right";
+      for (let t = 0; t <= topVal + 1e-9; t += step) { const yy = baseY - height * t / topVal; x.beginPath(); x.moveTo(axisX, yy); x.lineTo(axisX + plotW, yy); x.stroke(); x.fillText(kfmt(t), axisX - 10, yy + 5); }
+      x.textAlign = "left"; x.strokeStyle = "#111"; x.lineWidth = 2; x.beginPath(); x.moveTo(axisX, baseY); x.lineTo(axisX + plotW, baseY); x.stroke();
+      const groups = [["Avrg Concurrent", "average"], ["Peak Concurrent", "peak"]], gw = plotW / 2, bw = Math.min(34, (gw - 40) / names.length);
+      groups.forEach(([gl, key], gi) => {
+        const gx = axisX + gi * gw + (gw - bw * names.length) / 2;
+        names.forEach((n, i) => {
+          const val = ((pn.by[n] || {})[key]) || 0, h = height * val / topVal, bx = gx + i * bw;
+          x.fillStyle = colour[n]; x.fillRect(bx + 2, baseY - h, bw - 4, h);
+          x.save(); x.translate(bx + bw / 2 + 5, baseY - h - 8); x.rotate(-Math.PI / 2); x.fillStyle = "#111"; x.font = `800 17px ${FONT_}`; x.fillText(kfmt(val), 0, 0); x.restore();
+        });
+        x.fillStyle = "#111"; x.font = `700 17px ${FONT_}`; x.textAlign = "center"; x.fillText(gl, axisX + gi * gw + gw / 2, baseY + 28); x.textAlign = "left";
+      });
+      x.fillStyle = "#111"; x.font = `800 18px ${FONT_}`; x.textAlign = "center"; x.fillText(pn.label, axisX + plotW / 2, baseY + 62); x.textAlign = "left";
+      /* the legend, in this panel's order of strength */
+      const order = [...names].sort((a, b) => ((pn.by[b] || {}).average || 0) - ((pn.by[a] || {}).average || 0));
+      order.forEach((n, i) => { const lx = pn.left + 20 + (i % 4) * (panelW / 4), ly = baseY + 100 + Math.floor(i / 4) * 30; x.fillStyle = colour[n]; x.fillRect(lx, ly - 13, 14, 14); x.fillStyle = "#111"; x.font = `700 16px ${FONT_}`; x.fillText(n.slice(0, 16), lx + 22, ly); });
+    }
+    let y = top + height + 190;
+    x.fillStyle = "#b8923a"; x.font = `800 18px ${FONT_}`; x.fillText("STATAXIS VIEWPOINT", P, y); y += 14;
+    x.fillStyle = "#1f2937"; x.font = `500 20px ${FONT_}`; vpLines.forEach(t => { y += 30; x.fillText(t, P, y); });
+    x.fillStyle = "#b8923a"; x.fillRect(P, H - 84, W - 2 * P, 2);
+    x.fillStyle = "#4b5563"; x.font = `500 17px ${FONT_}`; x.fillText("Data via YouTube. Processed and evaluated by StatAxis.", P, H - 52); x.fillText("Measured from public YouTube data. Not TV ratings.", P, H - 26);
+    x.textAlign = "right"; x.fillStyle = "#8a6b1f"; x.fillText(window.sxDownloadedAt(), W - P, H - 52); x.fillStyle = "#4b5563"; x.fillText("stataxis.org", W - P, H - 26); x.textAlign = "left";
+    return c;
+  }
+
   /* ---------- report builder ---------- */
   add("builder", "Market tools", "Report builder", async el => {
     const f = SP.builder || {from: istDay(-7), to: istDay(-1), start_hour: 9, end_hour: 12, scope: "live", feed: "all", genre: "", segment: "", language: "", by_genre: false};
@@ -145,7 +220,7 @@
       <label>Category<br><select name="segment">${opt(SEGMENTS, f.segment)}</select></label><label>Language<br><select name="language">${opt(LANGS, f.language)}</select></label>
       <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="by_genre"${f.by_genre ? " checked" : ""}> Also split by genre</label>
       ${filterFields(f)}
-      <div class="btnrow"><button class="btn primary" type="submit">Show ranking</button><button class="btn" type="button" id="bpdf">Download PDF</button></div></form><div id="bmsg" class="msg" hidden></div><div id="bout"></div>`;
+      <div class="btnrow"><button class="btn primary" type="submit">Show ranking</button><button class="btn" type="button" id="bpdf">Download PDF</button><button class="btn" type="button" id="bcmp" title="One chart for these days and these hours: all streams and the primary stream side by side">Download comparison image</button></div></form><div id="bmsg" class="msg" hidden></div><div id="bout"></div>`;
     const read = () => { const form = $("#bf", el), v = formValues(form); v.by_genre = new FormData(form).has("by_genre"); v.known_only = new FormData(form).has("known_only"); keep("builder", v); return v; };
     const feedState = () => { $("#bf", el).elements.feed.disabled = $("#bf", el).elements.scope.value !== "live"; };
     $("#bf", el).elements.scope.onchange = feedState; feedState();
@@ -162,6 +237,15 @@
       } catch (e) { out.innerHTML = fail(e); wireUpgrade(out); }
     };
     $("#bf", el).onsubmit = ev => { ev.preventDefault(); show(); };
+    $("#bcmp", el).onclick = async () => {
+      const v = read(), m = $("#bmsg", el); m.hidden = false; m.className = "msg"; m.textContent = "Drawing the chart…";
+      try {
+        const base = {...v, scope: "live", by_genre: "", known_only: v.known_only ? 1 : ""};
+        const [all, prim] = await Promise.all([api("/api/v1/market/report", {...base, feed: "all"}), api("/api/v1/market/report", {...base, feed: "primary"})]);
+        saveCanvas(await comparisonPng(all, prim, v), `stataxis-comparison-${all.from}-${String(all.start_hour).padStart(2, "0")}-${String(all.end_hour).padStart(2, "0")}${v.language ? "-" + slug(v.language) : ""}.png`);
+        m.className = "msg ok"; m.textContent = "Saved the comparison image · " + window.sxDownloadedAt();
+      } catch (e) { m.className = "msg bad"; m.textContent = e.message; }
+    };
     $("#bpdf", el).onclick = () => { const v = read(), m = $("#bmsg", el); m.hidden = false; m.className = "msg"; m.textContent = "Making the PDF…"; downloadFile("/api/v1/market/report.pdf", {...v, by_genre: v.by_genre ? 1 : "", known_only: v.known_only ? 1 : ""}, "stataxis-report.pdf", m); };
   });
 

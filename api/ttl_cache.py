@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 MAX_ENTRIES = 256
 _TOKENS: "weakref.WeakKeyDictionary[Any, int]" = weakref.WeakKeyDictionary()
 _SERIAL = itertools.count(1)
+FORCE = threading.local()   # the warm-up loop sets FORCE.on: its questions are always worked out afresh (that is its job) and stored for everyone
 
 
 def _seconds(name: str) -> float:
@@ -146,6 +147,10 @@ def ttl_cache(scale: float = 1.0, stale: bool = False, key: Callable[..., Any] |
             keep = seconds_to_keep() * scale
             if keep <= 0:
                 return fn(session, *args, **kwargs)
+            if getattr(FORCE, "on", False) and stale:
+                value = fn(session, *args, **kwargs)
+                put((_which_database(session), repr(key(*args, **kwargs)) if key else repr((args, sorted(kwargs.items(), key=lambda item: item[0])))), value, session)
+                return value
             question = repr(key(*args, **kwargs)) if key else repr((args, sorted(kwargs.items(), key=lambda item: item[0])))
             k = (_which_database(session), question)
             fresh_for = keep

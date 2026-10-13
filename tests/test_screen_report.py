@@ -121,7 +121,7 @@ def test_every_block_has_its_own_pdf_and_post_image_and_nothing_says_branded_dow
     root = Path(__file__).resolve().parent.parent / "dashboard"
     bar, market, html = (root / "reportbar.js").read_text(encoding="utf-8"), (root / "market.js").read_text(encoding="utf-8"), (root / "workspace.html").read_text(encoding="utf-8")
     assert "function addUnitBars(view, screen)" in bar and "MutationObserver" in bar and 'className = "unitbar"' in bar          # each card (each channel, slot, group) gets its own buttons as it appears
-    assert "async function postPng(" in bar and "image/png" in bar and "-post-downloaded-" in bar                        # an image to post, with the time of download in the file name
+    assert "async function postPng(" in bar and "image/png" in bar and "-post${pages > 1" in bar and "-downloaded-${stamp}.png" in bar                        # an image to post, with the time of download in the file name
     assert "Download post image" in bar and "Download PDF" in bar
     for text in (bar, market, html):
         assert "branded download" not in text.lower() and "Download branded" not in text and "Take this screen with you" not in text
@@ -158,3 +158,26 @@ def test_reports_say_what_stands_out_from_the_figures_alone():
     assert "function findingsOf(chart)" in bar and "WHAT STANDS OUT" in bar and '"What stands out"' in bar          # in the post image and at the top of the PDF
     assert "leads with" in bar and "times" in bar and "holds" in bar and "do not have enough data yet" in bar          # who leads, by how much, the share, what is thin
     assert "r.value == null" in bar and "show 0 in this period" in bar                                                # a zero is a zero, not missing data
+
+
+def test_a_long_result_is_split_into_numbered_posts_and_every_report_carries_our_viewpoint():
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent / "dashboard"
+    bar = (root / "reportbar.js").read_text(encoding="utf-8")
+    assert "ROWS_PER = 8" in bar and "LINES_PER = 12" in bar and "-${n}-of-${pages}" in bar and "`${n} of ${pages}`" in bar        # 1 of 3, 2 of 3, 3 of 3
+    assert "b.rows.slice(0, 24)" in bar and "first ? kpis : []" in bar and "last ? findLines : []" in bar                     # the introduction on the first post, our reading on the last
+    assert "function viewpointOf(chart, viewId)" in bar and '"StatAxis viewpoint"' in bar and "STATAXIS VIEWPOINT" in bar            # in the PDF and on the post
+    assert "not proof of anything" in bar                                                                                          # the radar's reading describes, it does not accuse
+
+
+def test_the_report_builder_draws_one_date_and_one_time_interval_as_all_streams_beside_the_primary_stream():
+    from pathlib import Path
+    market = (Path(__file__).resolve().parent.parent / "dashboard" / "market.js").read_text(encoding="utf-8")
+    assert 'id="bcmp"' in market and "async function comparisonPng(all, prim, v)" in market and 'feed: "all"' in market and 'feed: "primary"' in market
+    assert '"All Streams"' in market and '"Primary Stream"' in market and "Avrg Concurrent" in market and "Peak Concurrent" in market and "Hrs | " in market   # the layout of the reference chart
+    assert "STATAXIS VIEWPOINT" in market and "sxDownloadedAt" in market
+
+
+def test_the_radar_describes_a_missing_dip_pattern_as_worth_a_look_not_as_a_finding_of_wrongdoing():
+    from api import authenticity
+    assert "no_ad_dips" in authenticity.SIGNALS and "not proof" in authenticity.METHOD

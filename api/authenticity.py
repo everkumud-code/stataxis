@@ -9,6 +9,8 @@ behind every flag, and keeps an admin's decision (cleared / watching / confirmed
   live_spike          concurrent viewers jump several times above the recent level and drop back within minutes
   live_flatline       a long live stream whose viewer count hardly moves (real audiences move)
   mechanical_steps    views growing by exactly the same amount sample after sample
+  no_ad_dips          a long live stream whose audience never dips, while comparable channels' audiences dip (commercial breaks, programme changes): real viewers leave at a break,
+                      inflated ones stay
 """
 
 from __future__ import annotations
@@ -32,6 +34,7 @@ SIGNALS = {
     "live_spike": "Live viewers jump and fall back within minutes",
     "live_flatline": "Live viewer count hardly moves",
     "mechanical_steps": "Views grow in identical steps",
+    "no_ad_dips": "Live viewers do not dip the way comparable channels' do",
 }
 STATUSES = ("cleared", "watching", "confirmed")
 METHOD = (
@@ -140,6 +143,19 @@ def scan(session: Session, *, days: int = 7, segment: str | None = None, languag
             live_group[o.video_id].append(o)
         for vid, rows in live_group.items():
             _live_signals(flags[rows[0].channel_id], rows)
+        # --- dips: each channel's biggest long stream against the other channels of its group
+        dip_of: dict[int, dict[str, float]] = {}
+        for vid, rows in live_group.items():
+            stats = dip_stats(rows)
+            if stats and (rows[0].channel_id not in dip_of or stats["average"] > dip_of[rows[0].channel_id]["average"]):
+                dip_of[rows[0].channel_id] = stats
+        segment_of = {c.id: c.segment or "news" for c in channels}
+        for cid, stats in dip_of.items():
+            peers = [o["per_hour"] for k, o in dip_of.items() if k != cid and segment_of.get(k) == segment_of.get(cid)]
+            if len(peers) >= 4 and median(peers) >= 0.8 and stats["per_hour"] <= 0.15 * median(peers):
+                flags[cid].append(_flag("no_ad_dips", "review", f"Over {stats['hours']:.0f} hours this stream's audience dipped {stats['per_hour']:.2f} times an hour, against about {median(peers):.1f} for comparable channels. "
+                                        "Real viewers usually leave at a commercial break or a change of programme; an audience that stays level through the day is worth a look.",
+                                        {"dips_per_hour": rnd(stats["per_hour"], 2), "peer_median_per_hour": rnd(median(peers), 1), "hours": round(stats["hours"], 1), "average_viewers": round(stats["average"]), "peers": len(peers)}))
 
     reviews = {(r.channel_id, r.signal): r for r in session.query(AuthenticityReview).filter(AuthenticityReview.channel_id.in_(ids)).all()} if ids else {}
     out = []
@@ -201,6 +217,33 @@ def _burst_and_steps(sink: list[dict[str, Any]], rows: list[Observation], title:
     if best >= 6:
         step = next(x for x, y in zip(deltas, deltas[1:]) if x == y and x >= 100)
         sink.append(_flag("mechanical_steps", "review", f"Views grew by exactly {step:,} for {best + 1} samples in a row.", {"video": title[:90], "step": step, "samples_in_a_row": best + 1}))
+
+
+def dip_stats(rows: list[Any]) -> dict[str, float] | None:
+    """How often a live stream's audience dips: a fall of 7% or more from the level of the last ten minutes, which then comes back (or after fifteen minutes is counted done).
+    Real audiences leave at a commercial break or a change of programme; None when the stream is too short or too small for dips to show."""
+    points = [(utc(o.observed_at), int(o.concurrent_viewers)) for o in rows if o.concurrent_viewers is not None]
+    if len(points) < 120:
+        return None
+    hours = (points[-1][0] - points[0][0]).total_seconds() / 3600
+    average = mean([v for _, v in points]) or 0
+    if hours < 3 or average < 500:
+        return None
+    dips, in_dip, level, started, start = 0, False, 0, None, 0
+    for i, (t, v) in enumerate(points):
+        while (t - points[start][0]).total_seconds() > 600:
+            start += 1
+        window = [pv for _, pv in points[start:i]]
+        if not window:
+            continue
+        top = max(window)
+        if not in_dip:
+            if top >= 300 and v <= 0.93 * top:
+                in_dip, level, started = True, top, t
+                dips += 1
+        elif v >= 0.97 * level or (t - started).total_seconds() > 900:
+            in_dip = False
+    return {"dips": dips, "hours": hours, "per_hour": dips / hours, "average": average}
 
 
 def _live_signals(sink: list[dict[str, Any]], rows: list[Observation]) -> None:

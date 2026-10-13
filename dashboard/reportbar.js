@@ -88,10 +88,10 @@
   }
   /* one report: the whole screen, or one card of it (one channel, one slot, one group ...) */
   function scopeOf(view, screen, card) {
-    if (!card) return {title: view.title, sub: filtersLine(screen), id: view.id, blocks: capture(screen), plain: plainOf(view)};
+    if (!card) return {title: view.title, sub: filtersLine(screen), id: view.id, blocks: capture(screen), plain: plainOf(view), viewId: view.id};
     const title = unitTitle(card), blocks = capture(card);
     if (blocks[0] && blocks[0].t === "h" && blocks[0].text.startsWith(title)) blocks.shift();
-    return {title, sub: [view.title, filtersLine(screen)].filter(Boolean).join("  |  "), id: `${view.id}-${slug(title)}`, blocks, plain: plainOf(view)};
+    return {title, sub: [view.title, filtersLine(screen)].filter(Boolean).join("  |  "), id: `${view.id}-${slug(title)}`, blocks, plain: plainOf(view), viewId: view.id};
   }
 
   /* ---------- PDF ---------- */
@@ -100,7 +100,8 @@
     try {
       await settle(screen, say);
       const s = scopeOf(view, screen, card);
-      const lead = findingsOf(barsOf(s.blocks.filter(b => !b.m)));
+      const chart = barsOf(s.blocks.filter(b => !b.m)), lead = findingsOf(chart);
+      s.blocks.unshift({t: "h", text: "StatAxis viewpoint"}, {t: "p", text: viewpointOf(chart, view.id)});
       if (lead.length) s.blocks.unshift({t: "h", text: "What stands out"}, ...lead.map(t => ({t: "p", text: "• " + t})));
       if (s.plain) s.blocks.unshift({t: "p", text: "About this report: " + s.plain});
       const res = await fetch("/api/v1/market/screen-report.pdf", {method: "POST", headers: {"Content-Type": "application/json", Authorization: "Bearer " + token()}, body: JSON.stringify({view: s.id, title: s.title, filters: s.sub, blocks: s.blocks})});
@@ -156,7 +157,7 @@
   function barsOf(blocks) {
     for (const b of blocks) {
       if (b.t !== "table" || b.m || b.rows.length < 2) continue;
-      const rows = b.rows.slice(0, 10), cols = b.head.length;
+      const rows = b.rows.slice(0, 24), cols = b.head.length;   /* up to three posts of eight */
       const numeric = c => rows.filter(r => num(r[c]) != null && /\d/.test(r[c])).length >= Math.ceil(rows.length * 0.5);
       const rank = c => rows.every((r, i) => num(r[c]) === i + 1);
       let label = -1, value = -1;
@@ -165,6 +166,22 @@
       if (label >= 0 && value >= 0) return {caption: /reading/i.test(b.head[value]) ? "Each one, out of 100" : b.head[value], rows: rows.map(r => ({label: r[label], value: num(r[value]) != null && /\d/.test(r[value]) ? Math.max(0, num(r[value])) : null, text: r[value]}))};
     }
     return null;
+  }
+  /* "StatAxis viewpoint": our reading of the figures in two or three sentences: how the lead looks, how the audience is shared, and what to keep in mind. Worked out from the figures shown; it describes, it does not accuse. */
+  const VIEWPOINT_NOTE = {
+    authenticity: "An unusual pattern is a reason to look closer, not proof of anything: StatAxis reports patterns in public numbers and leaves conclusions to people who can check the facts.",
+    stx: "STX is a guide to relative strength, not a verdict: a signal with little history counts for less, which is why the confidence is shown next to the score.",
+    creators: "The IFX Score compares creators with each other on what is public; a high score is a strong showing on these measures, nothing more.",
+    planner: "Use the figures to compare slots with each other, and confirm any price with the channel's own rate card.",
+  };
+  function viewpointOf(chart, viewId) {
+    const caution = VIEWPOINT_NOTE[viewId] || "Read the figures with the period in mind: a short window can be moved by a single event, and these are measured on YouTube, not on television.";
+    const have = chart ? chart.rows.filter(r => r.value != null && r.value > 0).sort((a, b) => b.value - a.value) : [];
+    if (have.length < 2) return caution;
+    const [top, next] = have, total = have.reduce((t, r) => t + r.value, 0), share = Math.round(100 * top.value / total), ratio = top.value / next.value;
+    const lead = ratio >= 2 ? `${top.label} has a runaway lead` : ratio >= 1.2 ? `${top.label} has a clear lead` : `${top.label} and ${next.label} are in a close race`;
+    const spread = have.length < 3 ? "" : share >= 50 ? `One channel holds the majority of this audience (${share}%).` : share >= 30 ? "One channel leads, yet the audience is still shared across several." : "The audience is spread widely; no channel dominates.";
+    return `${lead}. ${spread} ${caution}`.replace(/\s+/g, " ").trim();
   }
   /* "What stands out": a few plain sentences worked out only from the figures shown (who leads, by how much, how the total is shared), so a reader gets a take-away and not just a table */
   function findingsOf(chart) {
@@ -180,7 +197,7 @@
     else if (zero > 0) out.push(`${zero} of ${chart.rows.length} show 0 in this period.`);
     return out.slice(0, 4);
   }
-  async function postPng(title, subtitle, blocks, plain = "") {
+  async function postPng(title, subtitle, blocks, plain = "", viewId = "", pg = {n: 1}) {   /* one post of a series: {canvas, pages} */
     const W = 1080, P = 56, c0 = document.createElement("canvas"), m = c0.getContext("2d");
     const result = blocks.filter(b => !b.m), kpis = result.filter(b => b.kpi && b.kpi.v).slice(0, 3).map(b => b.kpi);
     m.font = `800 46px ${FONT}`; const titleLines = wrap(m, title, W - 2 * P).slice(0, 2);
@@ -189,6 +206,7 @@
     const chart = barsOf(result), finds = findingsOf(chart);
     m.font = `500 25px ${FONT}`; const findLines = finds.map(f => wrap(m, f, W - 2 * P - 34).slice(0, 2));
     const findH = finds.length ? 64 + findLines.reduce((t, l) => t + l.length * 33 + 10, 0) : 0;
+    const vp = viewpointOf(chart, viewId); m.font = `500 25px ${FONT}`; const vpLines = vp ? wrap(m, vp, W - 2 * P).slice(0, 6) : [], vpH = vpLines.length ? 70 + vpLines.length * 33 : 0;
     let body = [];   /* text lines when there is no table of numbers: {text, kind} */
     const few = result.filter(b => (b.t === "p" || b.t === "h") && !b.kpi).length <= 5, fs = few ? 36 : 28, lh = few ? 54 : 42;   /* a short note is set larger, like a poster */
     if (!chart) {
@@ -199,9 +217,14 @@
       m.font = `600 ${fs}px ${FONT}`;
       body = body.flatMap(l => wrap(m, l.text, W - 2 * P).slice(0, l.kind === "h" ? 1 : 3).map((t, i) => ({text: t, kind: l.kind, first: i === 0}))).slice(0, 14);
     }
-    const rowH = 70, kpiH = kpis.length ? 150 : 0;
-    const top = 150 + titleLines.length * 56 + subLines.length * 30 + 20 + plainLines.length * 38 + (plainLines.length ? 20 : 0) + kpiH;
-    const H = Math.max(1080, top + (chart ? 70 + chart.rows.length * rowH + findH : body.length * lh + 20) + 130);
+    /* more than one post can hold: eight bars (or twelve lines) to a post, numbered 1 of 3, 2 of 3 ... ; the introduction is on the first, our reading on the last */
+    const ROWS_PER = 8, LINES_PER = 12, pages = Math.max(1, chart ? Math.ceil(chart.rows.length / ROWS_PER) : Math.ceil(body.length / LINES_PER)), n = Math.min(pg.n || 1, pages), first = n === 1, last = n === pages;
+    const chartP = chart ? {...chart, rows: chart.rows.slice((n - 1) * ROWS_PER, n * ROWS_PER)} : null, bodyP = body.slice((n - 1) * LINES_PER, n * LINES_PER);
+    const kpiShown = first ? kpis : [], plainShown = first ? plainLines : [], findShown = last ? findLines : [], vpShown = last ? vpLines : [];
+    const findHP = last ? findH : 0, vpHP = last ? vpH : 0;
+    const rowH = 70, kpiH = kpiShown.length ? 150 : 0;
+    const top = 150 + titleLines.length * 56 + subLines.length * 30 + 20 + plainShown.length * 38 + (plainShown.length ? 20 : 0) + kpiH;
+    const H = Math.max(1080, top + (chartP ? 70 + chartP.rows.length * rowH + findHP : bodyP.length * lh + 20) + vpHP + 130);
     c0.width = W; c0.height = H; const x = c0.getContext("2d");
     x.fillStyle = "#061322"; x.fillRect(0, 0, W, H);
     const lg = await logo();
@@ -210,15 +233,17 @@
       for (let r = -10; r <= 10; r++) for (let k = -4; k <= 4; k++) x.drawImage(lg, k * 420 + (r % 2) * 210 - 150, r * 150 - 38, 300, 75);
       x.restore(); x.drawImage(lg, P, 36, 300, 75);
     } else { x.fillStyle = "#e1b94f"; x.font = `800 34px ${FONT}`; x.fillText("STATAXIS", P, 80); }
-    x.fillStyle = "#7f9ab2"; x.font = `500 20px ${FONT}`; x.textAlign = "right"; x.fillText("Stat the View. Axis the Viewpoint.", W - P, 76); x.textAlign = "left";
+    x.fillStyle = "#7f9ab2"; x.font = `500 20px ${FONT}`; x.textAlign = "right"; x.fillText("Stat the View. Axis the Viewpoint.", W - P, 76);
+    if (pages > 1) { x.fillStyle = "#e1b94f"; x.font = `800 26px ${FONT}`; x.fillText(`${n} of ${pages}`, W - P, 116); }
+    x.textAlign = "left";
     let y = 170;
     x.fillStyle = "#e8f1f8"; x.font = `800 46px ${FONT}`; titleLines.forEach(t => { x.fillText(t, P, y); y += 56; });
     x.fillStyle = "#9db3c6"; x.font = `500 22px ${FONT}`; subLines.forEach(t => { y += 4; x.fillText(t, P, y + 6); y += 26; });
     y += 20;
-    if (plainLines.length) { x.fillStyle = "#c3d4e2"; x.font = `500 27px ${FONT}`; plainLines.forEach(t => { x.fillText(t, P, y + 22); y += 38; }); y += 20; }
-    if (kpis.length) {   /* the headline numbers, big */
-      const gap = 20, w = (W - 2 * P - gap * (kpis.length - 1)) / kpis.length;
-      kpis.forEach((k, i) => {
+    if (plainShown.length) { x.fillStyle = "#c3d4e2"; x.font = `500 27px ${FONT}`; plainShown.forEach(t => { x.fillText(t, P, y + 22); y += 38; }); y += 20; }
+    if (kpiShown.length) {   /* the headline numbers, big */
+      const gap = 20, w = (W - 2 * P - gap * (kpiShown.length - 1)) / kpiShown.length;
+      kpiShown.forEach((k, i) => {
         const left = P + i * (w + gap);
         x.fillStyle = "#0b1f31"; x.strokeStyle = "#20394e"; x.lineWidth = 2; x.beginPath(); x.roundRect(left, y, w, 124, 14); x.fill(); x.stroke();
         x.fillStyle = "#9db3c6"; x.font = `600 20px ${FONT}`; x.fillText(String(k.l).slice(0, 26), left + 20, y + 34);
@@ -227,33 +252,38 @@
       });
       y += kpiH;
     }
-    if (chart) {
+    if (chartP) {
       x.fillStyle = "#7f9ab2"; x.font = `700 20px ${FONT}`; x.fillText(String(chart.caption || "").toUpperCase().slice(0, 40), P, y + 20); y += 46;
-      const max = Math.max(...chart.rows.map(r => r.value || 0), 1), left = 360, bar = W - left - P - 190;
-      chart.rows.forEach((r, i) => {
+      const max = Math.max(...chart.rows.map(r => r.value || 0), 1), left = 360, bar = W - left - P - 190;   /* one scale for the whole series */
+      chartP.rows.forEach((r, i) => {
         const yy = y + i * rowH;
         x.fillStyle = "#e8f1f8"; x.font = `700 26px ${FONT}`; x.fillText(String(r.label).slice(0, 22), P, yy + 42);
         if (r.value == null) { x.fillStyle = "#7f9ab2"; x.font = `500 22px ${FONT}`; x.fillText(String(r.text).slice(0, 30), left, yy + 42); return; }
         const w = Math.max(5, bar * r.value / max);
-        x.fillStyle = i === 0 ? "#e1b94f" : "#159de8"; x.fillRect(left, yy + 14, w, 38);
+        x.fillStyle = i === 0 && first ? "#e1b94f" : "#159de8"; x.fillRect(left, yy + 14, w, 38);
         x.fillStyle = "#e8f1f8"; x.font = `800 26px ${FONT}`; x.fillText(String(r.text).slice(0, 14), left + w + 14, yy + 44);
       });
-      if (finds.length) {
-        let fy = y + chart.rows.length * rowH + 24;
+      if (last && finds.length) {
+        let fy = y + chartP.rows.length * rowH + 24;
         x.fillStyle = "#7f9ab2"; x.font = `700 20px ${FONT}`; x.fillText("WHAT STANDS OUT", P, fy + 14); fy += 44;
-        findLines.forEach(lines => { lines.forEach((t, k) => { x.font = `500 25px ${FONT}`; if (k === 0) { x.fillStyle = "#e1b94f"; x.fillText("•", P, fy + 24); } x.fillStyle = "#d6e4ef"; x.fillText(t, P + 28, fy + 24); fy += 33; }); fy += 10; });
+        findShown.forEach(lines => { lines.forEach((t, k) => { x.font = `500 25px ${FONT}`; if (k === 0) { x.fillStyle = "#e1b94f"; x.fillText("•", P, fy + 24); } x.fillStyle = "#d6e4ef"; x.fillText(t, P + 28, fy + 24); fy += 33; }); fy += 10; });
       }
     } else {
-      body.forEach((l, i) => {
+      bodyP.forEach((l, i) => {
         x.fillStyle = l.kind === "h" ? "#e1b94f" : "#d6e4ef"; x.font = l.kind === "h" ? `800 ${fs}px ${FONT}` : `600 ${fs}px ${FONT}`;
         x.fillText(l.text, P, y + fs + i * lh);
       });
+    }
+    if (vpShown.length) {   /* our reading, last, in gold */
+      let vy = chartP ? y + chartP.rows.length * rowH + (finds.length ? findHP : 0) + 24 : y + bodyP.length * lh + 44;
+      x.fillStyle = "#e1b94f"; x.font = `800 20px ${FONT}`; x.fillText("STATAXIS VIEWPOINT", P, vy + 14); vy += 44;
+      x.fillStyle = "#e8f1f8"; x.font = `500 25px ${FONT}`; vpShown.forEach(t => { x.fillText(t, P, vy + 24); vy += 33; });
     }
     x.fillStyle = "#e1b94f"; x.fillRect(P, H - 96, W - 2 * P, 2);
     x.fillStyle = "#7f9ab2"; x.font = `500 18px ${FONT}`; x.fillText("Measured by STAXIS from public YouTube data. Not TV ratings.", P, H - 62);
     x.fillText("Data via YouTube. Processed and evaluated by StatAxis.", P, H - 32);
     x.textAlign = "right"; x.fillStyle = "#e1b94f"; x.fillText(window.sxDownloadedAt(), W - P, H - 62); x.fillStyle = "#7f9ab2"; x.fillText("stataxis.org", W - P, H - 32); x.textAlign = "left";
-    return c0;
+    return {canvas: c0, pages};
   }
   async function makePost(view, screen, card, say) {
     say("Making your post image…", true);
@@ -262,9 +292,15 @@
       const s = scopeOf(view, screen, card);
       if (!s.blocks.length) throw new Error("There is nothing here to put in a post yet.");
       const ch = (s.sub.match(/Channel: ([^|]+?)(?:\s*\||$)/) || [])[1], title = ch && !s.title.includes(ch) ? `${s.title} · ${ch}` : s.title;
-      const canvas = await postPng(title, s.sub, s.blocks, s.plain), name = `stataxis-${s.id}-post-downloaded-${window.sxFileStamp()}.png`;
-      await new Promise(res => canvas.toBlob(b => { save(b, name); res(); }, "image/png"));
-      say(`Saved ${name}  ·  ${window.sxDownloadedAt()}`, true);
+      const firstPost = await postPng(title, s.sub, s.blocks, s.plain, s.viewId, {n: 1}), pages = firstPost.pages, stamp = window.sxFileStamp(), saved = [];
+      for (let n = 1; n <= pages; n++) {   /* more than one post can hold: 1 of 3, 2 of 3, 3 of 3 */
+        const canvas = n === 1 ? firstPost.canvas : (await postPng(title, s.sub, s.blocks, s.plain, s.viewId, {n})).canvas;
+        const name = `stataxis-${s.id}-post${pages > 1 ? `-${n}-of-${pages}` : ""}-downloaded-${stamp}.png`;
+        await new Promise(res => canvas.toBlob(b => { save(b, name); res(); }, "image/png"));
+        saved.push(name);
+        if (n < pages) await new Promise(r => setTimeout(r, 450));   // the browser takes the files one after another
+      }
+      say(pages > 1 ? `Saved ${pages} images (1 of ${pages} to ${pages} of ${pages})  ·  ${window.sxDownloadedAt()}` : `Saved ${saved[0]}  ·  ${window.sxDownloadedAt()}`, true);
     } catch (e) { say(e.message); }
   }
 
