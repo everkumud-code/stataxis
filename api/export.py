@@ -7,8 +7,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
 
+from typing import Any
+
 from openpyxl import Workbook
-from sqlalchemy import Select, select
+from openpyxl.utils import get_column_letter
+from sqlalchemy import Select, and_, func, select
 from sqlalchemy.orm import Session
 
 from api.stamps import file_stamp, ist_cell, ist_stamp
@@ -37,15 +40,7 @@ class ObservationExportFilters:
     classification: str | None = None
 
 
-def filtered_observations(session: Session, filters: ObservationExportFilters) -> list[tuple[Observation, Video, Channel]]:
-    """Return observations matching the dashboard export filters."""
-    stmt: Select[tuple[Observation, Video, Channel]] = (
-        select(Observation, Video, Channel)
-        .join(Video, Video.id == Observation.video_id)
-        .join(Channel, Channel.id == Observation.channel_id)
-        .where(Channel.active.is_(True))   # a channel that is switched off is not in any report or download
-        .order_by(Observation.observed_at.asc(), Observation.id.asc())
-    )
+def _apply_filters(stmt: Select[Any], filters: ObservationExportFilters) -> Select[Any]:
     if filters.start_at is not None:
         stmt = stmt.where(Observation.observed_at >= filters.start_at)
     if filters.end_at is not None:
@@ -62,62 +57,72 @@ def filtered_observations(session: Session, filters: ObservationExportFilters) -
         stmt = stmt.where(Observation.is_live == filters.is_live)
     if filters.classification is not None:
         stmt = stmt.where(Observation.classification == filters.classification)
+    return stmt
+
+
+def _joined(*columns: Any) -> Select[Any]:
+    return (select(*columns).select_from(Observation).join(Video, Video.id == Observation.video_id).join(Channel, Channel.id == Observation.channel_id)
+            .where(Channel.active.is_(True))   # a channel that is switched off is not in any report or download
+            .order_by(Observation.observed_at.asc(), Observation.id.asc()))
+
+
+def filtered_observations(session: Session, filters: ObservationExportFilters) -> list[tuple[Observation, Video, Channel]]:
+    """Return observations matching the dashboard export filters."""
+    stmt: Select[tuple[Observation, Video, Channel]] = _apply_filters(_joined(Observation, Video, Channel), filters)
     rows = list(session.execute(stmt.limit(MAX_EXPORT_ROWS + 1)).all())
     if len(rows) > MAX_EXPORT_ROWS:
         raise ValueError("report has more than 50000 rows; narrow the date range or add filters")
     return rows
 
 
+def _widths(rows: list[list[Any]], header: list[str]) -> list[int]:
+    """Column widths from the header and the first few hundred rows (looking at every cell of a large sheet costs more than writing it)."""
+    return [min(max([len(h)] + [len(str(r[i])) for r in rows[:300] if r[i] is not None]) + 2, 48) for i, h in enumerate(header)]
+
+
+def _sheet(workbook: Workbook, title: str, header: list[str], rows: list[list[Any]]) -> None:
+    sheet = workbook.create_sheet(title)
+    sheet.freeze_panes = "A2"
+    for i, width in enumerate(_widths(rows, header)):
+        sheet.column_dimensions[get_column_letter(i + 1)].width = width
+    sheet.append(header)
+    for row in rows:
+        sheet.append(row)
+    sheet.auto_filter.ref = f"A1:{get_column_letter(len(header))}{len(rows) + 1}"
+
+
 def export_observations_xlsx(session: Session, filters: ObservationExportFilters) -> bytes:
-    """Build an Excel workbook containing filtered data and latest intelligence."""
-    rows = filtered_observations(session, filters)
-    workbook = Workbook()
+    """Build an Excel workbook containing filtered data and latest intelligence. Plain columns and a streaming workbook: a day of readings is tens of thousands of rows."""
+    columns = (Observation.observed_at, Video.id, Video.youtube_video_id, Video.title, Channel.name, Channel.language, Channel.region, Observation.classification, Observation.is_live,
+               Observation.view_count, Observation.like_count, Observation.comment_count, Observation.concurrent_viewers, Observation.source)
+    got = session.execute(_apply_filters(_joined(*columns), filters).limit(MAX_EXPORT_ROWS + 1)).all()
+    if len(got) > MAX_EXPORT_ROWS:
+        raise ValueError("report has more than 50000 rows; narrow the date range or add filters")
+    workbook = Workbook(write_only=True)
+    header = ["Observed At (IST)", "Video ID", "YouTube Video ID", "Title", "Channel", "Language", "Region", "Classification", "Live", "Views", "Likes", "Comments", "Concurrent Viewers", "Source"]
+    data_rows = [[ist_cell(r[0]), *r[1:]] for r in got]
+    _sheet(workbook, "StatAxis Data", header, data_rows)
 
-    data = workbook.active
-    data.title = "StatAxis Data"
-    data.append([
-        "Observed At (IST)", "Video ID", "YouTube Video ID", "Title", "Channel", "Language",
-        "Region", "Classification", "Live", "Views", "Likes", "Comments",
-        "Concurrent Viewers", "Source",
-    ])
-    video_ids = set()
-    for observation, video, channel in rows:
-        video_ids.add(video.id)
-        data.append([
-            ist_cell(observation.observed_at), video.id, video.youtube_video_id, video.title,
-            channel.name, channel.language, channel.region, observation.classification,
-            observation.is_live, observation.view_count, observation.like_count,
-            observation.comment_count, observation.concurrent_viewers, observation.source,
-        ])
-    _format_sheet(data)
-
-    intelligence = workbook.create_sheet("StatAxis Intelligence")
-    intelligence.append([
-        "Video ID", "YouTube Video ID", "Title", "STX Index", "Confidence",
-        "Available Signals", "Generated At (IST)", "StatAxis View", "Signal Contributions",
-    ])
-    if video_ids:
-        stmt = (
-            select(IntelligenceSnapshotRecord, Video)
-            .join(Video, Video.id == IntelligenceSnapshotRecord.video_id)
-            .where(IntelligenceSnapshotRecord.video_id.in_(video_ids))
-            .order_by(IntelligenceSnapshotRecord.generated_at.desc())
-        )
-        latest: dict[int, IntelligenceSnapshotRecord] = {}
-        for record, video in session.execute(stmt):
-            latest.setdefault(video.id, record)
-        for _, video, _ in rows:
-            record = latest.get(video.id)
-            if record is None:
-                continue
-            view = json.loads(record.view_json)
-            contributions = json.loads(record.contributions_json)
-            intelligence.append([
-                video.id, video.youtube_video_id, video.title, record.score,
-                record.confidence, record.available_signals, ist_cell(record.generated_at),
-                view.get("view", view.get("summary", "")), json.dumps(contributions, sort_keys=True),
-            ])
-    _format_sheet(intelligence)
+    # one line for each video: its newest score (only the newest snapshot of each video is read)
+    videos: dict[int, tuple[str, str]] = {}
+    for r in got:
+        videos.setdefault(r[1], (r[2], r[3]))
+    latest: dict[int, IntelligenceSnapshotRecord] = {}
+    ids = sorted(videos)
+    for i in range(0, len(ids), 800):
+        chunk = ids[i:i + 800]
+        newest = select(IntelligenceSnapshotRecord.video_id.label("v"), func.max(IntelligenceSnapshotRecord.generated_at).label("m")).where(IntelligenceSnapshotRecord.video_id.in_(chunk)).group_by(IntelligenceSnapshotRecord.video_id).subquery()
+        for record in session.execute(select(IntelligenceSnapshotRecord).join(newest, and_(IntelligenceSnapshotRecord.video_id == newest.c.v, IntelligenceSnapshotRecord.generated_at == newest.c.m))).scalars():
+            latest.setdefault(record.video_id, record)
+    lines = []
+    for video_id in videos:
+        record = latest.get(video_id)
+        if record is None:
+            continue
+        view = json.loads(record.view_json)
+        lines.append([video_id, videos[video_id][0], videos[video_id][1], record.score, record.confidence, record.available_signals, ist_cell(record.generated_at),
+                      view.get("view", view.get("summary", "")), json.dumps(json.loads(record.contributions_json), sort_keys=True)])
+    _sheet(workbook, "StatAxis Intelligence", ["Video ID", "YouTube Video ID", "Title", "STX Index", "Confidence", "Available Signals", "Generated At (IST)", "StatAxis View", "Signal Contributions"], lines)
 
     _add_notice_sheet(workbook)
     output = BytesIO()
@@ -260,12 +265,12 @@ DERIVED_METRICS_NOTICE = (
 
 def _add_notice_sheet(workbook: Workbook) -> None:
     notes = workbook.create_sheet("Notes")
+    notes.column_dimensions["A"].width = 120   # set before the rows (a streaming workbook needs it so)
     notes.append(["Downloaded at", ist_stamp()])
     notes.append([])
     notes.append(["Data source", "Data via YouTube. Processed and evaluated by StatAxis."])
     notes.append(["Data notice"])
     notes.append([DERIVED_METRICS_NOTICE])
-    notes.column_dimensions["A"].width = 120
 
 
 def _format_sheet(sheet) -> None:
