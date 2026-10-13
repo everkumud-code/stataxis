@@ -248,13 +248,13 @@ def test_the_workspace_menu_has_icons_counts_sub_menus_and_a_drawer_for_small_sc
     assert "ArrowDown" in html and 'class="tagon">LIVE' in html and "aria-current" in html                        # keyboard walk, live tag, current screen
 
 
-def test_the_workspace_has_an_address_bar_the_name_leads_home_and_one_menu_group_is_open_at_a_time():
+def test_the_workspace_has_an_address_bar_the_name_leads_home_and_every_menu_group_is_open_so_nothing_is_hidden():
     from pathlib import Path
     html = (Path(__file__).resolve().parent.parent / "dashboard" / "workspace.html").read_text(encoding="utf-8")
     assert '<a class="logo" href="#/" id="homelink"' in html                                                      # the StatAxis name goes to the start of the workspace
     assert 'id="crumbs"' in html and "function buildCrumbs(view)" in html and 'id="jump"' in html                 # Home / group / screen, and a box to go anywhere
     assert "buildNav(v.id); buildCrumbs(v);" in html and 'ev.key === "/"' in html                                 # drawn for every screen, "/" focuses the box
-    assert "navOpen = navOpen === name ? null : name" in html and "sx_nav_closed" not in html                      # opening a group closes the one that was open
+    assert "navShut = new Set()" in html and "shut = !q && navShut.has(name)" in html and "navOpen" not in html and "sx_nav_closed" not in html   # every group starts open; folding one never hides another
 
 
 def test_every_time_on_screen_is_indian_time() -> None:

@@ -939,7 +939,7 @@ const MENU_HINT = {
   "adm-users": "Create logins, reset passwords, tick privileges", "adm-apps": "People who asked for access", "adm-access": "Packages on or off, and who may use what", "adm-claims": "Who says which channel is theirs", "adm-packages": "Package names and prices",
   "adm-channels": "Every channel, with its On/Off switch", "adm-groups": "Which group each channel belongs to", "adm-audience": "Audience profiles supplied for channels", "adm-quota": "YouTube quota: what we use and what we need",
 };
-let navFilter = "", navOpen = null, navHere = null;
+let navFilter = "", navShut = new Set(), navHere = null;   /* every group is open: a client never has to hunt; a person may fold a group they do not use, and it stays folded only until the page is reloaded */
 const MENU_ICON = {
   "Start here": '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
   "Live now": '<circle cx="12" cy="12" r="2"/><path d="M7.5 7.5a6.4 6.4 0 000 9M16.5 7.5a6.4 6.4 0 010 9M4.5 4.5a10.6 10.6 0 000 15M19.5 4.5a10.6 10.6 0 010 15"/>',
@@ -963,14 +963,14 @@ function menuGroups() {
 function buildNav(current, keepFocus = false) {
   const groups = menuGroups();
   const hereName = (groups.find(([, vs]) => vs.some(v => v.id === current)) || [])[0] || null;
-  if (hereName !== navHere) { navHere = hereName; navOpen = hereName; }   /* going to a screen in another group opens that group (and so closes the one before) */
+  if (hereName !== navHere) { navHere = hereName; navShut.delete(hereName); }   /* going to a screen opens its group if the person had folded it */
   const q = navFilter.trim().toLowerCase(), label = v => MENU_LABEL[v.id] || v.title;
   let html = `<input id="navfind" type="search" placeholder="Find a screen…" aria-label="Find a screen" autocomplete="off" value="${esc(navFilter)}">`;
   let n = 0;
   for (const [name, views] of groups) {
     const vs = q ? views.filter(v => (label(v) + " " + (MENU_HINT[v.id] || "")).toLowerCase().includes(q)) : views;
     if (!vs.length) continue;
-    const here = vs.some(v => v.id === current), shut = !q && navOpen !== name, sid = "sub" + (n++);
+    const here = vs.some(v => v.id === current), shut = !q && navShut.has(name), sid = "sub" + (n++);
     html += `<div class="grp${shut ? " closed" : ""}${here ? " here" : ""}" data-grp="${esc(name)}"><button class="gh" type="button" aria-expanded="${!shut}" aria-controls="${sid}"><span class="gi"><svg viewBox="0 0 24 24" aria-hidden="true">${MENU_ICON[name] || MENU_ICON.More}</svg></span><span class="gt">${esc(name)}</span><span class="gc">${vs.length}</span><i class="chev"></i></button>` +
       `<div class="sub" id="${sid}"><div class="subin">` +
       vs.map(v => `<a class="nav" href="#/${v.id}" title="${esc(MENU_HINT[v.id] || "")}"${v.id === current ? ' aria-current="page"' : ""}><span>${esc(label(v))}</span>${MENU_LIVE.has(v.id) ? '<span class="tagon">LIVE</span>' : ""}<small>${esc(MENU_HINT[v.id] || "")}</small></a>`).join("") + `</div></div></div>`;
@@ -982,8 +982,8 @@ function buildNav(current, keepFocus = false) {
   if (keepFocus) { find.focus(); find.setSelectionRange(find.value.length, find.value.length); }
   nav.querySelectorAll(".gh").forEach(h => {
     h.onclick = () => {
-      const name = h.parentElement.dataset.grp; navOpen = navOpen === name ? null : name;   /* opening one closes the one that was open; tapping the open one closes it */
-      nav.querySelectorAll(".grp").forEach(g => { const shut = g.dataset.grp !== navOpen; g.classList.toggle("closed", shut); g.querySelector(".gh").setAttribute("aria-expanded", String(!shut)); });
+      const name = h.parentElement.dataset.grp, g = h.parentElement; navShut.has(name) ? navShut.delete(name) : navShut.add(name);   /* folding one group never hides another */
+      const shut = navShut.has(name); g.classList.toggle("closed", shut); h.setAttribute("aria-expanded", String(!shut));
     };
   });
   /* arrow keys walk the menu: Down and Up move between the group headings and the screens that are showing */
