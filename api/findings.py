@@ -25,11 +25,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api import authenticity
-from api.market_common import latest_observations, mean, now_utc, parse_published, pick_channels, rnd, today_ist, utc
+from api.market_common import latest_observations, mean, now_utc, pick_channels, rnd, today_ist, utc
 from api.market_tools import _videos_in, prime_time, weekly_views
 from api.creator_index import creator_index
 from collector.storage import Channel, Observation
-from metrics.markets import market_label
 
 PERSONAS = {
     "media": "Media company",
@@ -130,7 +129,7 @@ def _prime(session: Session, start: str, end: str, segment: str | None, language
                "audience": f"Most people are watching live news around {best_slot.replace('-', ' to ')}, mostly on {best['name']}."},
               {"media": 85, "buyer": 95, "politician": 80, "influencer": 20, "audience": 70})]
     out.append(_f("peak-moment", f"The highest single moment was {peak['peak_concurrent']:,.0f} viewers on {peak['name']} at {peak_slot.replace('-', ' to ')}",
-                  f"The highest minute in any evening slot of these days. It is a peak, not an average: it shows what the channel can draw, not what it draws every night.",
+                  "The highest minute in any evening slot of these days. It is a peak, not an average: it shows what the channel can draw, not what it draws every night.",
                   {"channel": peak["name"], "peak": peak["peak_concurrent"], "slot": peak_slot, "average_in_that_slot": peak["average_concurrent"]}, conf, "primetime", "Open prime time",
                   {"media": "Peaks show your ceiling. The gap between your peak and your average is the audience you rented for a moment but did not keep.",
                    "buyer": "Do not buy on a peak. Price a spot on the average and treat the peak as upside.",
@@ -205,7 +204,7 @@ def _creators(session: Session, segment: str | None, language: str | None, now: 
                       f"Profile: {top['profile']}. " + (f"Strong on {', '.join(top['strengths'])}. " if top["strengths"] else "") + (f"{rising['name']} is rising." if rising else ""),
                       {"group": seg, "top": top["name"], "index_score": top["index_score"], "confidence": top["confidence"], "profile": top["profile"], "rising": rising["name"] if rising else None, "compared": len(scored)},
                       top["confidence_label"], "creators", "Open the IFX Score",
-                      {"influencer": f"This is the benchmark in your group. The pillar you are weakest on (Impact, Followership or eXposure) shows where to work.",
+                      {"influencer": "This is the benchmark in your group. The pillar you are weakest on (Impact, Followership or eXposure) shows where to work.",
                        "buyer": f"For a creator campaign, {top['name']} scores best, but read the profile: '{top['profile']}' tells you whether results are steady or hit-driven.",
                        "politician": f"Among {label}, {top['name']} has the strongest mix of reach, reaction and regularity. Compare before choosing a messenger.",
                        "media": f"Independent voices are competing for your audience. {top['name']} is the one to watch in {label}."},

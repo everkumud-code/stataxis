@@ -678,7 +678,7 @@
       try {
         const [sp, mv] = await Promise.all([api("/api/v1/lab/spikes", {hours: v.hours, language: v.language}), api("/api/v1/lab/movement", {minutes: v.minutes, language: v.language})]);
         const lead = r => r.lead_stream ? `<strong>${esc(r.lead_stream.title || r.lead_stream.video_id)}</strong>${r.lead_stream.was_new ? ' <span class="tag green">new stream</span>' : ""}` : "—";
-        out.innerHTML = `<section class="card"><h2>Spikes in the last ${esc(sp.hours)} hours</h2>` + (sp.spikes.length ? table([
+        out.innerHTML = `<section class="card"><h2>Spikes in the last ${esc(sp.hours)} ${Number(sp.hours) === 1 ? "hour" : "hours"}</h2>` + (sp.spikes.length ? table([
           {h: "Channel", html: 1, v: r => `<strong>${esc(r.channel)}</strong>`}, {h: "Started (IST)", v: r => r.started_ist}, {h: "Before", n: 1, v: r => whole(r.before)}, {h: "Peak", n: 1, v: r => whole(r.peak)},
           {h: "Rise", n: 1, v: r => whole(r.rise)}, {h: "Stream that carried it", html: 1, v: lead}, {h: "Share of the rise", n: 1, v: r => r.lead_stream && r.lead_stream.share_of_rise_percent != null ? r.lead_stream.share_of_rise_percent + "%" : "—"}], sp.spikes)
           : `<p class="muted">No channel rose suddenly in these hours.</p>`) + `<p class="muted" style="margin-top:8px">${esc(sp.rule)} ${esc(sp.note)}</p></section>

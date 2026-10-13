@@ -10,7 +10,7 @@ from api.ttl_cache import ttl_cache
 
 import math
 from collections import defaultdict
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func

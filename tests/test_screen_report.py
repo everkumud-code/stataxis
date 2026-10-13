@@ -181,3 +181,28 @@ def test_the_report_builder_draws_one_date_and_one_time_interval_as_all_streams_
 def test_the_radar_describes_a_missing_dip_pattern_as_worth_a_look_not_as_a_finding_of_wrongdoing():
     from api import authenticity
     assert "no_ad_dips" in authenticity.SIGNALS and "not proof" in authenticity.METHOD
+
+
+def test_hindi_and_other_scripts_are_drawn_as_letters_not_as_black_boxes():
+    import fitz
+
+    from api.report_pdf import _plain_ok, _shaped, clean_screen, screen_pdf
+
+    assert _plain_ok("Aaj Tak - 12,000 viewers") and not _plain_ok("आज तक")
+    png, w, h = _shaped("आज तक लाइव — ज्ञानेश कुमार", 9.0, 11.0, "#061322", False, "left", 200.0)
+    pixmap = fitz.Pixmap(png)
+    assert pixmap.alpha and w == 200.0 and h > 9
+    assert any(pixmap.samples[i] for i in range(3, len(pixmap.samples), 4))                                  # something was drawn (alpha > 0), so it is not an empty picture
+
+    hindi = screen(title="Spikes", blocks=[{"t": "p", "text": "Stream that carried it: आज तक लाइव"},
+                                           {"t": "table", "head": ["Channel", "Stream that carried it", "Gained"], "rows": [["Aaj Tak", "आज की ताज़ा खबर लाइव", "8,913"], ["Beta TV", "Plain English title", "1,200"]]}])
+    plain = screen(title="Spikes", blocks=[hindi["blocks"][0] | {"text": "Stream that carried it: Aaj Tak live"},
+                                           {"t": "table", "head": ["Channel", "Stream that carried it", "Gained"], "rows": [["Aaj Tak", "Aaj ki taaza khabar live", "8,913"], ["Beta TV", "Plain English title", "1,200"]]}])
+    pdf = screen_pdf(clean_screen(hindi), protect=False)
+    doc = fitz.open(stream=pdf, filetype="pdf")
+    text = "".join(page.get_text() for page in doc)
+    assert "Plain English title" in text and "8,913" in text                                                 # ordinary text stays text
+    assert "आज" not in text and "■" not in text                                                              # Hindi is not written with a font that lacks it
+    base = fitz.open(stream=screen_pdf(clean_screen(plain), protect=False), filetype="pdf")
+    assert sum(len(page.get_images()) for page in doc) > sum(len(page.get_images()) for page in base)       # the Hindi cells and line are pictures of real letters
+    assert screen_pdf(clean_screen(hindi))[:4] == b"%PDF"   # the protected download works too

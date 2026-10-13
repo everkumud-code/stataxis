@@ -7,6 +7,8 @@ import binascii
 import re
 import secrets
 from datetime import datetime
+from functools import lru_cache
+from html import unescape
 from io import BytesIO
 from typing import Any
 from xml.sax.saxutils import escape
@@ -17,7 +19,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
-from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Flowable, Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from api.stamps import file_stamp, ist_stamp
 
@@ -95,6 +97,97 @@ def _n(value: Any) -> str:
     return "-" if value is None else f"{value:,.0f}" if isinstance(value, (int, float)) else str(value)
 
 
+# ---------------------------------------------------------------------------------------------- Hindi and every other script
+# reportlab's own fonts hold Western letters only; Devanagari (and Tamil, Arabic, emoji, arrows...) would print as black boxes. Text that Helvetica cannot write is therefore set by MuPDF, which shapes it
+# correctly with its built-in Noto fonts, and placed on the page as a transparent picture. (The finished report is a set of page pictures anyway, so nothing readable is lost.)
+def _plain_ok(text: str) -> bool:
+    try:
+        text.encode("cp1252")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
+def _markup_text(markup: str) -> str:
+    return unescape(re.sub(r"<[^>]+>", "", markup.replace("<br/>", " ")))
+
+
+def _html(markup: str) -> str:
+    """reportlab paragraph markup (<font color size>, <b>, <br/>) as the HTML MuPDF sets."""
+    def font(m: re.Match[str]) -> str:
+        attrs = m.group(1)
+        color, size = re.search(r"color\s*=\s*['\"]?(#[0-9a-fA-F]{3,8})", attrs), re.search(r"size\s*=\s*['\"]?([0-9.]+)", attrs)
+        return "<span style=\"" + (f"color:{color.group(1)};" if color else "") + (f"font-size:{size.group(1)}pt;" if size else "") + "\">"
+    return re.sub(r"</font>", "</span>", re.sub(r"<font([^>]*)>", font, markup))
+
+
+@lru_cache(maxsize=512)
+def _shaped(html: str, size: float, leading: float, color: str, bold: bool, align: str, width: float | None) -> tuple[bytes, float, float]:
+    """(PNG, width, height in points) of ``html`` set at ``size``; ``width`` None means as wide as the text is (up to 560 points)."""
+    fitz = _mupdf()
+    css = f"body{{margin:0;padding:0}}p{{margin:0;padding:0;font-family:sans-serif;font-size:{size}pt;line-height:{leading}pt;color:{color};text-align:{align};font-weight:{'700' if bold else '400'}}}"
+    source = f"<p>{html}</p>"
+    probe = fitz.Story(source, user_css=css)
+    _more, filled_box = probe.place(fitz.Rect(0, 0, width or 560, 3000))
+    filled = fitz.Rect(filled_box)
+    w, h = float(width or max(2.0, filled.x1 + 1)), float(filled.y1 + 2)
+    out = BytesIO()
+    writer = fitz.DocumentWriter(out)
+    story = fitz.Story(source, user_css=css)
+    device = writer.begin_page(fitz.Rect(0, 0, w, h))
+    story.place(fitz.Rect(0, 0, w, h))
+    story.draw(device)
+    writer.end_page()
+    writer.close()
+    page = fitz.open(stream=out.getvalue(), filetype="pdf")[0]
+    return page.get_pixmap(matrix=fitz.Matrix(3, 3), alpha=True).tobytes("png"), w, h
+
+
+def _hex(color: Any) -> str:
+    return "#" + color.hexval()[2:]
+
+
+class Shaped(Flowable):
+    """Text that Helvetica cannot write, set by MuPDF and drawn as a picture that wraps to the width it is given."""
+
+    def __init__(self, html: str, style: ParagraphStyle) -> None:
+        super().__init__()
+        self.html, self.style = html, style
+        self.spaceBefore, self.spaceAfter, self.keepWithNext = style.spaceBefore, style.spaceAfter, getattr(style, "keepWithNext", 0)
+        self._png, self._w, self._h = b"", 0.0, 0.0
+
+    def wrap(self, avail_width: float, avail_height: float) -> tuple[float, float]:
+        st = self.style
+        self._png, self._w, self._h = _shaped(self.html, st.fontSize, st.leading, _hex(st.textColor), "Bold" in st.fontName, ("right", "center", "left", "justify")[st.alignment] if st.alignment in (1, 2) else "left", float(avail_width))
+        return self._w, self._h
+
+    def draw(self) -> None:
+        self.canv.drawImage(ImageReader(BytesIO(self._png)), 0, 0, self._w, self._h, mask="auto")
+
+
+def _para(markup: str, style: ParagraphStyle) -> Any:
+    """A paragraph that always shows every letter: a normal one when Helvetica can write the text, a shaped one when it cannot."""
+    return Paragraph(markup, style) if _plain_ok(_markup_text(markup)) else Shaped(_html(markup), style)
+
+
+def _cell(text: str, align: str = "left") -> Any:
+    """A table cell: the plain string when Helvetica can write it (the table's own font is used), otherwise a shaped picture."""
+    if _plain_ok(text):
+        return text
+    return Shaped(escape(text), ParagraphStyle("cell", fontName="Helvetica", fontSize=8.5, leading=10.5, textColor=NAVY, alignment=2 if align == "right" else 0))
+
+
+def _put(canvas: Any, x: float, y: float, text: str, font: str, size: float, color: Any, right: bool = False) -> None:
+    """canvas.drawString / drawRightString that also copes with text Helvetica cannot write."""
+    canvas.setFillColor(color)
+    if _plain_ok(text):
+        canvas.setFont(font, size)
+        (canvas.drawRightString if right else canvas.drawString)(x, y, text)
+        return
+    png, w, h = _shaped(escape(text), size, size * 1.2, _hex(color), "Bold" in font, "left", None)
+    canvas.drawImage(ImageReader(BytesIO(png)), x - w if right else x, y - size * 0.3, w, h, mask="auto")
+
+
 def _hours(r: dict[str, Any]) -> str:
     return f"{r['start_hour']:02d}:00-{r['end_hour']:02d}:00 IST"
 
@@ -128,13 +221,14 @@ def _bars(rows: list[dict[str, Any]], key: str, width: float, label: str) -> Dra
     for i, r in enumerate(rows):
         y = row_h * (len(rows) - 1 - i)
         w = (width - left - 60) * r[key] / top
-        d.add(String(0, y + 4, str(r["name"])[:24], fontName="Helvetica", fontSize=8, fillColor=NAVY))
+        d.add(String(0, y + 4, str(r["name"])[:24].encode("cp1252", "replace").decode("cp1252"), fontName="Helvetica", fontSize=8, fillColor=NAVY))
         d.add(Rect(left, y + 1, max(w, 1), 10, fillColor=BLUE if i else GOLD, strokeColor=None))
         d.add(String(left + w + 4, y + 3, _n(r[key]), fontName="Helvetica-Bold", fontSize=8, fillColor=NAVY))
     return d
 
 
 def _table(data: list[list[str]], widths: list[float], right_from: int = 2) -> Table:
+    data = [[c if i == 0 else _cell(c, "right" if j >= right_from else "left") for j, c in enumerate(row)] for i, row in enumerate(data)]
     t = Table(data, colWidths=widths, repeatRows=1)
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), NAVY), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white), ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 8),
@@ -153,22 +247,12 @@ def _decorate(canvas: Any, document: Any, downloaded: str, data_note: str, who: 
     canvas.setFillColor(NAVY)
     canvas.rect(0, ph - 16 * mm, pw, 16 * mm, stroke=0, fill=1)
     canvas.drawImage(ImageReader(BytesIO(logo_png(ring="#e8f0f8", ink="#e8f0f8", gold="#e1b94f", words=False, scale=2))), 16 * mm, ph - 14 * mm, 12 * mm, 12 * 124 / 150 * mm, mask="auto")
-    canvas.setFillColor(GOLD)
-    canvas.setFont("Helvetica-Bold", 13)
-    canvas.drawString(31 * mm, ph - 10.5 * mm, "STATAXIS")
-    canvas.setFillColor(colors.white)
-    canvas.setFont("Helvetica", 8)
-    canvas.drawRightString(pw - 16 * mm, ph - 7.5 * mm, "Stat the View. Axis the Viewpoint.")
-    canvas.setFillColor(colors.HexColor("#e1b94f"))
-    canvas.setFont("Helvetica-Bold", 8)
-    canvas.drawRightString(pw - 16 * mm, ph - 12 * mm, f"Downloaded {downloaded}")
-    canvas.setFillColor(GREY)
-    canvas.setFont("Helvetica", 7.5)
-    canvas.drawString(16 * mm, 9 * mm, f"Downloaded {downloaded}{who}" + (f"  |  {data_note}" if data_note else "") + "  |  STATAXIS")
-    canvas.setFont("Helvetica", 6.8)
-    canvas.drawString(16 * mm, 5.5 * mm, YOUTUBE_NOTE)
-    canvas.setFont("Helvetica", 7.5)
-    canvas.drawRightString(pw - 16 * mm, 9 * mm, f"Page {document.page}")
+    _put(canvas, 31 * mm, ph - 10.5 * mm, "STATAXIS", "Helvetica-Bold", 13, GOLD)
+    _put(canvas, pw - 16 * mm, ph - 7.5 * mm, "Stat the View. Axis the Viewpoint.", "Helvetica", 8, colors.white, right=True)
+    _put(canvas, pw - 16 * mm, ph - 12 * mm, f"Downloaded {downloaded}", "Helvetica-Bold", 8, colors.HexColor("#e1b94f"), right=True)
+    _put(canvas, 16 * mm, 9 * mm, f"Downloaded {downloaded}{who}" + (f"  |  {data_note}" if data_note else "") + "  |  STATAXIS", "Helvetica", 7.5, GREY)
+    _put(canvas, 16 * mm, 5.5 * mm, YOUTUBE_NOTE, "Helvetica", 6.8, GREY)
+    _put(canvas, pw - 16 * mm, 9 * mm, f"Page {document.page}", "Helvetica", 7.5, GREY, right=True)
     canvas.setStrokeColor(GOLD)
     canvas.setLineWidth(0.6)
     canvas.line(16 * mm, 13 * mm, pw - 16 * mm, 13 * mm)
@@ -185,39 +269,39 @@ def report_pdf(r: dict[str, Any], protect: bool = True) -> bytes:
     body = ParagraphStyle("b", parent=ss["BodyText"], fontName="Helvetica", fontSize=8.5, leading=11.5, textColor=GREY)
     story: list[Any] = []
     filters = r.get("filters") or {}
-    story.append(Paragraph(escape(report_title(r)), h1))
-    story.append(Paragraph(escape(f"{_dates(r)}  |  Indian time  |  " + ("" if r.get("kind") == "briefing" else f"Genre: {r['genre'] or 'all genres'}  |  ") + f"Language: {filters.get('language') or 'all'}  |  Group: {filters.get('segment') or 'all'}"), body))
+    story.append(_para(escape(report_title(r)), h1))
+    story.append(_para(escape(f"{_dates(r)}  |  Indian time  |  " + ("" if r.get("kind") == "briefing" else f"Genre: {r['genre'] or 'all genres'}  |  ") + f"Language: {filters.get('language') or 'all'}  |  Group: {filters.get('segment') or 'all'}"), body))
     try:
         as_of = ist_stamp(datetime.fromisoformat(r["generated_at"]))
     except (KeyError, TypeError, ValueError):
         as_of = downloaded
-    story.append(Paragraph(f"<font color='#b8923a'><b>Downloaded {escape(downloaded)}</b></font>  |  Data as of {escape(as_of)}", body))
+    story.append(_para(f"<font color='#b8923a'><b>Downloaded {escape(downloaded)}</b></font>  |  Data as of {escape(as_of)}", body))
     story.append(Spacer(1, 8))
     width = A4[0] - 32 * mm
     rows = r["rows"]
     if r.get("kind") == "briefing":
         b = r["briefing"]
-        kp = [[Paragraph(f"<font size=15 color='#061322'><b>{escape(str(k['value']))}</b></font><br/><font size=7.5 color='#5b6b7b'>{escape(k['label'])}<br/>{escape(k['detail'])}</font>", body) for k in b["kpis"]]]
+        kp = [[_para(f"<font size=15 color='#061322'><b>{escape(str(k['value']))}</b></font><br/><font size=7.5 color='#5b6b7b'>{escape(k['label'])}<br/>{escape(k['detail'])}</font>", body) for k in b["kpis"]]]
         if kp[0]:
             t = Table(kp, colWidths=[width / len(kp[0])] * len(kp[0]))
             t.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.4, LINE), ("INNERGRID", (0, 0), (-1, -1), 0.4, LINE), ("BACKGROUND", (0, 0), (-1, -1), BAND), ("VALIGN", (0, 0), (-1, -1), "TOP"),
                                    ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7)]))
             story.append(t)
-        story.append(Paragraph("What the data shows, and what it means for you", h2))
+        story.append(_para("What the data shows, and what it means for you", h2))
         if not b["findings"]:
-            story.append(Paragraph(escape(b.get("note") or "No findings."), body))
+            story.append(_para(escape(b.get("note") or "No findings."), body))
         small = ParagraphStyle("sm", parent=body, fontSize=7.8, leading=10, textColor=GREY)
         head3 = ParagraphStyle("h3", parent=body, fontName="Helvetica-Bold", fontSize=10.2, leading=13, textColor=NAVY, spaceBefore=6)
         for n, f in enumerate(b["findings"], start=1):
             ev = ", ".join(f"{k.replace('_', ' ')}: {v}" for k, v in f["evidence"].items() if isinstance(v, (int, float, str)) and v not in ("", None))[:230]
-            story.append(Paragraph(escape(f"{n}. {f['headline']}"), head3))
-            story.append(Paragraph(escape(f["detail"]), body))
-            story.append(Paragraph(f"<font color='#b8923a'><b>For you:</b></font> {escape(f['so_what'])}", body))
-            story.append(Paragraph(escape(f"Confidence: {f['confidence']}  |  Evidence: {ev}"), small))
-        story.append(Paragraph("Where to look next", h2))
-        story.append(Paragraph(escape("  |  ".join(x["label"] for x in b["recommended"])), body))
+            story.append(_para(escape(f"{n}. {f['headline']}"), head3))
+            story.append(_para(escape(f["detail"]), body))
+            story.append(_para(f"<font color='#b8923a'><b>For you:</b></font> {escape(f['so_what'])}", body))
+            story.append(_para(escape(f"Confidence: {f['confidence']}  |  Evidence: {ev}"), small))
+        story.append(_para("Where to look next", h2))
+        story.append(_para(escape("  |  ".join(x["label"] for x in b["recommended"])), body))
     elif not rows:
-        story.append(Paragraph("No channel was measured in these hours on these days with these filters. Nothing is estimated, so there is nothing to show.", body))
+        story.append(_para("No channel was measured in these hours on these days with these filters. Nothing is estimated, so there is nothing to show.", body))
     elif r["kind"] == "audience":
         story.append(_bars(rows, "average", width, "Average concurrent viewers (top 10)"))
         story.append(Spacer(1, 8))
@@ -229,26 +313,26 @@ def report_pdf(r: dict[str, Any], protect: bool = True) -> bytes:
         data = [["#", "Channel", "Views gained", "Share %", "Videos", "New uploads"]] + [[str(x["rank"]), x["name"][:34], _n(x["views"]), _n(x["share_percent"]), _n(x["videos"]), _n(x["uploads"])] for x in rows]
         story.append(_table(data, [10 * mm, 70 * mm, 28 * mm, 20 * mm, 20 * mm, 20 * mm]))
     for g in r.get("by_genre") or []:
-        story.append(Paragraph(escape(f"Genre: {g['genre']}"), h2))
+        story.append(_para(escape(f"Genre: {g['genre']}"), h2))
         if r["kind"] == "audience":
             data = [["#", "Channel", "Average", "Peak"]] + [[str(x["rank"]), x["name"][:34], _n(x["average"]), _n(x["peak"])] for x in g["rows"][:5]]
             story.append(_table(data, [10 * mm, 90 * mm, 30 * mm, 30 * mm]))
         else:
             data = [["#", "Channel", "Views gained", "Share %"]] + [[str(x["rank"]), x["name"][:34], _n(x["views"]), _n(x["share_percent"])] for x in g["rows"][:5]]
             story.append(_table(data, [10 * mm, 90 * mm, 30 * mm, 30 * mm]))
-    story.append(Paragraph("How these numbers were worked out", h2))
-    story.append(Paragraph(escape(r["method"]), body))
+    story.append(_para("How these numbers were worked out", h2))
+    story.append(_para(escape(r["method"]), body))
     cov = r.get("coverage") or {}
     if r["kind"] == "briefing":
         pass
     elif r["kind"] == "views" and cov.get("videos_matching"):
         story.append(Spacer(1, 4))
-        story.append(Paragraph(escape(f"Coverage: {cov['videos_measured_at_both_ends']} of {cov['videos_matching']} matching videos were measured at both ends of the window ({cov['percent_measured']}%); {cov['videos_left_out']} were left out."), body))
+        story.append(_para(escape(f"Coverage: {cov['videos_measured_at_both_ends']} of {cov['videos_matching']} matching videos were measured at both ends of the window ({cov['percent_measured']}%); {cov['videos_left_out']} were left out."), body))
     elif r["kind"] == "audience":
         story.append(Spacer(1, 4))
-        story.append(Paragraph(escape(f"Coverage: {cov.get('channels_seen_live', 0)} channels were seen live in these hours over {cov.get('days_requested', 0)} day(s)."), body))
+        story.append(_para(escape(f"Coverage: {cov.get('channels_seen_live', 0)} channels were seen live in these hours over {cov.get('days_requested', 0)} day(s)."), body))
     story.append(Spacer(1, 4))
-    story.append(Paragraph("Measured by STAXIS from public YouTube data. This is not TV ratings and not a statement about who watched; audiences of different channels overlap by an amount that is not visible here.", body))
+    story.append(_para("Measured by STAXIS from public YouTube data. This is not TV ratings and not a statement about who watched; audiences of different channels overlap by an amount that is not visible here.", body))
 
     who = f" for {r['prepared_for']}" if r.get("prepared_for") else ""
 
@@ -326,13 +410,13 @@ def screen_pdf(screen: dict[str, Any], prepared_for: str | None = None, protect:
     muted = ParagraphStyle("m", parent=body, fontSize=8, leading=10.5, textColor=GREY)
     cell = ParagraphStyle("c", parent=body, fontSize=7.6, leading=9.4, spaceAfter=0)
     cellh = ParagraphStyle("ch", parent=cell, fontName="Helvetica-Bold", textColor=colors.white)
-    story: list[Any] = [Paragraph(escape(screen["title"]), h1),
-                        Paragraph(f"<font color='#b8923a'><b>Downloaded {escape(downloaded)}</b></font>" + (f"  |  {escape(screen['filters'])}" if screen["filters"] else ""), muted), Spacer(1, 8)]
+    story: list[Any] = [_para(escape(screen["title"]), h1),
+                        _para(f"<font color='#b8923a'><b>Downloaded {escape(downloaded)}</b></font>" + (f"  |  {escape(screen['filters'])}" if screen["filters"] else ""), muted), Spacer(1, 8)]
     for b in screen["blocks"]:
         if b["t"] == "h":
-            story.append(Paragraph(escape(b["text"]), h2))
+            story.append(_para(escape(b["text"]), h2))
         elif b["t"] == "p":
-            story.append(Paragraph(escape(b["text"]), body))
+            story.append(_para(escape(b["text"]), body))
         elif b["t"] == "img":
             try:
                 img = ImageReader(BytesIO(b["bytes"]))
@@ -347,17 +431,17 @@ def screen_pdf(screen: dict[str, Any], prepared_for: str | None = None, protect:
             weight = [max(4, min(34, max([len(b["head"][i])] + [len(r[i]) for r in b["rows"][:60]]))) for i in range(cols)]
             total = float(sum(weight))
             widths = [width * w / total for w in weight]
-            data = [[Paragraph(escape(c), cellh) for c in b["head"]]] + [[Paragraph(escape(c), cell) for c in r] for r in b["rows"]]
+            data = [[_para(escape(c), cellh) for c in b["head"]]] + [[_para(escape(c), cell) for c in r] for r in b["rows"]]
             t = Table(data, colWidths=widths, repeatRows=1)
             t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), NAVY), ("VALIGN", (0, 0), (-1, -1), "TOP"), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BAND]),
                                    ("LINEBELOW", (0, 0), (-1, -1), 0.25, LINE), ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3), ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3)]))
             story.append(Spacer(1, 3))
             story.append(t)
             if b.get("cut"):
-                story.append(Paragraph(f"The first {MAX_ROWS} rows are shown here; the screen has more.", muted))
+                story.append(_para(f"The first {MAX_ROWS} rows are shown here; the screen has more.", muted))
             story.append(Spacer(1, 4))
     story.append(Spacer(1, 8))
-    story.append(Paragraph(escape("This report shows the screen as it was on the screen when it was downloaded. Measured by STAXIS from public YouTube data. This is not TV ratings and not a statement about who watched."), muted))
+    story.append(_para(escape("This report shows the screen as it was on the screen when it was downloaded. Measured by STAXIS from public YouTube data. This is not TV ratings and not a statement about who watched."), muted))
     who = f" for {prepared_for}" if prepared_for else ""
 
     def page(canvas: Any, document: Any) -> None:
