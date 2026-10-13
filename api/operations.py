@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
+from api.ttl_cache import ttl_cache
 from collector.integrity import audit_database
 from collector.storage import CollectionRun, Observation
 from metrics.persistence import IntelligenceSnapshotRecord
@@ -29,6 +30,7 @@ def collection_health(session: Session, *, as_of: datetime | None = None, stale_
     return {"status": run.status, "fresh": fresh, "as_of": resolved_as_of.isoformat(), "latest_run": {"id": run.id, "started_at": started_at.isoformat(), "finished_at": finished_at.isoformat() if finished_at else None, "status": run.status, "channels_attempted": run.channels_attempted, "videos_observed": run.videos_observed, "error_message": run.error_message, "age_minutes": round(age_minutes, 2)}, "stale_after_minutes": stale_after_minutes}
 
 
+@ttl_cache(stale=True)
 def intelligence_readiness(session: Session, *, as_of: datetime | None = None, stale_after_minutes: int = 360, min_snapshot_coverage: float = 1.0) -> dict[str, Any]:
     """Assess collection freshness, persisted-data integrity, and STX coverage."""
     if not 0.0 <= min_snapshot_coverage <= 1.0:
@@ -36,7 +38,7 @@ def intelligence_readiness(session: Session, *, as_of: datetime | None = None, s
     resolved_as_of = _utc(as_of or datetime.now(UTC))
     health = collection_health(session, as_of=resolved_as_of, stale_after_minutes=stale_after_minutes)
     integrity = audit_database(session, as_of=as_of)
-    integrity_payload = {"ok": integrity.ok, "checked_channels": integrity.checked_channels, "checked_videos": integrity.checked_videos, "checked_observations": integrity.checked_observations, "checked_collection_runs": integrity.checked_collection_runs, "issue_count": len(integrity.issues), "issues": [{"code": issue.code, "message": issue.message} for issue in integrity.issues]}
+    integrity_payload = {"ok": integrity.ok, "checked_channels": integrity.checked_channels, "checked_videos": integrity.checked_videos, "checked_observations": integrity.checked_observations, "checked_collection_runs": integrity.checked_collection_runs, "issue_count": len(integrity.issues), "issues": [{"code": issue.code, "message": issue.message} for issue in integrity.issues[:200]], "issues_shown": min(len(integrity.issues), 200)}
     run = health["latest_run"]
     if not integrity.ok:
         observed = 0 if run is None else max(0, int(run["videos_observed"]))

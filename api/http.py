@@ -18,6 +18,7 @@ from api.media_intelligence import channel_media_intelligence, market_report
 from api.operations import collection_health, intelligence_readiness
 from api.report import channel_report
 from api.signals import channel_signals
+from api.ttl_cache import ttl_cache
 
 
 
@@ -122,6 +123,12 @@ def get_channel_media_intelligence(session: Session, channel_id: int, *, as_of: 
     return 200, payload
 
 
+def _market_report_fresh(*_args: Any, period: str = "7d", **_kwargs: Any) -> float:
+    """How long a stored market report counts as fresh: the short windows move every minute, the long ones barely do."""
+    return 75.0 if period in ("1h", "3h", "6h", "today") else 300.0
+
+
+@ttl_cache(stale=True, snapshot=_market_report_fresh)
 def get_market_report(session: Session, *, as_of: datetime | None = None, period: str = "7d", language: str | None = None, region: str | None = None, market: str | None = None, stream_scope: str = "all", limit: int = 50, segment: str | None = None) -> tuple[int, dict[str, Any]]:
     try:
         payload = market_report(session, as_of=as_of, period=period, language=language, region=region, market=market, segment=segment, stream_scope=stream_scope, limit=limit)

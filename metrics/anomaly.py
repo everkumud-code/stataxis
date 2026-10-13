@@ -48,58 +48,54 @@ def detect_anomalies(
     if window is not None and window < minimum_points:
         raise ValueError("window must be at least minimum_points")
 
-    results: list[AnomalyPoint] = []
+    return [_assess(points, index, minimum_points, z_threshold, window) for index in range(len(points))]
 
-    for index, (observed_at, value) in enumerate(points):
-        history = [item_value for _, item_value in points[:index] if item_value is not None]
-        if window is not None:
-            history = history[-window:]
 
-        if value is None or len(history) < minimum_points:
-            results.append(
-                AnomalyPoint(
-                    observed_at=observed_at,
-                    value=value,
-                    baseline=median(history) if history else None,
-                    mad=_robust_scale(history) if history else None,
-                    robust_z_score=None,
-                    is_anomaly=False,
-                    direction=None,
-                    sufficient_data=False,
-                )
-            )
-            continue
+def _assess(points: list[tuple[datetime, float | None]], index: int, minimum_points: int, z_threshold: float, window: int | None) -> AnomalyPoint:
+    """The assessment of one observation against everything (or the window) before it."""
+    observed_at, value = points[index]
+    history = [item_value for _, item_value in points[:index] if item_value is not None]
+    if window is not None:
+        history = history[-window:]
 
-        baseline = median(history)
-        mad = _robust_scale(history)
-        difference = value - baseline
-
-        if mad == 0:
-            relative_change = abs(difference) / max(abs(baseline), 1.0)
-            robust_z_score = float("inf") if relative_change >= 0.05 else 0.0
-            is_anomaly = relative_change >= 0.05
-        else:
-            robust_z_score = difference / mad
-            is_anomaly = abs(robust_z_score) >= z_threshold
-
-        direction = None
-        if is_anomaly:
-            direction = "positive" if difference > 0 else "negative"
-
-        results.append(
-            AnomalyPoint(
-                observed_at=observed_at,
-                value=float(value),
-                baseline=float(baseline),
-                mad=float(mad),
-                robust_z_score=float(robust_z_score),
-                is_anomaly=is_anomaly,
-                direction=direction,
-                sufficient_data=True,
-            )
+    if value is None or len(history) < minimum_points:
+        return AnomalyPoint(
+            observed_at=observed_at,
+            value=value,
+            baseline=median(history) if history else None,
+            mad=_robust_scale(history) if history else None,
+            robust_z_score=None,
+            is_anomaly=False,
+            direction=None,
+            sufficient_data=False,
         )
 
-    return results
+    baseline = median(history)
+    mad = _robust_scale(history)
+    difference = value - baseline
+
+    if mad == 0:
+        relative_change = abs(difference) / max(abs(baseline), 1.0)
+        robust_z_score = float("inf") if relative_change >= 0.05 else 0.0
+        is_anomaly = relative_change >= 0.05
+    else:
+        robust_z_score = difference / mad
+        is_anomaly = abs(robust_z_score) >= z_threshold
+
+    direction = None
+    if is_anomaly:
+        direction = "positive" if difference > 0 else "negative"
+
+    return AnomalyPoint(
+        observed_at=observed_at,
+        value=float(value),
+        baseline=float(baseline),
+        mad=float(mad),
+        robust_z_score=float(robust_z_score),
+        is_anomaly=is_anomaly,
+        direction=direction,
+        sufficient_data=True,
+    )
 
 
 def latest_anomaly(
@@ -109,11 +105,13 @@ def latest_anomaly(
     z_threshold: float = 3.5,
     window: int | None = None,
 ) -> AnomalyPoint | None:
-    """Return the anomaly assessment for the latest supplied observation."""
-    results = detect_anomalies(
-        points,
-        minimum_points=minimum_points,
-        z_threshold=z_threshold,
-        window=window,
-    )
-    return results[-1] if results else None
+    """Return the anomaly assessment for the latest supplied observation (only that one is worked out: assessing every earlier point as well made this quadratic)."""
+    if minimum_points < 1:
+        raise ValueError("minimum_points must be at least 1")
+    if z_threshold <= 0:
+        raise ValueError("z_threshold must be positive")
+    if window is not None and window < minimum_points:
+        raise ValueError("window must be at least minimum_points")
+    if not points:
+        return None
+    return _assess(points, len(points) - 1, minimum_points, z_threshold, window)

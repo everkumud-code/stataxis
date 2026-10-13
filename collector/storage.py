@@ -207,6 +207,14 @@ class AppSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
+class Snapshot(Base):
+    """A finished answer of a heavy screen (see api/ttl_cache.py): worked out once by the warm-up loop, read by every web process."""
+    __tablename__ = "stx_snapshots"
+    key: Mapped[str] = mapped_column(String(160), primary_key=True)
+    payload: Mapped[str] = mapped_column(Text, default="")
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
 class PackageConfig(Base):
     """Reserved commercial package slot; intentionally empty until configured."""
     __tablename__ = "stx_package_configs"

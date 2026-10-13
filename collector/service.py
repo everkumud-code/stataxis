@@ -305,6 +305,9 @@ def run_service(
             daemon=True,
         )
         collector.start()
+        from collector.warmer import warm_forever
+
+        Thread(target=warm_forever, args=(engine, stop), name="warm-up-loop", daemon=True).start()   # the heavy screens' answers, ready before anyone asks
         try:
             _live_loop(engine, live_client, stop, live_poll_seconds, secrets)
         finally:
