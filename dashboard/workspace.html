@@ -915,21 +915,23 @@ function downloadCsv(rows, name) {
 /* The menu is grouped by what a person is trying to do, not by how the screens were built. A screen that is not listed here still appears, under "More". */
 const MENU_LAYOUT = [
   ["Start here", ["briefing", "overview"]],
-  ["Watch live", ["live", "liveevent", "primetime", "stream", "spikes"]],
-  ["Know the market", ["market", "channel", "dashboard", "competition", "stx", "content", "trends", "changed", "research"]],
-  ["Plan and report", ["planner", "weekly", "builder", "forecasts", "notes", "alerts", "evaluate", "audience"]],
+  ["Live now", ["live", "liveevent", "spikes", "alerts"]],
+  ["Reports and downloads", ["builder", "primetime", "weekly", "stream", "notes"]],
+  ["Channels and rivals", ["market", "competition", "channel", "dashboard", "trends", "stx"]],
+  ["What moved and why", ["content", "changed", "research", "forecasts"]],
+  ["Ads and audience", ["planner", "audience", "evaluate"]],
   ["Creators and trust", ["creators", "authenticity", "mychannels"]],
   ["My account", ["profile"]],
   ["System health", ["operations", "integrity", "completeness"]],
   ["People and access", ["adm-users", "adm-apps", "adm-access", "adm-claims", "adm-packages"]],
   ["Channels and data", ["adm-channels", "adm-groups", "adm-audience", "adm-quota"]],
 ];
-const MENU_LABEL = {evaluate: "Check a video", trends: "Audience over time", audience: "Audience: place and age", creators: "IFX Score (creators)"};
+const MENU_LABEL = {builder: "Report builder (day and hours)", stream: "Live, replay, video, Shorts", evaluate: "Check a video", trends: "Audience over time", audience: "Audience: place and age", creators: "IFX Score (creators)"};
 const MENU_HINT = {
   briefing: "What the data says this week, written for your role", overview: "The market today at a glance", live: "Who is live right now and how many are watching", liveevent: "Up to 30 channels on one live event, side by side",
   primetime: "Which channel owns each evening hour", stream: "Live, replay, video and Shorts audiences compared", market: "Every channel ranked by views gained", channel: "One channel: audience, momentum, content",
   dashboard: "One channel in depth, with the market beside it", competition: "Who leads, who is climbing, how far behind", stx: "The STX Index and the signals behind it", content: "The videos that moved most", trends: "How a channel's audience moved over time",
-  changed: "What moved since the last period", research: "Tone and topics in video titles", planner: "Where to place your ad spots and what each costs", weekly: "Views of the week's uploads, per channel", builder: "Build a PDF report",
+  changed: "What moved since the last period", research: "Tone and topics in video titles", planner: "Where to place your ad spots and what each costs", weekly: "Views of the week's uploads, per channel", builder: "Pick the days, the hours (IST), the language and genre; see average and peak, download a PDF",
   evaluate: "Check one public video and read its STX", audience: "Where viewers live and how old they are, where known", creators: "The IFX Score for creators and journalists", authenticity: "Viewership that looks too good or too still",
   spikes: "Sudden rises in a channel's audience, with the stream behind each, and who gained while who lost", forecasts: "What we expected each channel's prime time to be, and how close it was", notes: "A dated note on what the data said, each day and each week",
   alerts: "Tell us a level or a change on a channel's live audience; it shows here when it happens", completeness: "How many of the live readings that should be there are there, per channel per day",
@@ -940,9 +942,9 @@ const MENU_HINT = {
 let navFilter = "", navOpen = null, navHere = null;
 const MENU_ICON = {
   "Start here": '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
-  "Watch live": '<circle cx="12" cy="12" r="2"/><path d="M7.5 7.5a6.4 6.4 0 000 9M16.5 7.5a6.4 6.4 0 010 9M4.5 4.5a10.6 10.6 0 000 15M19.5 4.5a10.6 10.6 0 010 15"/>',
-  "Know the market": '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
-  "Plan and report": '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  "Live now": '<circle cx="12" cy="12" r="2"/><path d="M7.5 7.5a6.4 6.4 0 000 9M16.5 7.5a6.4 6.4 0 010 9M4.5 4.5a10.6 10.6 0 000 15M19.5 4.5a10.6 10.6 0 010 15"/>',
+  "Channels and rivals": '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  "Reports and downloads": '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   "Creators and trust": '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
   "My account": '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>',
   "System health": '<path d="M3 12h4l3-8 4 16 3-8h4"/>',

@@ -235,7 +235,7 @@ def test_the_workspace_menu_is_grouped_by_task_and_lists_every_screen_once_with_
     hints = re.search(r"const MENU_HINT = \{(.*?)\n\};", ws, re.S).group(1)
     for vid in ids:
         assert re.search(rf'(?:\b{re.escape(vid)}|"{re.escape(vid)}"): "', hints), f"no hint for {vid}"
-    for group in ("Start here", "Watch live", "Know the market", "Plan and report", "Creators and trust", "My account", "People and access"):
+    for group in ("Start here", "Live now", "Reports and downloads", "Channels and rivals", "What moved and why", "Ads and audience", "Creators and trust", "My account", "People and access"):
         assert f'["{group}"' in layout, group
     assert 'id="navfind"' in ws and "Find a screen" in ws
 
