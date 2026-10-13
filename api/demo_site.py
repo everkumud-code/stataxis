@@ -23,7 +23,7 @@ from collector.storage import Base, User
 
 REBUILD_SECONDS = 1800          # the invented numbers are rebuilt around the current time every half hour
 READ_ONLY_MESSAGE = "The demo is read-only. Apply for access to use this with your own data."
-ALLOWED_POST = {"/api/v1/market/planner", "/api/v1/market/screen-report.pdf"}   # they only calculate or draw a PDF; nothing is stored
+ALLOWED_POST = {"/api/v1/market/planner", "/api/v1/market/screen-report.pdf", "/api/v1/lab/alerts/list"}   # they only calculate or draw a PDF; nothing is stored
 
 INJECT = r"""<script>/* STAXIS demo: this page runs the real workspace on invented data and cannot change anything */
 (function () {

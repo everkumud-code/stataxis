@@ -63,7 +63,7 @@ def public_application(session_factory: Callable[[], Any]):
             return _json(start_response, 429, {"error": "too many requests"}, retry)
         key = (id(session_factory), path)   # the real site and the public demo each have their own answers
         hit = _CACHE.get(key)
-        if hit and time.monotonic() - hit[0] < CACHE_SECONDS:
+        if hit and time.monotonic() - hit[0] < (120 if path.endswith("/status") else CACHE_SECONDS):   # the status counts thirty days of readings: two minutes is fresh enough
             return _json(start_response, 200, hit[1])
         session = session_factory()
         try:
