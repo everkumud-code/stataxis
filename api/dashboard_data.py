@@ -281,7 +281,7 @@ def market_topic_distribution(
         select(Channel.id, Channel.name, Video.topic, Observation.video_id, func.max(Observation.observed_at))
         .join(Video, Video.channel_id == Channel.id)
         .join(Observation, Observation.video_id == Video.id)
-        .where(Observation.observed_at >= start, Observation.observed_at <= now, analysis_observation_clause())
+        .where(Observation.observed_at >= start, Observation.observed_at <= now, analysis_observation_clause(), Channel.active.is_(True))
         .group_by(Channel.id, Channel.name, Video.topic, Observation.video_id)
     ).all()
     channels: dict[int, dict[str, Any]] = {}

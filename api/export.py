@@ -43,6 +43,7 @@ def filtered_observations(session: Session, filters: ObservationExportFilters) -
         select(Observation, Video, Channel)
         .join(Video, Video.id == Observation.video_id)
         .join(Channel, Channel.id == Observation.channel_id)
+        .where(Channel.active.is_(True))   # a channel that is switched off is not in any report or download
         .order_by(Observation.observed_at.asc(), Observation.id.asc())
     )
     if filters.start_at is not None:

@@ -168,7 +168,11 @@
       let label = -1, value = -1;
       for (let c = 0; c < cols; c++) { if (label < 0 && !numeric(c)) label = c; }
       for (let c = 0; c < cols; c++) { if (c !== label && numeric(c) && !rank(c) && !/weight|points/i.test(b.head[c])) { value = c; break; } }
-      if (label >= 0 && value >= 0) return {caption: /reading/i.test(b.head[value]) ? "Each one, out of 100" : b.head[value], rows: rows.map(r => ({label: r[label], value: num(r[value]) != null && /\d/.test(r[value]) ? Math.max(0, num(r[value])) : null, text: r[value]}))};
+      if (label >= 0 && value >= 0) {
+        /* a channel with no data (a dash, "not enough history", or nothing measured) is left out of a post: only channels with figures are shown */
+        const kept = rows.map(r => ({label: r[label], value: num(r[value]) != null && /\d/.test(r[value]) ? Math.max(0, num(r[value])) : null, text: r[value]})).filter(r => r.value != null && r.value > 0);
+        if (kept.length) return {caption: /reading/i.test(b.head[value]) ? "Each one, out of 100" : b.head[value], rows: kept};
+      }
     }
     return null;
   }
@@ -216,7 +220,7 @@
     const few = result.filter(b => (b.t === "p" || b.t === "h") && !b.kpi).length <= 5, fs = few ? 36 : 28, lh = few ? 54 : 42;   /* a short note is set larger, like a poster */
     if (!chart) {
       for (const b of result) {
-        if (b.t === "table") { for (const r of b.rows.slice(0, 6)) body.push({text: r.filter(Boolean).join("  ·  "), kind: "p"}); continue; }
+        if (b.t === "table") { for (const r of b.rows.filter(row => row.slice(1).some(c => /\d/.test(c))).slice(0, 6)) body.push({text: r.filter(Boolean).join("  ·  "), kind: "p"}); continue; }   /* rows with no figures are left out */
         if ((b.t === "p" || b.t === "h") && !b.kpi && !/^(review now|check|nothing unusual)(?![a-z])/i.test(b.text)) body.push({text: b.text, kind: b.t});   /* the radar's risk labels stay on the screen; they are not for a post */
       }
       m.font = `600 ${fs}px ${FONT}`;

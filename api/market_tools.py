@@ -242,6 +242,7 @@ PLANNER_METHOD = (
 )
 
 
+@ttl_cache(stale=True)
 def media_plan(session: Session, *, start_hour: int, end_hour: int, days: int = 7, language: str | None = None, segment: str | None = None,
                rates: dict[int, float] | None = None, budget: float | None = None, max_share: float = 0.4, authenticity: dict[int, dict[str, Any]] | None = None,
                target: dict[str, Any] | None = None, profiles: dict[int, dict[str, Any]] | None = None, channel_ids: list[int] | None = None, now: datetime | None = None) -> dict[str, Any]:

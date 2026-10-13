@@ -17,7 +17,8 @@ from sqlalchemy.orm import Session
 
 from api import audience as audience_mod
 from api.live_stats import live_window_stats
-from api.market_common import MAX_RANGE_DAYS, ist_hours, mean, now_utc, parse_day, parse_published, pick_channels, rnd, utc
+from api.market_common import MAX_RANGE_DAYS, ist_hours, mean, now_utc, parse_day, parse_published, pick_channels, rnd, today_ist, utc
+from api.ttl_cache import ttl_cache
 from api.media_intelligence import _scope_matches
 from collector.storage import Observation, Video
 from collector.topics import load_topic_keywords
@@ -54,6 +55,15 @@ def _check(feed: str, scope: str, genre: str | None, start_hour: int, end_hour: 
         raise ValueError("choose hours like 9 to 12 (Indian time)")
 
 
+def _fresh_for(*_args: Any, end_date: str = "", **_kwargs: Any) -> float:
+    """A report that ends before today is settled (an hour); one that reaches into today can change as each hour completes (two minutes)."""
+    try:
+        return 3600.0 if parse_day(end_date, "to") < today_ist() else 120.0
+    except ValueError:
+        return 120.0
+
+
+@ttl_cache(stale=True, snapshot=_fresh_for)
 def build_report(session: Session, *, start_date: str, end_date: str, start_hour: int = 9, end_hour: int = 12, feed: str = "all", scope: str = "live", genre: str | None = None,
                  language: str | None = None, segment: str | None = None, by_genre: bool = False, top: int = 50, channel_ids: list[int] | None = None,
                  target: dict[str, Any] | None = None, profiles: dict[int, dict[str, Any]] | None = None, known_only: bool = False, now: datetime | None = None) -> dict[str, Any]:

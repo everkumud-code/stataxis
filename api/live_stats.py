@@ -33,6 +33,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from api.live_monitor import LIVE_STREAM_FRESHNESS_SECONDS, language_group
+from api.ttl_cache import ttl_cache
 from collector.storage import Channel, Observation, Video, effective_channel_language
 from metrics.feeds import LiveStream, min_primary_hours, split_feeds
 from metrics.markets import market_label, normalize_segment
@@ -135,6 +136,7 @@ def _feed_stats(values: list[int]) -> dict[str, Any]:
     return {"average": round(sum(values) / len(values), 1), "peak": max(values)}
 
 
+@ttl_cache(scale=0.4)
 def live_window_stats(
     session: Session,
     *,

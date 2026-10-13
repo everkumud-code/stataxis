@@ -72,6 +72,75 @@ def _is_postgres(session: Any) -> bool:
         return False
 
 
+# ---- the data epoch: a number that changes when the list of channels (or a channel's group, language, name or on/off switch) changes. Answers carry the epoch they were made under, so a channel switched off
+# disappears from every screen and report at once, not when a stored answer happens to expire.
+_EPOCH_KEY = "data_epoch"
+_EPOCH_MEMO: dict[int, tuple[float, str]] = {}
+
+
+def bump_epoch(bind: Any) -> None:
+    try:
+        from sqlalchemy.orm import Session
+
+        from collector.storage import AppSetting
+
+        with Session(bind) as writer:
+            row = writer.get(AppSetting, _EPOCH_KEY)
+            if row is None:
+                row = AppSetting(key=_EPOCH_KEY)
+                writer.add(row)
+            row.value, row.updated_at = str(time.time_ns()), datetime.now(UTC)
+            writer.commit()
+        _EPOCH_MEMO.pop(id(bind), None)
+    except Exception as exc:
+        logger.warning("could not change the data epoch: %s", type(exc).__name__)
+
+
+def _epoch(session: Any) -> str:
+    """The current data epoch, read at most every three seconds per database."""
+    try:
+        bind = session.get_bind()
+        hit = _EPOCH_MEMO.get(id(bind))
+        if hit is not None and time.monotonic() - hit[0] < 3.0:
+            return hit[1]
+        from sqlalchemy.orm import Session
+
+        from collector.storage import AppSetting
+
+        with Session(bind) as reader:
+            row = reader.get(AppSetting, _EPOCH_KEY)
+            value = row.value if row is not None else "0"
+        _EPOCH_MEMO[id(bind)] = (time.monotonic(), value)
+        return value
+    except Exception:
+        return "0"
+
+
+_WATCHED = ("active", "segment", "language", "name", "region")
+
+
+def _install_epoch_listeners() -> None:
+    from sqlalchemy import event, inspect
+    from sqlalchemy.orm import Session
+
+    @event.listens_for(Session, "before_flush")
+    def _noticed(session: Any, _context: Any, _instances: Any) -> None:
+        from collector.storage import Channel, ChannelLanguageOverride
+
+        for obj in [*session.new, *session.deleted, *session.dirty]:
+            if isinstance(obj, ChannelLanguageOverride) or (isinstance(obj, Channel) and (obj in session.new or obj in session.deleted or any(inspect(obj).attrs[a].history.has_changes() for a in _WATCHED))):
+                session.info["_data_epoch_bump"] = True
+                return
+
+    @event.listens_for(Session, "after_commit")
+    def _changed(session: Any) -> None:
+        if session.info.pop("_data_epoch_bump", False):
+            bump_epoch(session.get_bind())
+
+
+_install_epoch_listeners()
+
+
 def _snapshot_key(name: str, question: str) -> str:
     return f"{name}:{hashlib.sha1(question.encode('utf-8')).hexdigest()}"
 
@@ -149,10 +218,10 @@ def ttl_cache(scale: float = 1.0, stale: bool = False, key: Callable[..., Any] |
                 return fn(session, *args, **kwargs)
             if getattr(FORCE, "on", False) and stale:
                 value = fn(session, *args, **kwargs)
-                put((_which_database(session), repr(key(*args, **kwargs)) if key else repr((args, sorted(kwargs.items(), key=lambda item: item[0])))), value, session)
+                put((_which_database(session), f"{_epoch(session)}|" + (repr(key(*args, **kwargs)) if key else repr((args, sorted(kwargs.items(), key=lambda item: item[0]))))), value, session)
                 return value
             question = repr(key(*args, **kwargs)) if key else repr((args, sorted(kwargs.items(), key=lambda item: item[0])))
-            k = (_which_database(session), question)
+            k = (_which_database(session), f"{_epoch(session)}|{question}")
             fresh_for = keep
             use_snapshots = stale and snapshot_seconds() > 0 and _is_postgres(session)
             if use_snapshots:

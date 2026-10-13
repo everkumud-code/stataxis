@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from api.access import require_capability
 from api.auth import AuthIdentity
 from api.auth_service import policy_for_identity
+from api.ttl_cache import ttl_cache
 from collector.storage import Channel, Observation, Video, effective_channel_language, save_observations
 from collector.youtube.client import YouTubeClient
 from collector.youtube.manual_live import ManualLiveTarget, fetch_manual_live
@@ -49,6 +50,7 @@ def sample_live_url(session: Session, identity: AuthIdentity, url: str, display_
     }
 
 
+@ttl_cache(scale=0.4)   # a live screen: everyone who asks for the same window in the same few seconds shares one answer
 def live_audience_window(session: Session, *, start_at: datetime, end_at: datetime, language: str | None = None) -> dict[str, Any]:
     start_at = _utc(start_at)
     end_at = _utc(end_at)

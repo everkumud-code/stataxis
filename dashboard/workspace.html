@@ -713,7 +713,7 @@ add("live", "Intelligence", "Live audience", async el => {
   el.innerHTML = head("Live audience", "Concurrent viewers across live channels, exactly as observed.") + filterBar({period: false, stream: false}) +
     `<div class="tabs" role="group" aria-label="Window">${[1, 6, 24].map(h => `<button class="tab" type="button" data-h="${h}" aria-pressed="${h === span}">Last ${h}h</button>`).join("")}</div><div id="lv"><p class="muted">Loading…</p></div>`;
   el.querySelectorAll("[data-h]").forEach(b => b.onclick = () => { F.liveHours = b.dataset.h; saveF(); render(); });
-  const end = new Date(), start = new Date(end - span * 3600e3);
+  const end = new Date(Math.floor(Date.now() / 15000) * 15000), start = new Date(end - span * 3600e3);   /* the window ends on a fifteen-second mark: everyone looking in the same moments shares one answer */
   let d; try { d = await api("/api/v1/audience/live", {start: start.toISOString(), end: end.toISOString(), language: F.language}); }
   catch (e) { if (e.status === 403 || /premium/i.test(e.message)) { $("#lv", el).innerHTML = state("Live audience is a paid feature", "Your plan does not include live audience windows. Ask your admin to change your plan.", ""); return; } throw e; }
   const langs = Object.entries(d.languages || {});

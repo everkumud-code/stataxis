@@ -30,6 +30,15 @@ def _guarded(engine: Any, name: str, job: Any) -> None:
         logger.warning("job %s failed: %s", name, type(exc).__name__)
 
 
+def _remove_old_snapshots(session: Session, now: datetime) -> int:
+    """Stored answers older than a day are never read again (a newer one replaced them, or the channel list changed since): drop them."""
+    from collector.storage import Snapshot
+
+    removed = session.query(Snapshot).filter(Snapshot.computed_at < now - timedelta(days=1)).delete(synchronize_session=False)
+    session.commit()
+    return removed
+
+
 def minute_jobs(engine: Any, now: datetime) -> None:
     from api.alerts import evaluate_alerts
 
@@ -43,6 +52,7 @@ def periodic_jobs(engine: Any, now: datetime) -> None:
 
     local = now + IST
     _guarded(engine, "close_interrupted_runs", close_interrupted_runs)
+    _guarded(engine, "old_snapshots_removed", lambda s: _remove_old_snapshots(s, now))
     for kind, day in due_notes(now):
         _guarded(engine, f"note_{kind}", lambda s, k=kind, d=day: int(generate_note(s, k, d, now=now)))
     if local.hour >= 6:

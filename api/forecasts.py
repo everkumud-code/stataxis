@@ -94,12 +94,12 @@ def track_record(session: Session, *, days: int = 30) -> dict[str, Any]:
 
 
 def forecast_overview(session: Session, *, now: datetime | None = None) -> dict[str, Any]:
-    names = {cid: name for cid, name in session.query(Channel.id, Channel.name)}
+    names = {cid: name for cid, name in session.query(Channel.id, Channel.name).filter(Channel.active.is_(True))}   # a channel switched off after its forecast was written is not listed
     today = (now or datetime.now(UTC)).astimezone(IST).date()
     def line(r: Prediction) -> dict[str, Any]:
         return {"channel_id": r.channel_id, "channel": names.get(r.channel_id, "?"), "date": r.target_date, "slot": r.slot, "predicted": round(r.predicted), "days_used": r.days_used,
                 "actual": None if r.actual is None else round(r.actual), "error_percent": r.error_percent, "hit": r.hit, "made_at": r.made_at.isoformat()}
-    upcoming = session.query(Prediction).filter(Prediction.target_date >= today.isoformat(), Prediction.scored_at.is_(None)).order_by(Prediction.predicted.desc()).limit(25).all()
-    recent = session.query(Prediction).filter(Prediction.actual.is_not(None)).order_by(Prediction.target_date.desc(), Prediction.predicted.desc()).limit(40).all()
+    upcoming = session.query(Prediction).filter(Prediction.target_date >= today.isoformat(), Prediction.scored_at.is_(None), Prediction.channel_id.in_(list(names))).order_by(Prediction.predicted.desc()).limit(25).all()
+    recent = session.query(Prediction).filter(Prediction.actual.is_not(None), Prediction.channel_id.in_(list(names))).order_by(Prediction.target_date.desc(), Prediction.predicted.desc()).limit(40).all()
     total = int(session.query(func.count(Prediction.id)).scalar() or 0)
     return {"method": METHOD, "slot": SLOT_LABEL, "total_written": total, "track_record": track_record(session), "upcoming": [line(r) for r in upcoming], "recent": [line(r) for r in recent]}
