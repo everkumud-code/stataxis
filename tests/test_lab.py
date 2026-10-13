@@ -358,3 +358,13 @@ def test_a_collection_pass_in_progress_does_not_make_the_status_look_delayed():
     s.commit()
     snap = status.status_snapshot(s, now=T0 + timedelta(minutes=5))
     assert snap["status"] == "operational" and snap["components"][1]["status"] == "operational" and "success" in snap["components"][1]["detail"]
+
+
+def test_the_radars_cache_key_does_not_change_with_the_clock_so_a_stored_answer_is_found():
+    from api import authenticity
+    from api.market_common import now_utc
+    now = now_utc()
+    same = {authenticity._question(days=7), authenticity._question(days=7, now=now), authenticity._question(days=7, now=now - timedelta(minutes=25))}
+    assert len(same) == 1                                                                           # asked about now: always the same question
+    assert authenticity._question(days=7, now=now - timedelta(days=3)) != authenticity._question(days=7)      # a past moment is its own question
+    assert authenticity._question(days=7, segment="news") != authenticity._question(days=7)

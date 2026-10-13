@@ -44,9 +44,10 @@ METHOD = (
 
 
 def _question(*, days: int = 7, segment: str | None = None, language: str | None = None, channel_ids: list[int] | None = None, now: datetime | None = None, use_cache: bool = True) -> tuple:
-    """What makes two scans the same question: the filters and the moment to the ten minutes (a briefing and the radar screen ask at slightly different instants)."""
+    """What makes two scans the same question: the filters, and 'now' (a briefing and the radar screen ask at slightly different instants; how old an answer may be is decided by the cache, not by the key)."""
     moment = utc(now) if now else now_utc()
-    return (int(days), segment, language, tuple(sorted(channel_ids or [])), moment.replace(minute=moment.minute // 10 * 10, second=0, microsecond=0))
+    when = "now" if abs((moment - now_utc()).total_seconds()) < 3600 else moment.replace(minute=moment.minute // 10 * 10, second=0, microsecond=0)   # asked about now: one question, however the clock moves; a past moment keeps its own
+    return (int(days), segment, language, tuple(sorted(channel_ids or [])), when)
 
 
 def _series(rows: list[Observation]) -> list[tuple[datetime, Observation]]:

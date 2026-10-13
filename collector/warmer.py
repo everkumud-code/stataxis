@@ -41,7 +41,7 @@ def slow_round() -> list[tuple[str, str]]:
     calls += [("/api/v1/markets/report", _q(period=p, stream_scope="all", limit=200)) for p in ("3w", "month")]
     calls += [("/api/v1/operations/readiness", ""), ("/api/v1/markets/topics", ""), ("/api/v1/lab/completeness", "days=3")]
     calls += [("/api/v1/insights/what-changed", f"hours={h}") for h in (24, 72, 168)]
-    calls += [("/api/v1/market/weekly", week), ("/api/v1/market/prime-time", week), ("/api/v1/market/authenticity", "days=7"), ("/api/v1/market/creator-index", "days=30")]
+    calls += [("/api/v1/market/weekly", week), ("/api/v1/market/prime-time", week), ("/api/v1/market/authenticity", "days=7"), ("/api/v1/market/creator-index", "days=30")] + [("/api/v1/market/creator-index", f"segment={seg}&days=30") for seg in ("creator", "journalist", "commentator")]
     calls += [("/api/v1/market/briefing", _q(persona=persona, days=7, language=lang)) for persona in PERSONAS for lang in LANGUAGES]
     return calls
 

@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from api.ttl_cache import ttl_cache
 from collector.storage import Channel, ChannelStats, Observation, Video
 from metrics.engine import ObservationPoint
 from metrics.pipeline import build_intelligence_snapshot
@@ -261,6 +262,7 @@ def channel_stx_trend(
         "timeline": timeline,
     }
 
+@ttl_cache(stale=True)
 def market_topic_distribution(
     session: Session,
     *,
