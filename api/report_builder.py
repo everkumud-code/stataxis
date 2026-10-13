@@ -96,15 +96,16 @@ def _live(session: Session, windows: list, *, feed: str, genre: str | None, lang
             for row in stats["channels"]:
                 if channel_ids and row["channel_id"] not in channel_ids:
                     continue
-                a = acc.setdefault(row["channel_id"], {"name": row["name"], "language": row["language"], "segment": row["segment"], "avg": [], "peaks": []})
+                a = acc.setdefault(row["channel_id"], {"name": row["name"], "language": row["language"], "segment": row["segment"], "avg": [], "peaks": [], "watch": []})
                 stat = row["feeds"][feed]
                 if stat["average"] is not None:
                     a["avg"].append(stat["average"])
                     a["peaks"].append(stat["peak"])
+                    a["watch"].append(row["watch_hours"][feed])
         return acc
 
     def rows_of(acc: dict[int, dict[str, Any]]) -> list[dict[str, Any]]:
-        rows = [{"channel_id": cid, "name": a["name"], "language": a["language"], "segment": a["segment"], "average": rnd(mean(a["avg"]), 0), "peak": max(a["peaks"]), "days_seen": len(a["avg"])}
+        rows = [{"channel_id": cid, "name": a["name"], "language": a["language"], "segment": a["segment"], "average": rnd(mean(a["avg"]), 0), "peak": max(a["peaks"]), "watch_hours": round(sum(a["watch"]), 1), "days_seen": len(a["avg"])}
                 for cid, a in acc.items() if a["avg"]]
         rows.sort(key=lambda r: r["average"], reverse=True)
         total = sum(r["average"] for r in rows) or 0

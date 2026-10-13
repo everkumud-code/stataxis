@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -35,6 +35,16 @@ def _describe_skipped(skipped: dict[str, str], names: dict[str, str] | None = No
     return ", ".join(
         f"{names.get(channel_id, channel_id)} [{channel_id}: {reason}]" for channel_id, reason in sorted(skipped.items())
     )[:1500]
+
+
+def close_interrupted_runs(session: Session, *, older_than_minutes: int = 45) -> int:
+    """A deploy or restart in the middle of a pass leaves its run marked 'running' for ever. Close those (only ones that began a while ago) so the history says what happened."""
+    cutoff = datetime.now(UTC) - timedelta(minutes=older_than_minutes)
+    stale = session.query(CollectionRun).filter(CollectionRun.status == "running", CollectionRun.started_at < cutoff).all()
+    for run in stale:
+        run.status, run.finished_at, run.error_message = "failed", datetime.now(UTC), "interrupted by a restart"
+    session.commit()
+    return len(stale)
 
 
 def run_collection_pass(

@@ -28,7 +28,8 @@ def _q(**params: Any) -> str:
 
 def quick_round() -> list[tuple[str, str]]:
     """The windows that move every minute."""
-    return [("/api/v1/markets/report", _q(period=period, language=lang, stream_scope="all", limit=200)) for period in ("1h", "3h", "6h", "today") for lang in LANGUAGES]
+    calls = [("/api/v1/markets/report", _q(period=period, language=lang, stream_scope="all", limit=200)) for period in ("1h", "3h", "6h", "today") for lang in LANGUAGES]
+    return calls + [("/api/v1/lab/spikes", "hours=6"), ("/api/v1/lab/movement", "minutes=30")]
 
 
 def slow_round() -> list[tuple[str, str]]:
@@ -38,7 +39,7 @@ def slow_round() -> list[tuple[str, str]]:
     week = _q(**{"from": (yesterday - timedelta(days=6)).isoformat(), "to": yesterday.isoformat()})
     calls: list[tuple[str, str]] = [("/api/v1/markets/report", _q(period="7d", language=lang, stream_scope="all", limit=200)) for lang in LANGUAGES]
     calls += [("/api/v1/markets/report", _q(period=p, stream_scope="all", limit=200)) for p in ("3w", "month")]
-    calls += [("/api/v1/operations/readiness", ""), ("/api/v1/markets/topics", "")]
+    calls += [("/api/v1/operations/readiness", ""), ("/api/v1/markets/topics", ""), ("/api/v1/lab/completeness", "days=3")]
     calls += [("/api/v1/insights/what-changed", f"hours={h}") for h in (24, 72, 168)]
     calls += [("/api/v1/market/weekly", week), ("/api/v1/market/prime-time", week), ("/api/v1/market/authenticity", "days=7"), ("/api/v1/market/creator-index", "days=30")]
     calls += [("/api/v1/market/briefing", _q(persona=persona, days=7, language=lang)) for persona in PERSONAS for lang in LANGUAGES]

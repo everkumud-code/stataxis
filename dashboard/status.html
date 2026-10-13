@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="StatAxis status: is the measurement running, how fresh it is, and how much of the time it has been running.">
+<title>Status — StatAxis</title><link rel="icon" href="assets/stataxis-favicon.svg"><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="tech.css">
+<style>.legal{max-width:900px;margin:auto;padding:48px 24px 80px}.legal-card{background:var(--sx-card);border:1px solid var(--sx-line);border-radius:18px;padding:34px}.legal h1{font-size:clamp(38px,6vw,58px);margin:10px 0 12px}.legal h2{font-size:22px;margin:30px 0 10px;color:var(--sx-ink)}.legal p,.legal li{color:var(--sx-muted)}
+.big{display:flex;align-items:center;gap:14px;font-size:26px;font-weight:800;margin:18px 0}.dot{width:16px;height:16px;border-radius:50%;background:#7f9ab2;flex:none}.dot.operational{background:#35d399;box-shadow:0 0 0 6px #35d39933}.dot.delayed,.dot.degraded{background:#f2a93b;box-shadow:0 0 0 6px #f2a93b33}.dot.down{background:#ff7180;box-shadow:0 0 0 6px #ff718033}
+.row{display:flex;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid var(--sx-line)}.row b{color:var(--sx-ink)}.row span{color:var(--sx-muted);text-align:right}.nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:10px}.num{border:1px solid var(--sx-line);border-radius:12px;padding:14px}.num b{display:block;font-size:26px;color:var(--sx-ink)}.num span{color:var(--sx-muted);font-size:13px}</style>
+</head>
+<body class="sx-site"><div id="nav"></div>
+<main class="legal"><section class="legal-card">
+<span class="sx-kicker">STATAXIS · STATUS</span><h1>Status</h1>
+<div class="big"><span class="dot" id="dot"></span><span id="overall">Checking…</span></div>
+<div id="components"></div>
+<h2>Right now</h2>
+<div class="nums"><div class="num"><b id="n-channels">–</b><span>channels measured</span></div><div class="num"><b id="n-live">–</b><span>live now</span></div><div class="num"><b id="n-readings">–</b><span>readings stored</span></div></div>
+<h2>Measurement availability</h2>
+<div id="avail"></div>
+<p id="note" style="margin-top:14px"></p>
+<p class="meta" id="stamp"></p>
+</section></main><div id="footer"></div>
+<script>
+const LABEL = {operational: "Operational", delayed: "Delayed", degraded: "Degraded", down: "Down"};
+const num = n => Number(n).toLocaleString("en-IN");
+const ist = iso => new Date(iso).toLocaleString("en-IN", {dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata"}) + " IST";
+async function load() {
+  try {
+    const d = await (await fetch("/api/v1/public/status")).json();
+    document.getElementById("dot").className = "dot " + d.status;
+    document.getElementById("overall").textContent = d.status === "operational" ? "All systems operational" : d.status === "degraded" ? "Running with delays" : "Measurement is down";
+    document.getElementById("components").innerHTML = d.components.map(c => `<div class="row"><b>${c.name}</b><span>${LABEL[c.status] || c.status} · ${c.detail}</span></div>`).join("");
+    document.getElementById("n-channels").textContent = num(d.channels_measured); document.getElementById("n-live").textContent = num(d.channels_live_now); document.getElementById("n-readings").textContent = num(d.readings_stored);
+    document.getElementById("avail").innerHTML = d.measurement_availability.map(a => `<div class="row"><b>Last ${a.hours >= 24 ? (a.hours / 24) + (a.hours === 24 ? " day" : " days") : a.hours + " hours"}</b><span>${a.percent == null ? "no data yet" : a.percent + "%"}${a.covers_hours < a.hours ? " (since recording began, " + a.covers_hours + " hours)" : ""}</span></div>`).join("");
+    document.getElementById("note").textContent = d.uptime_note;
+    document.getElementById("stamp").textContent = "Updated " + ist(d.generated_at) + ". This page refreshes every minute.";
+  } catch (e) { document.getElementById("overall").textContent = "The status could not be loaded."; }
+}
+load(); setInterval(load, 60000);
+</script><script src="site.js"></script></body></html>

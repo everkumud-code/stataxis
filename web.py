@@ -20,6 +20,7 @@ from api.evaluate_http import evaluate_application
 from api.http import wsgi_application
 from api.insight_extensions import insight_application
 from api.live_http import live_application
+from api.lab_http import lab_application
 from api.market_http import market_application
 from api.my_channels_http import my_channels_application
 from api.public_http import public_application
@@ -74,7 +75,7 @@ def _make_routes(session_factory: Callable[[], Session]) -> dict[str, Callable[.
         "api": gated(protect_application(wsgi_application(session_factory))), "auth": auth_application(session_factory), "evaluate": gated(evaluate_application(session_factory)),
         "live": gated(live_application(session_factory)), "admin": gated(admin_application(session_factory)), "insight": gated(protect_application(insight_application(session_factory))),
         "market": gated(market_application(session_factory)), "my": gated(my_channels_application(session_factory)), "public": public_application(session_factory),
-        "me": gated(me_application(session_factory)),
+        "me": gated(me_application(session_factory)), "lab": gated(lab_application(session_factory)),
     }
 
 
@@ -104,6 +105,8 @@ def _dispatch_api(routes: dict[str, Callable[..., Any]], environ: dict[str, Any]
         return routes["public"](environ, lambda status, headers, *args: _start_response(start_response, status, headers))
     if path == "/api/v1/me" or path.startswith("/api/v1/me/"):
         return routes["me"](environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
+    if path.startswith("/api/v1/lab/"):
+        return routes["lab"](environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
     if path.startswith("/api/v1/my/"):
         return routes["my"](environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
     if path.startswith("/api/v1/market/"):

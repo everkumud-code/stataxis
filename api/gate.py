@@ -12,9 +12,13 @@ from typing import Any, Callable
 
 from api import feature_access
 from api.auth_service import authenticate
+from api.rate_limit import limiter
 from collector.storage import User
 
+import os
+
 EXEMPT_UNTIL_PASSWORD_CHANGED = {("GET", "/api/v1/me")}
+API_PER_MINUTE = int(os.getenv("STAXIS_API_PER_MINUTE", "600") or 600)
 ADMIN_ONLY_PREFIXES: tuple[str, ...] = ()
 FEATURE_RULES = (("/api/v1/operations/", ["operations", "integrity"]), ("/api/v1/evaluate/", ["evaluate"]), ("/api/v1/audience/live", ["live"]), ("/api/v1/reports/export", ["data_export"]),
                  ("/api/v1/insights/", ["overview", "changed", "research", "dashboard"]))   # these screens share one source: any of them is enough
@@ -41,6 +45,9 @@ def gate_application(session_factory: Callable[[], Any], downstream: Callable[..
             if user is None or not user.active:
                 # a valid signature is not enough: the account must exist and be switched on today (a removed or switched-off person, or a token made for another database, is refused)
                 return _json(start_response, "401 Unauthorized", {"error": "authentication required"})
+            retry = limiter.check(f"api:{user.id}", API_PER_MINUTE, 60)   # one person cannot take the server for everyone: about ten calls a second is far more than any screen needs
+            if retry:
+                return _json(start_response, "429 Too Many Requests", {"error": "too many requests; wait a moment", "retry_after_seconds": retry})
             if user.must_change_password and (method, path) not in EXEMPT_UNTIL_PASSWORD_CHANGED:
                 return _json(start_response, "403 Forbidden", {"error": "choose your own password first", "code": "password_change_required"})
             if path.startswith(ADMIN_ONLY_PREFIXES) and not user.is_admin:

@@ -16,11 +16,13 @@ from sqlalchemy import func
 from api import feature_access
 from api.live_stats import FRESHNESS_SECONDS
 from api.market_common import now_utc, utc
+from api.methodology import methodology
+from api.status import status_snapshot
 from api.package_config import _payload as package_payload
 from api.rate_limit import client_ip, limiter
 from collector.storage import Channel, Observation, PackageConfig
 
-_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_CACHE: dict[tuple[int, str], tuple[float, dict[str, Any]]] = {}
 CACHE_SECONDS = 60
 
 
@@ -54,20 +56,28 @@ def public_application(session_factory: Callable[[], Any]):
         path, method = environ.get("PATH_INFO", ""), environ.get("REQUEST_METHOD", "GET")
         if method != "GET":
             return _json(start_response, 405, {"error": "method not allowed"})
-        if path not in {"/api/v1/public/pulse", "/api/v1/public/packages"}:
+        if path not in {"/api/v1/public/pulse", "/api/v1/public/packages", "/api/v1/public/status", "/api/v1/public/methodology"}:
             return _json(start_response, 404, {"error": "not found"})
         retry = limiter.check(f"public:{client_ip(environ)}", 90, 60)
         if retry:
             return _json(start_response, 429, {"error": "too many requests"}, retry)
-        hit = _CACHE.get(path)
+        key = (id(session_factory), path)   # the real site and the public demo each have their own answers
+        hit = _CACHE.get(key)
         if hit and time.monotonic() - hit[0] < CACHE_SECONDS:
             return _json(start_response, 200, hit[1])
         session = session_factory()
         try:
-            data = pulse(session) if path.endswith("/pulse") else packages(session)
+            if path.endswith("/pulse"):
+                data = pulse(session)
+            elif path.endswith("/status"):
+                data = status_snapshot(session)
+            elif path.endswith("/methodology"):
+                data = methodology()
+            else:
+                data = packages(session)
         finally:
             session.close()
-        _CACHE[path] = (time.monotonic(), data)
+        _CACHE[key] = (time.monotonic(), data)
         return _json(start_response, 200, data)
 
     return application

@@ -308,6 +308,9 @@ def run_service(
         from collector.warmer import warm_forever
 
         Thread(target=warm_forever, args=(engine, stop), name="warm-up-loop", daemon=True).start()   # the heavy screens' answers, ready before anyone asks
+        from collector.jobs import run_jobs
+
+        Thread(target=run_jobs, args=(engine, stop), name="scheduled-jobs", daemon=True).start()   # alerts, notes, forecasts, housekeeping
         try:
             _live_loop(engine, live_client, stop, live_poll_seconds, secrets)
         finally:

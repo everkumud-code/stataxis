@@ -230,7 +230,7 @@
         const d = await api("/api/v1/market/report", {...v, by_genre: v.by_genre ? 1 : "", known_only: v.known_only ? 1 : ""});
         const live = d.kind === "audience";
         out.innerHTML = `<section class="card" style="margin-top:14px"><h2>${esc(d.scope_label)}${d.feed ? " · " + esc(d.feed) + " feeds" : ""} · ${String(d.start_hour).padStart(2, "0")}:00–${String(d.end_hour).padStart(2, "0")}:00 IST</h2><p class="muted">${esc(fdate(d.from))} – ${esc(fdate(d.to))} · genre: ${esc(d.genre || "all")}</p>${
-          d.rows.length ? table(live ? [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, {h: "Average viewers", n: 1, v: r => whole(r.average)}, {h: "Peak", n: 1, v: r => whole(r.peak)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}, {h: "Days seen", n: 1, v: r => r.days_seen}]
+          d.rows.length ? table(live ? [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, {h: "Average viewers", n: 1, v: r => whole(r.average)}, {h: "Peak", n: 1, v: r => whole(r.peak)}, {h: "Hours watched", n: 1, v: r => whole(r.watch_hours)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}, {h: "Days seen", n: 1, v: r => r.days_seen}]
             : [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, {h: "Views gained", n: 1, v: r => whole(r.views)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}, {h: "Videos", n: 1, v: r => r.videos}, {h: "New uploads", n: 1, v: r => r.uploads}], d.rows)
           : `<p class="muted">Nothing was measured in these hours with these filters. Nothing is estimated.</p>`}</section>${(d.by_genre || []).map(g => `<section class="card" style="margin-top:14px"><h2>Genre: ${esc(g.genre)}</h2>${table([{h: "#", v: r => r.rank}, {h: "Channel", v: r => r.name}, {h: live ? "Average" : "Views gained", n: 1, v: r => whole(live ? r.average : r.views)}], g.rows.slice(0, 5))}</section>`).join("")}
           ${!live ? `<p class="muted" style="margin-top:8px">Coverage: ${whole(d.coverage.videos_measured_at_both_ends)} of ${whole(d.coverage.videos_matching)} matching videos measured at both ends of the hours.</p>` : ""}${method(d.method)}`;
@@ -664,6 +664,102 @@
     };
     $("#qf", el).onsubmit = ev => { ev.preventDefault(); run(); }; run();
   }, {admin: 1});
+
+  /* ---------- spikes and audience movement ---------- */
+  add("spikes", "Market tools", "Spikes and movement", async el => {
+    const f = SP.spikes || {hours: "6", minutes: "30", language: ""};
+    el.innerHTML = head("Spikes and movement", "Sudden rises in a channel's live audience with the stream that carried each one, and who gained while who lost in the same minutes.") +
+      `<form class="card" id="spf" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin:12px 0">
+        <label>Spikes in the last<br><select name="hours">${opt([["1", "1 hour"], ["3", "3 hours"], ["6", "6 hours"], ["12", "12 hours"], ["24", "24 hours"]], f.hours)}</select></label>
+        <label>Movement over<br><select name="minutes">${opt([["15", "15 minutes"], ["30", "30 minutes"], ["60", "1 hour"], ["120", "2 hours"]], f.minutes)}</select></label>
+        <label>Language<br><select name="language">${opt(LANGS, f.language)}</select></label><button class="btn primary" type="submit">Show</button></form><div id="spout"></div>`;
+    const run = async () => {
+      const v = formValues($("#spf", el)); keep("spikes", v); const out = $("#spout", el); out.innerHTML = `<p class="muted">Working it out…</p>`;
+      try {
+        const [sp, mv] = await Promise.all([api("/api/v1/lab/spikes", {hours: v.hours, language: v.language}), api("/api/v1/lab/movement", {minutes: v.minutes, language: v.language})]);
+        const lead = r => r.lead_stream ? `<strong>${esc(r.lead_stream.title || r.lead_stream.video_id)}</strong>${r.lead_stream.was_new ? ' <span class="tag green">new stream</span>' : ""}` : "—";
+        out.innerHTML = `<section class="card"><h2>Spikes in the last ${esc(sp.hours)} hours</h2>` + (sp.spikes.length ? table([
+          {h: "Channel", html: 1, v: r => `<strong>${esc(r.channel)}</strong>`}, {h: "Started (IST)", v: r => r.started_ist}, {h: "Before", n: 1, v: r => whole(r.before)}, {h: "Peak", n: 1, v: r => whole(r.peak)},
+          {h: "Rise", n: 1, v: r => whole(r.rise)}, {h: "Stream that carried it", html: 1, v: lead}, {h: "Share of the rise", n: 1, v: r => r.lead_stream && r.lead_stream.share_of_rise_percent != null ? r.lead_stream.share_of_rise_percent + "%" : "—"}], sp.spikes)
+          : `<p class="muted">No channel rose suddenly in these hours.</p>`) + `<p class="muted" style="margin-top:8px">${esc(sp.rule)} ${esc(sp.note)}</p></section>
+          <div class="grid kpis" style="margin-top:14px">${kpi("Gained", whole(mv.gained_total), "viewers, channels that rose")}${kpi("Lost", whole(mv.lost_total), "viewers, channels that fell")}${kpi("Matched shift", whole(mv.matched_shift), "the part of both that lines up", "gold")}</div>
+          <section class="card" style="margin-top:14px"><h2>Who gained and who lost in the last ${esc(mv.minutes)} minutes</h2>` + table([
+          {h: "Channel", html: 1, v: r => `<strong>${esc(r.channel)}</strong>`}, {h: "Before", n: 1, v: r => whole(r.before)}, {h: "Now", n: 1, v: r => whole(r.after)}, {h: "Change", n: 1, v: r => (r.change > 0 ? "+" : "") + whole(r.change)}, {h: "Change %", n: 1, v: r => r.change_percent == null ? "—" : (r.change_percent > 0 ? "+" : "") + r.change_percent + "%"}],
+          [...mv.channels.slice(0, 8), ...mv.channels.slice(-8).filter(r => r.change < 0)].filter((r, i, a) => a.findIndex(x => x.channel_id === r.channel_id) === i), "Nothing is live.") + `</section>
+          <section class="card" style="margin-top:14px"><h2>Where the attention moved</h2>` + (mv.shifts.length ? table([{h: "From", v: r => r.from}, {h: "To", v: r => r.to}, {h: "Viewers", n: 1, v: r => whole(r.viewers)}], mv.shifts) : `<p class="muted">No matched shift between channels in this window.</p>`) +
+          `<p class="muted" style="margin-top:8px">${esc(mv.note)}</p></section>`;
+      } catch (e) { out.innerHTML = fail(e); wireUpgrade(out); }
+    };
+    $("#spf", el).onsubmit = ev => { ev.preventDefault(); run(); }; run();
+  });
+
+  /* ---------- forecasts with their track record ---------- */
+  add("forecasts", "Market tools", "Forecasts", async el => {
+    el.innerHTML = head("Forecasts", "What StatAxis expected each channel's prime-time audience to be, written down before the slot, and how close it turned out to be.") + `<div id="fcout"><p class="muted">Loading…</p></div>`;
+    try {
+      const d = await api("/api/v1/lab/forecasts"), t = d.track_record;
+      const mark = r => r.hit == null ? "—" : r.hit ? '<span class="tag green">hit</span>' : '<span class="tag red">miss</span>';
+      $("#fcout", el).innerHTML = `<div class="grid kpis">${kpi("Hit rate", t.hit_rate_percent == null ? "—" : t.hit_rate_percent + "%", t.scored ? `${t.hits} of ${t.scored} forecasts within 20%` : "No forecast has been scored yet", "gold")}${kpi("Typical miss", t.median_error_percent == null ? "—" : t.median_error_percent + "%", "median size of the error")}${kpi("Forecasts written", whole(d.total_written), "since they began")}</div>
+        <section class="card" style="margin-top:14px"><h2>Expected today, ${esc(d.slot)} IST</h2>${table([{h: "Channel", html: 1, v: r => `<strong>${esc(r.channel)}</strong>`}, {h: "Date", v: r => r.date}, {h: "Expected average viewers", n: 1, v: r => whole(r.predicted)}, {h: "Earlier days used", n: 1, v: r => r.days_used}], d.upcoming, "Forecasts for the next slot are written at 06:00 IST.")}</section>
+        <section class="card" style="margin-top:14px"><h2>How earlier forecasts turned out</h2>${table([{h: "Channel", html: 1, v: r => `<strong>${esc(r.channel)}</strong>`}, {h: "Date", v: r => r.date}, {h: "Expected", n: 1, v: r => whole(r.predicted)}, {h: "Measured", n: 1, v: r => whole(r.actual)},
+          {h: "Error", n: 1, v: r => r.error_percent == null ? "—" : (r.error_percent > 0 ? "+" : "") + r.error_percent + "%"}, {h: "", html: 1, v: mark}], d.recent, "No forecast has been scored yet: the first ones are scored when their slot is over.")}</section>
+        <p class="muted" style="margin-top:10px">${esc(d.method)}</p>`;
+    } catch (e) { $("#fcout", el).innerHTML = fail(e); wireUpgrade($("#fcout", el)); }
+  });
+
+  /* ---------- daily and weekly notes ---------- */
+  add("notes", "Market tools", "Notes", async el => {
+    el.innerHTML = head("Notes", "A dated note on what the data said, written each day and each week from the stored measurements.") + `<div id="ntout"><p class="muted">Loading…</p></div>`;
+    try {
+      const d = await api("/api/v1/lab/notes");
+      $("#ntout", el).innerHTML = d.notes.length ? d.notes.map(n => `<section class="card" style="margin-top:14px"><h2>${esc(n.title)}</h2>
+        ${(n.findings || []).map(f => `<div style="margin:10px 0"><strong>${esc(f.headline)}</strong><p class="muted">${esc(f.detail)}</p>${f.so_what ? `<p><span class="tag">For you</span> ${esc(f.so_what)}</p>` : ""}</div>`).join("")}
+        <p class="muted">${esc(n.how || "")}</p></section>`).join("") : state("No note yet", "The first note is written at 09:00 IST, once there is enough measured data to say something.");
+    } catch (e) { $("#ntout", el).innerHTML = fail(e); wireUpgrade($("#ntout", el)); }
+  });
+
+  /* ---------- alerts ---------- */
+  add("alerts", "Market tools", "Alerts", async el => {
+    el.innerHTML = head("Alerts", "Pick a channel and a rule. When it is met, it shows here.") + `<div id="alout"><p class="muted">Loading…</p></div>`;
+    const draw = async d => {
+      const out = $("#alout", el);
+      out.innerHTML = `<form class="card" id="alf" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin:12px 0">
+          <label>Channel<br><select name="channel_id">${channels.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("")}</select></label>
+          <label>Rule<br><select name="kind">${Object.entries(d.kinds).map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join("")}</select></label>
+          <label>Number<br><input type="number" name="threshold" min="1" step="any" value="10000" required style="width:130px"></label>
+          <label>Over (minutes)<br><select name="window_minutes">${opt([["10", "10"], ["30", "30"], ["60", "60"]], "10")}</select></label>
+          <button class="btn primary" type="submit">Add alert</button></form><div id="almsg" class="msg" hidden></div>
+        <section class="card"><h2>What fired${d.unseen ? ` · ${d.unseen} new` : ""}</h2>${d.events.length ? d.events.map(e => `<p style="margin:8px 0">${e.seen ? "" : '<span class="tag green">new</span> '}<strong>${esc(when(e.fired_at))}</strong> · ${esc(e.message)}</p>`).join("") : '<p class="muted">Nothing has fired yet.</p>'}</section>
+        <section class="card" style="margin-top:14px"><h2>Your alerts (${d.alerts.length} of ${d.max})</h2>${table([{h: "Channel", html: 1, v: r => `<strong>${esc(r.channel)}</strong>`}, {h: "Rule", v: r => r.kind_label + " " + whole(r.threshold) + (r.kind.endsWith("percent") ? "% in " + r.window_minutes + " min" : "")},
+          {h: "On", html: 1, v: r => r.active ? '<span class="tag green">on</span>' : '<span class="tag">off</span>'}, {h: "Last fired", v: r => r.last_fired_at ? when(r.last_fired_at) : "never"},
+          {h: "", html: 1, v: r => `<div class="btnrow"><button class="btn" type="button" data-tg="${esc(r.id)}" data-to="${r.active ? 0 : 1}">${r.active ? "Switch off" : "Switch on"}</button><button class="btn" type="button" data-del="${esc(r.id)}">Delete</button></div>`}], d.alerts, "No alerts yet.")}</section>
+        <p class="muted" style="margin-top:10px">${esc(d.delivery)}</p>`;
+      const say = (t, ok) => { const m = $("#almsg", el); m.hidden = !t; m.className = "msg " + (ok ? "ok" : "bad"); m.textContent = t || ""; };
+      $("#alf", el).onsubmit = async ev => { ev.preventDefault(); const v = formValues(ev.target); try { draw(await post("/api/v1/lab/alerts/create", {channel_id: +v.channel_id, kind: v.kind, threshold: +v.threshold, window_minutes: +v.window_minutes})); } catch (e) { say(e.message); } };
+      out.querySelectorAll("[data-tg]").forEach(b => b.onclick = async () => draw(await post("/api/v1/lab/alerts/toggle", {alert_id: +b.dataset.tg, active: b.dataset.to === "1"})));
+      out.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { if (confirm("Delete this alert?")) draw(await post("/api/v1/lab/alerts/delete", {alert_id: +b.dataset.del})); });
+      if (d.unseen) post("/api/v1/lab/alerts/seen", {}).catch(() => {});
+    };
+    try { draw(await post("/api/v1/lab/alerts/list", {})); } catch (e) { $("#alout", el).innerHTML = fail(e); wireUpgrade($("#alout", el)); }
+  });
+
+  /* ---------- how complete the record is ---------- */
+  add("completeness", "Market tools", "Data completeness", async el => {
+    const f = SP.completeness || {days: "3", only: ""};
+    el.innerHTML = head("Data completeness", "For each channel and each day, how many of the live readings that should be there are there.") +
+      `<form class="card" id="cpf" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin:12px 0"><label>Days<br><select name="days">${opt([["1", "Today"], ["3", "3 days"], ["7", "7 days"]], f.days)}</select></label>
+        <label>Show<br><select name="only">${opt([["", "Every channel"], ["gaps", "Only days with gaps"]], f.only)}</select></label><button class="btn primary" type="submit">Show</button></form><div id="cpout"></div>`;
+    const run = async () => {
+      const v = formValues($("#cpf", el)); keep("completeness", v); const out = $("#cpout", el); out.innerHTML = `<p class="muted">Working it out…</p>`;
+      try {
+        const d = await api("/api/v1/lab/completeness", {days: v.days}), rows = d.rows.filter(r => !v.only || (r.completeness_percent != null && r.completeness_percent < 99.5)).sort((a, b) => a.day < b.day ? 1 : a.day > b.day ? -1 : (a.completeness_percent ?? 100) - (b.completeness_percent ?? 100));
+        out.innerHTML = `<div class="grid kpis">${d.by_day.slice(0, 3).map(x => kpi(x.day, x.average_percent + "%", `${x.channels} channels · lowest ${x.lowest_percent}%`, x.average_percent >= 98 ? "gold" : "")).join("")}</div>
+          <section class="card" style="margin-top:14px"><h2>Channel by day</h2>${table([{h: "Day", v: r => r.day}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.channel)}</strong>`}, {h: "Streams", n: 1, v: r => r.streams}, {h: "Readings", n: 1, v: r => whole(r.readings)}, {h: "Expected", n: 1, v: r => whole(r.expected)},
+            {h: "Hours live", n: 1, v: r => dec(r.hours_live)}, {h: "Complete", n: 1, v: r => r.completeness_percent == null ? "—" : r.completeness_percent + "%"}], rows, "No gaps found.")}<p class="muted" style="margin-top:8px">${esc(d.method)}</p></section>`;
+      } catch (e) { out.innerHTML = fail(e); wireUpgrade(out); }
+    };
+    $("#cpf", el).onsubmit = ev => { ev.preventDefault(); run(); }; run();
+  });
 
   /* the briefing is the first thing in the menu and where a person lands */
   const firstView = VIEWS.briefing; delete VIEWS.briefing;

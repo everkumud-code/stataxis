@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, create_engine, event, inspect, text
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from collector.topics import assign_topic
@@ -205,6 +205,63 @@ class AppSetting(Base):
     value: Mapped[str] = mapped_column(Text, default="")
     updated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class Alert(Base):
+    """A person's alert on one channel's live audience (api/alerts.py)."""
+    __tablename__ = "stx_alerts"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("stx_users.id"), index=True)
+    channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(24))
+    threshold: Mapped[float] = mapped_column(Float)
+    window_minutes: Mapped[int] = mapped_column(Integer, default=10)
+    cooldown_minutes: Mapped[int] = mapped_column(Integer, default=60)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_fired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class AlertEvent(Base):
+    """One time an alert fired: what the channel's audience was and what it said."""
+    __tablename__ = "stx_alert_events"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    alert_id: Mapped[int] = mapped_column(ForeignKey("stx_alerts.id"), index=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
+    channel_id: Mapped[int] = mapped_column(Integer)
+    fired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
+    value: Mapped[float] = mapped_column(Float)
+    message: Mapped[str] = mapped_column(Text, default="")
+    seen: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Prediction(Base):
+    """What StatAxis expected a channel's prime-time audience to be, written down before the slot, and later scored against what was measured (api/forecasts.py)."""
+    __tablename__ = "stx_predictions"
+    __table_args__ = (UniqueConstraint("target_date", "slot", "channel_id", name="uq_stx_prediction"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    made_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    target_date: Mapped[str] = mapped_column(String(10), index=True)
+    slot: Mapped[str] = mapped_column(String(11))
+    channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
+    predicted: Mapped[float] = mapped_column(Float)
+    days_used: Mapped[int] = mapped_column(Integer, default=0)
+    actual: Mapped[float | None] = mapped_column(Float, nullable=True)
+    error_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
+    hit: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    scored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Note(Base):
+    """A daily or weekly note written by the findings engine on a schedule (api/notes.py)."""
+    __tablename__ = "stx_notes"
+    __table_args__ = (UniqueConstraint("kind", "for_date", name="uq_stx_note"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(12))
+    for_date: Mapped[str] = mapped_column(String(10), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    body_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
 class Snapshot(Base):

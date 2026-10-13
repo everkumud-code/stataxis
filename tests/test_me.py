@@ -37,7 +37,7 @@ def world():
 def test_a_new_free_login_sees_the_basics_only_and_the_package_decides_the_rest(world):
     s, _, u = world
     free = me.nav_views(s, u["free"])
-    assert set(free) == {"briefing", "overview", "market", "channel", "stx"}
+    assert set(free) == {"briefing", "overview", "market", "channel", "stx", "notes"}
     idea = set(me.nav_views(s, u["idea"]))
     assert idea > set(free) and {"dashboard", "weekly", "primetime", "builder", "content", "trends", "changed", "evaluate", "stream"} <= idea and not {"planner", "live", "authenticity", "creators", "audience"} & idea
     analyst = set(me.nav_views(s, u["analyst"]))
@@ -62,8 +62,8 @@ def test_the_first_choice_narrows_the_menu_to_what_is_relevant_and_never_adds_wh
     out = me.set_preferences(s, u["analyst"], {"persona": "buyer", "views": ["planner", "creators", "live"], "start_view": "profile"})
     assert out["nav"] == ["live", "creators", "planner"] and out["start_view"] == "profile"
     chosen_but_not_allowed = me.set_preferences(s, u["free"], {"views": ["planner", "authenticity"]})
-    assert chosen_but_not_allowed["nav"] == ["briefing", "overview", "market", "channel", "stx"]     # nothing allowed was chosen: the person sees what they may use, never an empty menu
-    assert me.set_preferences(s, u["free"], {"persona": None, "views": None})["nav"] == ["briefing", "overview", "market", "channel", "stx"]
+    assert chosen_but_not_allowed["nav"] == ["briefing", "overview", "market", "channel", "stx", "notes"]     # nothing allowed was chosen: the person sees what they may use, never an empty menu
+    assert me.set_preferences(s, u["free"], {"persona": None, "views": None})["nav"] == ["briefing", "overview", "market", "channel", "stx", "notes"]
 
 
 @pytest.mark.parametrize("body", [{"persona": "king"}, {"views": ["nope"]}, {"views": "weekly"}, {"languages": ["Klingon"]}, {"segments": ["xyz"]}, {"start_view": "nowhere"}])
@@ -199,7 +199,7 @@ def test_with_packages_off_every_login_sees_every_screen_and_menu_choices_wait(w
     token = login(s, "idea@x.com", "x" * 14)["access_token"]
     assert verify_token(token).plan == "sx_enterprise"                              # the session carries the top package while packages are off
     feature_access.set_packages_enabled(s, True, "boss@x.com")
-    assert set(me.nav_views(s, u["free"])) == {"briefing", "overview", "market", "channel", "stx"}   # and everything is as before when they are back on
+    assert set(me.nav_views(s, u["free"])) == {"briefing", "overview", "market", "channel", "stx", "notes"}   # and everything is as before when they are back on
 
 
 def test_with_packages_off_there_are_no_seat_limits_and_new_logins_get_the_top_package(world):

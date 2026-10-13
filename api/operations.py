@@ -26,7 +26,12 @@ def collection_health(session: Session, *, as_of: datetime | None = None, stale_
     finished_at = _utc(run.finished_at) if run.finished_at else None
     reference_at = finished_at or started_at
     age_minutes = max(0.0, (resolved_as_of - reference_at).total_seconds() / 60)
-    fresh = reference_at <= resolved_as_of and run.status == "success" and age_minutes <= stale_after_minutes
+    judged = run
+    if run.status == "running":   # a pass in progress is not a verdict: freshness is judged by the last pass that ended
+        judged = session.execute(select(CollectionRun).where(CollectionRun.status != "running").order_by(CollectionRun.started_at.desc(), CollectionRun.id.desc()).limit(1)).scalar_one_or_none() or run
+    judged_at = _utc(judged.finished_at or judged.started_at)
+    judged_age = max(0.0, (resolved_as_of - judged_at).total_seconds() / 60)
+    fresh = judged_at <= resolved_as_of and judged.status in ("success", "partial") and judged_age <= stale_after_minutes   # a partial pass (some channel could not be read) still brought in data
     return {"status": run.status, "fresh": fresh, "as_of": resolved_as_of.isoformat(), "latest_run": {"id": run.id, "started_at": started_at.isoformat(), "finished_at": finished_at.isoformat() if finished_at else None, "status": run.status, "channels_attempted": run.channels_attempted, "videos_observed": run.videos_observed, "error_message": run.error_message, "age_minutes": round(age_minutes, 2)}, "stale_after_minutes": stale_after_minutes}
 
 

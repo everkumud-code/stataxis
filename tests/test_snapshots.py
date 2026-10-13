@@ -9,7 +9,7 @@ from collector import warmer
 
 def test_the_warm_up_loop_asks_what_people_ask_most():
     quick, slow = warmer.quick_round(), warmer.slow_round()
-    assert len(quick) == 12 and all(path == "/api/v1/markets/report" for path, _ in quick)                      # 4 short windows x 3 languages
+    assert len(quick) == 14 and sum(1 for path, _ in quick if path == "/api/v1/markets/report") == 12 and ("/api/v1/lab/spikes", "hours=6") in quick      # 4 short windows x 3 languages, and the spikes and the movement
     assert ("/api/v1/markets/report", "period=1h&stream_scope=all&limit=200") in quick                           # an empty language is left out, as the screen leaves it out
     assert ("/api/v1/markets/report", "period=today&language=Hindi&stream_scope=all&limit=200") in quick
     paths = {path for path, _ in slow}

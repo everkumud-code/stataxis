@@ -151,6 +151,11 @@
     planner: "Where to place ad spots on live news, and roughly what each costs, from real audience numbers.",
     authenticity: "Viewing patterns that look unusual, for a person to look at. A pattern is not proof of anything.",
     audience: "Where viewers live and how old they are, shown only where a channel or a study has supplied it.",
+    spikes: "Sudden rises in a channel's live audience, the stream that carried each, and who gained while who lost in the same minutes.",
+    forecasts: "What StatAxis expected each channel's prime-time audience to be, written down before the slot, with how close it turned out to be.",
+    notes: "A dated note on what the data said, written each day and each week.",
+    alerts: "Alerts a person has set on a channel's live audience, and what fired.",
+    completeness: "How many of the live readings that should be in StatAxis's record are there, per channel and day.",
   };
   const plainOf = view => PLAIN[view.id] || (typeof MENU_HINT !== "undefined" && MENU_HINT[view.id]) || "";
   /* the first table that has a column of numbers worth drawing: its first text column labels the bars. Weights and points are the method, not the result, so they are never the bars. */

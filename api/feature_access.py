@@ -28,6 +28,10 @@ FEATURES: dict[str, tuple[str, str]] = {
     "research": ("Research signals: tone and topics in titles", SXPlan.INTELLIGENCE.value),
     "operations": ("Operations: how collection is running", SXPlan.CORPORATE.value),
     "integrity": ("Data integrity checks", SXPlan.CORPORATE.value),
+    "spikes": ("Spikes and audience movement", SXPlan.INTELLIGENCE.value),
+    "forecasts": ("Prime-time forecasts and their track record", SXPlan.ANALYST.value),
+    "notes": ("Daily and weekly notes", SXPlan.FREE.value),
+    "alerts": ("Alerts on channels", SXPlan.IDEA.value),
     "briefing": ("Briefing: findings for your role", SXPlan.FREE.value),
     "weekly": ("Weekly views report", SXPlan.IDEA.value),
     "prime_time": ("Prime-time audience report", SXPlan.IDEA.value),
@@ -40,6 +44,10 @@ FEATURES: dict[str, tuple[str, str]] = {
     "data_export": ("Excel data exports (machine-readable)", SXPlan.ANALYST.value),
 }
 DESCRIPTIONS = {
+    "spikes": "Sudden rises in a channel's live audience with the stream that carried them, and who gained while who lost in the same minutes.",
+    "forecasts": "What StatAxis expected each channel's prime-time audience to be, written down before the slot and scored afterwards, with the hit rate.",
+    "notes": "A dated note on what the data said, written each day and each week by the findings engine.",
+    "alerts": "Alerts on a channel's live audience (a level, a rise or a fall), shown inside StatAxis.",
     "operations": "How collection is running: channels tracked, last pass, readiness.",
     "integrity": "Checks on the stored data: gaps and inconsistencies, with the evidence.",
     "overview": "The state of the market today: who leads, what changed, and where to look next.",

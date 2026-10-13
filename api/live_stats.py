@@ -190,6 +190,7 @@ def live_window_stats(
                 "all": _feed_stats(all_values),
             },
             "peak_at": series[peak_index][0].isoformat(),
+            "watch_hours": {key: round(sum(getattr(split, key) for _, split, _ in series) * bucket_seconds / 3600, 1) for key in ("all", "primary", "secondary")},   # viewer-hours of live viewing observed
             "streams_seen": len(seen),
             "observed_minutes": round(len(series) * bucket_seconds / 60, 1),
             "coverage_percent": round(len(series) / len(grid) * 100, 1),
