@@ -124,8 +124,8 @@ def get_channel_media_intelligence(session: Session, channel_id: int, *, as_of: 
 
 
 def _market_report_fresh(*_args: Any, period: str = "7d", **_kwargs: Any) -> float:
-    """How long a stored market report counts as fresh: the short windows move every minute (the warm-up loop renews them every 100 seconds), the long ones barely do."""
-    return 150.0 if period in ("1h", "3h", "6h", "today") else 600.0
+    """How long a stored market report counts as fresh: the short windows move every minute (the warm-up loop renews them every 150 seconds), the long ones barely do."""
+    return 240.0 if period in ("1h", "3h", "6h", "today") else 600.0
 
 
 @ttl_cache(stale=True, snapshot=_market_report_fresh)

@@ -1,7 +1,7 @@
 """Keeps the heavy screens' answers ready: asks the questions people ask most, over and over, and stores the finished answers (api/ttl_cache.py, table stx_snapshots).
 
 It asks through the real web application (an in-process call, with a token for the administrator account), so what it stores is exactly what a person's screen would have asked for.
-Two rounds: the short windows (last hour, 3 hours, 6 hours, today) every minute, everything else every few minutes. It runs in the collector's container, which has the lower CPU share, so a
+Two rounds: the short windows (last hour, 3 hours, 6 hours, today) and the spikes every 2.5 minutes, everything else every 8 minutes. It runs in the collector's container, which has the lower CPU share, so a
 busy moment on the web screens always comes first. Off unless STAXIS_SNAPSHOT_SECONDS is above zero.
 """
 
@@ -67,7 +67,7 @@ def _token(engine: Any) -> str | None:
         return issue_token(AuthIdentity(admin.id, admin.email, admin.plan, True), ttl_seconds=3600)
 
 
-def warm_forever(engine: Any, stop: Event, *, quick_seconds: int = 100, slow_seconds: int = 420) -> None:
+def warm_forever(engine: Any, stop: Event, *, quick_seconds: int = 150, slow_seconds: int = 480) -> None:
     from api.ttl_cache import FORCE, snapshot_seconds
 
     if snapshot_seconds() <= 0:

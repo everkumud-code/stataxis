@@ -348,3 +348,13 @@ def test_every_new_screen_is_in_the_menu_the_screen_list_and_the_privileges():
     ids = {v[0]: v[2] for v in me.VIEWS}
     for screen, feature in (("spikes", "spikes"), ("forecasts", "forecasts"), ("notes", "notes"), ("alerts", "alerts"), ("completeness", "integrity")):
         assert ids[screen] == feature and feature in feature_access.FEATURES and f'"{screen}"' in ws and f'add("{screen}"' in market
+
+
+def test_a_collection_pass_in_progress_does_not_make_the_status_look_delayed():
+    s, _ = make_session()
+    stream(s, channel(s, "a", "Alpha"), "main", T0, 5, 9000)
+    s.add(CollectionRun(started_at=T0 - timedelta(minutes=30), finished_at=T0 - timedelta(minutes=28), status="success", channels_attempted=84, videos_observed=10))
+    s.add(CollectionRun(started_at=T0 + timedelta(minutes=3), status="running", channels_attempted=84, videos_observed=0))   # the pass that has just begun
+    s.commit()
+    snap = status.status_snapshot(s, now=T0 + timedelta(minutes=5))
+    assert snap["status"] == "operational" and snap["components"][1]["status"] == "operational" and "success" in snap["components"][1]["detail"]

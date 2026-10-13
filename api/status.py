@@ -41,7 +41,7 @@ def status_snapshot(session: Session, *, now: datetime | None = None) -> dict[st
     now = now or datetime.now(UTC)
     last = session.execute(select(func.max(Observation.observed_at))).scalar()
     age = (now - (last if last.tzinfo else last.replace(tzinfo=UTC))).total_seconds() / 60 if last else None
-    run = session.execute(select(CollectionRun).order_by(CollectionRun.started_at.desc()).limit(1)).scalar_one_or_none()
+    run = session.execute(select(CollectionRun).where(CollectionRun.status != "running").order_by(CollectionRun.started_at.desc()).limit(1)).scalar_one_or_none()   # a pass in progress is not a verdict: the last one that ended is
     run_age = None
     if run is not None:
         reference = run.finished_at or run.started_at
