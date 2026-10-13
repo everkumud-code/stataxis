@@ -86,3 +86,16 @@ def test_invalid_parameters_are_rejected():
 
 def test_latest_anomaly_empty_input():
     assert latest_anomaly([]) is None
+
+
+def test_latest_anomaly_equals_the_last_of_all_assessments() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from metrics.anomaly import detect_anomalies, latest_anomaly
+    start = datetime(2026, 10, 1, tzinfo=UTC)
+    values = [100, 102, 99, 101, None, 100, 103, 98, 100, 500, 101, 100, 99, 102, 100, 101, 100]
+    for window in (None, 8):
+        for cut in range(1, len(values) + 1):
+            pts = [(start + timedelta(minutes=i), v) for i, v in enumerate(values[:cut])]
+            assert latest_anomaly(pts, window=window) == detect_anomalies(pts, window=window)[-1]
+    assert latest_anomaly([]) is None

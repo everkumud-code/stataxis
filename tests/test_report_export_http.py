@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import UTC, datetime
 from io import BytesIO
 
@@ -108,10 +109,10 @@ def test_report_export_returns_xlsx_for_premium_plan(monkeypatch):
     assert captured["status"] == "200 OK"
     headers = dict(captured["headers"])
     assert headers["Content-Type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    assert headers["Content-Disposition"] == "attachment; filename=stataxis-report.xlsx"
+    assert re.fullmatch(r"attachment; filename=stataxis-report-downloaded-\d{8}-\d{4}\.xlsx", headers["Content-Disposition"])
     workbook = load_workbook(BytesIO(body), read_only=True)
     assert workbook.sheetnames == ["StatAxis Data", "StatAxis Intelligence", "Notes"]
-    assert workbook["StatAxis Data"].max_row == 2
+    assert len(list(workbook["StatAxis Data"].iter_rows())) == 2   # a header and one reading
 
 
 def test_report_export_rejects_missing_date_range_for_authenticated_request(monkeypatch):

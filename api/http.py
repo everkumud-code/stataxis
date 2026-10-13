@@ -18,9 +18,11 @@ from api.media_intelligence import channel_media_intelligence, market_report
 from api.operations import collection_health, intelligence_readiness
 from api.report import channel_report
 from api.signals import channel_signals
+from api.ttl_cache import ttl_cache
 
 
 
+@ttl_cache(stale=True)
 def get_channel_dashboard_overview(session: Session, channel_id: int) -> tuple[int, dict[str, Any]]:
     if channel_id <= 0:
         return 400, {"error": "channel_id must be a positive integer"}
@@ -28,6 +30,7 @@ def get_channel_dashboard_overview(session: Session, channel_id: int) -> tuple[i
     return (404, {"error": "channel not found"}) if payload is None else (200, payload)
 
 
+@ttl_cache(stale=True)
 def get_channel_stx_trend(session: Session, channel_id: int, days: str) -> tuple[int, dict[str, Any]]:
     if channel_id <= 0:
         return 400, {"error": "channel_id must be a positive integer"}
@@ -57,6 +60,7 @@ def get_video_intelligence(session: Session, video_id: int) -> tuple[int, dict[s
     return 200, payload
 
 
+@ttl_cache(stale=True)
 def get_channel_comparison(session: Session, channel_id: int, *, as_of: datetime | None = None) -> tuple[int, dict[str, Any]]:
     if channel_id <= 0:
         return 400, {"error": "channel_id must be a positive integer"}
@@ -66,6 +70,7 @@ def get_channel_comparison(session: Session, channel_id: int, *, as_of: datetime
     return 200, payload
 
 
+@ttl_cache(stale=True)
 def get_channels_comparison(session: Session, channel_ids: list[int], *, as_of: datetime | None = None) -> tuple[int, dict[str, Any]]:
     if not channel_ids:
         return 400, {"error": "at least one channel_id is required"}
@@ -92,6 +97,7 @@ def get_intelligence_readiness(session: Session, *, as_of: datetime | None = Non
     return 200, payload
 
 
+@ttl_cache(stale=True)
 def get_channel_report(session: Session, channel_id: int, *, as_of: datetime | None = None, series_days: int = 30, signal_hours: int = 24) -> tuple[int, dict[str, Any]]:
     if channel_id <= 0:
         return 400, {"error": "channel_id must be a positive integer"}
@@ -110,6 +116,7 @@ def get_channel_report(session: Session, channel_id: int, *, as_of: datetime | N
     return 200, payload
 
 
+@ttl_cache(stale=True)
 def get_channel_media_intelligence(session: Session, channel_id: int, *, as_of: datetime | None = None, period: str = "7d", stream_scope: str = "all") -> tuple[int, dict[str, Any]]:
     if channel_id <= 0:
         return 400, {"error": "channel_id must be a positive integer"}
@@ -122,6 +129,12 @@ def get_channel_media_intelligence(session: Session, channel_id: int, *, as_of: 
     return 200, payload
 
 
+def _market_report_fresh(*_args: Any, period: str = "7d", **_kwargs: Any) -> float:
+    """How long a stored market report counts as fresh: the short windows move every minute (the warm-up loop renews them every 150 seconds), the long ones barely do."""
+    return 240.0 if period in ("1h", "3h", "6h", "today") else 600.0
+
+
+@ttl_cache(stale=True, snapshot=_market_report_fresh)
 def get_market_report(session: Session, *, as_of: datetime | None = None, period: str = "7d", language: str | None = None, region: str | None = None, market: str | None = None, stream_scope: str = "all", limit: int = 50, segment: str | None = None) -> tuple[int, dict[str, Any]]:
     try:
         payload = market_report(session, as_of=as_of, period=period, language=language, region=region, market=market, segment=segment, stream_scope=stream_scope, limit=limit)
@@ -130,6 +143,7 @@ def get_market_report(session: Session, *, as_of: datetime | None = None, period
     return 200, payload
 
 
+@ttl_cache(stale=True)
 def get_channel_overview(session: Session, channel_id: int) -> tuple[int, dict[str, Any]]:
     if channel_id <= 0:
         return 400, {"error": "channel_id must be a positive integer"}
@@ -139,6 +153,7 @@ def get_channel_overview(session: Session, channel_id: int) -> tuple[int, dict[s
     return 200, payload
 
 
+@ttl_cache(stale=True)
 def get_channel_series(session: Session, channel_id: int, days: int = 30) -> tuple[int, dict[str, Any]]:
     if channel_id <= 0:
         return 400, {"error": "channel_id must be a positive integer"}
@@ -154,6 +169,7 @@ def get_channel_series(session: Session, channel_id: int, days: int = 30) -> tup
     return 200, payload
 
 
+@ttl_cache(stale=True)
 def get_channel_signals(session: Session, channel_id: int, hours: int = 24) -> tuple[int, dict[str, Any]]:
     if channel_id <= 0:
         return 400, {"error": "channel_id must be a positive integer"}
@@ -369,6 +385,12 @@ def _report_response(environ: dict[str, Any], start_response: Callable[..., Any]
         filters = _export_filters_from_query(query)
     except ValueError as exc:
         return _json_response(start_response, 400, {"error": str(exc)})
+    try:
+        from api.feature_access import require_export
+        if plan != "sx_free":
+            require_export(session_factory, user_id=int(environ.get("STATAXIS_USER_ID") or 0) or None, plan=plan, is_admin=environ.get("HTTP_X_STATAXIS_ROLE") == "admin")
+    except PermissionError as exc:
+        return _json_response(start_response, 403, {"error": str(exc)})
     session = session_factory()
     try:
         status, headers, body = export_response(session, plan, filters)

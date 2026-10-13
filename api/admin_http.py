@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 from typing import Any, Callable
 
-from api.admin import add_channel, add_video, deactivate_channel, remove_video, rename_channel, set_channel_language
+from api.admin import add_channel, add_video, deactivate_channel, list_all_channels, remove_video, rename_channel, set_channel_active, set_channel_language, set_channel_segment
 from api.auth_service import authenticate
+from api import audience as audience_mod
+from api import feature_access, my_channels, user_admin
 from api.package_config import list_package_slots, update_package_slot
 from collector.storage import User
 
@@ -36,9 +38,53 @@ def admin_application(session_factory: Callable[[], Any]):
                 if path == "/api/v1/admin/packages/configure":
                     slot = int(body.get("slot"))
                     return _json(start_response, 200, {"package": update_package_slot(session, slot, body)})
+                if path == "/api/v1/admin/audience/set":
+                    return _json(start_response, 200, audience_mod.set_profile(session, channel_id=int(body.get("channel_id")), source=str(body.get("source") or ""), source_note=str(body.get("source_note") or ""),
+                                                                              as_of=str(body.get("as_of") or ""), age=body.get("age"), gender=body.get("gender"), states=body.get("states"),
+                                                                              countries=body.get("countries"), by=identity.email))
+                if path == "/api/v1/admin/audience/remove":
+                    return _json(start_response, 200, audience_mod.remove_profile(session, int(body.get("channel_id"))))
+                if path == "/api/v1/admin/features/list":
+                    return _json(start_response, 200, {"features": feature_access.matrix(session), "plans": feature_access.plans_overview(), "packages_enabled": feature_access.packages_enabled(session)})
+                if path == "/api/v1/admin/features/packages":
+                    if not isinstance(body.get("enabled"), bool): raise ValueError("enabled must be true or false")
+                    return _json(start_response, 200, feature_access.set_packages_enabled(session, body["enabled"], identity.email))
+                if path == "/api/v1/admin/features/set":
+                    return _json(start_response, 200, feature_access.set_min_plan(session, str(body.get("feature") or ""), str(body.get("min_plan") or ""), identity.email))
+                if path == "/api/v1/admin/users/list":
+                    return _json(start_response, 200, {"users": user_admin.list_users(session, q=str(body.get("q") or ""), plan=str(body.get("plan") or ""), status=str(body.get("status") or "")),
+                                                       "plans": feature_access.plans_overview()})
+                if path == "/api/v1/admin/users/features":
+                    target = session.get(User, int(body.get("user_id")))
+                    if target is None: raise LookupError("user not found")
+                    return _json(start_response, 200, {"user": user_admin.payload(target), "features": feature_access.user_matrix(session, target), "plans": feature_access.plans_overview()})
+                if path == "/api/v1/admin/users/features/set":
+                    raw = body.get("allowed")
+                    if raw is not None and not isinstance(raw, bool): raise ValueError("allowed must be true, false or null")
+                    return _json(start_response, 200, {"features": feature_access.set_user_feature(session, int(body.get("user_id")), str(body.get("feature") or ""), raw, identity.email)})
+                if path == "/api/v1/admin/users/plan":
+                    return _json(start_response, 200, user_admin.set_plan(session, int(body.get("user_id")), str(body.get("plan") or "")))
+                if path == "/api/v1/admin/users/active":
+                    return _json(start_response, 200, user_admin.set_active(session, int(body.get("user_id")), bool(body.get("active")), identity.user_id))
+                if path == "/api/v1/admin/users/create":
+                    return _json(start_response, 200, user_admin.create_user(session, email=str(body.get("email") or ""), name=str(body.get("name") or ""), organization=str(body.get("organization") or ""),
+                                                                              mobile=str(body.get("mobile") or ""), plan=str(body.get("plan") or "")))
+                if path == "/api/v1/admin/channel-claims/list":
+                    return _json(start_response, 200, {"claims": my_channels.list_claims(session, str(body.get("status") or "") or None)})
+                if path == "/api/v1/admin/channel-claims/decide":
+                    return _json(start_response, 200, my_channels.decide(session, int(body.get("claim_id")), str(body.get("decision") or ""), by=identity.email, note=str(body.get("note") or ""), track=bool(body.get("track"))))
+                if path == "/api/v1/admin/channel-claims/assign":
+                    return _json(start_response, 200, my_channels.assign(session, int(body.get("user_id")), int(body.get("channel_id")), by=identity.email, track=bool(body.get("track"))))
+                if path == "/api/v1/admin/channel-claims/remove":
+                    return _json(start_response, 200, my_channels.admin_remove(session, int(body.get("claim_id"))))
+                if path == "/api/v1/admin/users/rename-login":
+                    return _json(start_response, 200, user_admin.rename_login(session, int(body.get("user_id")), str(body.get("login_id") or "")))
+                if path == "/api/v1/admin/users/reset-password":
+                    return _json(start_response, 200, user_admin.reset_password(session, int(body.get("user_id"))))
                 if path == "/api/v1/admin/users/approve":
                     user_id = int(body.get("user_id")); user = session.query(User).filter_by(id=user_id).one_or_none()
                     if user is None: raise LookupError("user not found")
+                    user_admin.check_seat(session, user.organization, user.requested_plan or user.plan, exclude_user_id=user.id)
                     user.approval_status = "approved"; user.active = True
                     if user.requested_plan: user.plan = user.requested_plan
                     session.commit()
@@ -52,7 +98,14 @@ def admin_application(session_factory: Callable[[], Any]):
                     users = session.query(User).filter_by(approval_status="pending").order_by(User.created_at.asc()).all()
                     return _json(start_response, 200, {"users": [_user_payload(user) for user in users]})
                 if path == "/api/v1/admin/channels":
-                    return _json(start_response, 200, add_channel(session, identity, body.get("url", ""), body.get("display_name", ""), body.get("language", ""), body.get("region", ""), body.get("market", "")))
+                    return _json(start_response, 200, add_channel(session, identity, body.get("url", ""), body.get("display_name", ""), body.get("language", ""), body.get("region", ""), body.get("market", ""), segment=body.get("segment") or None))
+                if path == "/api/v1/admin/channels/segment":
+                    return _json(start_response, 200, set_channel_segment(session, identity, int(body.get("channel_id")), str(body.get("segment") or "")))
+                if path == "/api/v1/admin/channels/all":
+                    return _json(start_response, 200, {"channels": list_all_channels(session, identity)})
+                if path == "/api/v1/admin/channels/active":
+                    if not isinstance(body.get("active"), bool): raise ValueError("active must be true or false")
+                    return _json(start_response, 200, set_channel_active(session, identity, int(body.get("channel_id")), body["active"]))
                 if path == "/api/v1/admin/channels/deactivate":
                     return _json(start_response, 200, deactivate_channel(session, identity, int(body.get("channel_id"))))
                 if path == "/api/v1/admin/channels/rename":

@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from api.ttl_cache import ttl_cache
 from collector.storage import Channel, ChannelStats, Observation, Video
 from metrics.engine import ObservationPoint
 from metrics.pipeline import build_intelligence_snapshot
@@ -261,6 +262,7 @@ def channel_stx_trend(
         "timeline": timeline,
     }
 
+@ttl_cache(stale=True)
 def market_topic_distribution(
     session: Session,
     *,
@@ -279,7 +281,7 @@ def market_topic_distribution(
         select(Channel.id, Channel.name, Video.topic, Observation.video_id, func.max(Observation.observed_at))
         .join(Video, Video.channel_id == Channel.id)
         .join(Observation, Observation.video_id == Video.id)
-        .where(Observation.observed_at >= start, Observation.observed_at <= now, analysis_observation_clause())
+        .where(Observation.observed_at >= start, Observation.observed_at <= now, analysis_observation_clause(), Channel.active.is_(True))
         .group_by(Channel.id, Channel.name, Video.topic, Observation.video_id)
     ).all()
     channels: dict[int, dict[str, Any]] = {}

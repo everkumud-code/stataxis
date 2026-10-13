@@ -74,7 +74,7 @@ def test_login_rejects_wrong_password(tmp_path, monkeypatch):
     monkeypatch.setenv("STAXIS_AUTH_SECRET", "test-secret")
     session = make_session(tmp_path)
     register_test_user(session)
-    with pytest.raises(PermissionError, match="invalid email or password"):
+    with pytest.raises(PermissionError, match="invalid login ID or password"):
         login(session, "test@example.com", "wrong password")
     session.close()
 

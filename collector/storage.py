@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, create_engine, inspect, text
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from collector.topics import assign_topic
@@ -75,14 +75,83 @@ class Observation(Base):
     video_id: Mapped[int] = mapped_column(ForeignKey("stx_videos.id"), index=True)
     channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    view_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    like_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    comment_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    view_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)   # a stream that has been live for years passes 2.1 billion views
+    like_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    comment_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     concurrent_viewers: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_live: Mapped[bool] = mapped_column(Boolean, default=False)
     classification: Mapped[str] = mapped_column(String(32), default="UNKNOWN", index=True)
     source: Mapped[str] = mapped_column(String(50), default="youtube_data_api")
     collector_version: Mapped[str] = mapped_column(String(32), default="0.1.0")
+
+
+class AuthenticityReview(Base):
+    """An admin's decision on one kind of unusual-viewership flag for one channel: cleared, watching or confirmed."""
+    __tablename__ = "stx_authenticity_reviews"
+    __table_args__ = (UniqueConstraint("channel_id", "signal", name="uq_stx_authenticity_review"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
+    signal: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(20))
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class FeatureAccess(Base):
+    """The lowest package that may use a feature (an admin can change it); a feature with no row uses the built-in default."""
+    __tablename__ = "stx_feature_access"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    feature: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    min_plan: Mapped[str] = mapped_column(String(32))
+    updated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class AudienceProfile(Base):
+    """Who a channel's audience is (age, gender, states, countries), with where the figures came from. YouTube does not publish this for other people's channels,
+    so a profile exists only when the channel (or a study) supplied it, and it always says who and when."""
+    __tablename__ = "stx_audience_profiles"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), unique=True, index=True)
+    source: Mapped[str] = mapped_column(String(40))
+    source_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    as_of: Mapped[str] = mapped_column(String(10))
+    age_json: Mapped[str] = mapped_column(Text, default="{}")
+    gender_json: Mapped[str] = mapped_column(Text, default="{}")
+    states_json: Mapped[str] = mapped_column(Text, default="{}")
+    countries_json: Mapped[str] = mapped_column(Text, default="{}")
+    updated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class UserChannel(Base):
+    """A login's own channel. A claim starts pending; it counts as the person's channel only once approved: either the code the person was given
+    was found in the channel's own description (proof that they control it), or an administrator approved or assigned it."""
+    __tablename__ = "stx_user_channels"
+    __table_args__ = (UniqueConstraint("user_id", "channel_id", name="uq_stx_user_channel"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("stx_users.id"), index=True)
+    channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending | approved | rejected
+    method: Mapped[str | None] = mapped_column(String(16), nullable=True)  # code | admin
+    code: Mapped[str] = mapped_column(String(40))
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class UserFeatureOverride(Base):
+    """A privilege an admin gave to, or took from, one person, whatever their package says."""
+    __tablename__ = "stx_user_feature_overrides"
+    __table_args__ = (UniqueConstraint("user_id", "feature", name="uq_stx_user_feature"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("stx_users.id"), index=True)
+    feature: Mapped[str] = mapped_column(String(40))
+    allowed: Mapped[bool] = mapped_column(Boolean)
+    set_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    set_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
 class CollectionRun(Base):
@@ -111,6 +180,96 @@ class User(Base):
     purpose_of_use: Mapped[str | None] = mapped_column(Text, nullable=True)
     requested_plan: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)  # set for accounts made or reset by an administrator: the first thing they do is choose their own password
+
+
+class UserPref(Base):
+    """What one person chose to see: who they are in the market, which screens they want, their languages and groups, where to land, and a few profile details."""
+    __tablename__ = "stx_user_prefs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("stx_users.id"), unique=True, index=True)
+    persona: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    views_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    languages_json: Mapped[str] = mapped_column(Text, default="[]")
+    segments_json: Mapped[str] = mapped_column(Text, default="[]")
+    start_view: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    job_title: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class AppSetting(Base):
+    """A switch an administrator can turn from the workspace, e.g. whether packages decide what a person may see."""
+    __tablename__ = "stx_settings"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+    updated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class Alert(Base):
+    """A person's alert on one channel's live audience (api/alerts.py)."""
+    __tablename__ = "stx_alerts"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("stx_users.id"), index=True)
+    channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(24))
+    threshold: Mapped[float] = mapped_column(Float)
+    window_minutes: Mapped[int] = mapped_column(Integer, default=10)
+    cooldown_minutes: Mapped[int] = mapped_column(Integer, default=60)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_fired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class AlertEvent(Base):
+    """One time an alert fired: what the channel's audience was and what it said."""
+    __tablename__ = "stx_alert_events"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    alert_id: Mapped[int] = mapped_column(ForeignKey("stx_alerts.id"), index=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
+    channel_id: Mapped[int] = mapped_column(Integer)
+    fired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
+    value: Mapped[float] = mapped_column(Float)
+    message: Mapped[str] = mapped_column(Text, default="")
+    seen: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Prediction(Base):
+    """What StatAxis expected a channel's prime-time audience to be, written down before the slot, and later scored against what was measured (api/forecasts.py)."""
+    __tablename__ = "stx_predictions"
+    __table_args__ = (UniqueConstraint("target_date", "slot", "channel_id", name="uq_stx_prediction"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    made_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    target_date: Mapped[str] = mapped_column(String(10), index=True)
+    slot: Mapped[str] = mapped_column(String(11))
+    channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
+    predicted: Mapped[float] = mapped_column(Float)
+    days_used: Mapped[int] = mapped_column(Integer, default=0)
+    actual: Mapped[float | None] = mapped_column(Float, nullable=True)
+    error_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
+    hit: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    scored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Note(Base):
+    """A daily or weekly note written by the findings engine on a schedule (api/notes.py)."""
+    __tablename__ = "stx_notes"
+    __table_args__ = (UniqueConstraint("kind", "for_date", name="uq_stx_note"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(12))
+    for_date: Mapped[str] = mapped_column(String(10), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    body_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class Snapshot(Base):
+    """A finished answer of a heavy screen (see api/ttl_cache.py): worked out once by the warm-up loop, read by every web process."""
+    __tablename__ = "stx_snapshots"
+    key: Mapped[str] = mapped_column(String(160), primary_key=True)
+    payload: Mapped[str] = mapped_column(Text, default="")
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
 class PackageConfig(Base):
@@ -144,6 +303,16 @@ def _add_column_if_missing(connection, table: str, name: str, definition: str, k
             raise
 
 
+def _widen_observation_counters(connection) -> None:
+    """Databases made before the counters were 64-bit hold them as 32-bit numbers: a channel's year-round live stream (billions of views) could not be stored at all. Widen them once (PostgreSQL; SQLite does not care)."""
+    if connection.dialect.name != "postgresql":
+        return
+    types = {item["name"]: str(item["type"]).upper() for item in inspect(connection).get_columns("stx_observations")}
+    narrow = [name for name in ("view_count", "like_count", "comment_count") if types.get(name) == "INTEGER"]
+    if narrow:
+        connection.execute(text("ALTER TABLE stx_observations " + ", ".join(f"ALTER COLUMN {name} TYPE BIGINT" for name in narrow)))
+
+
 def create_database(url: str):
     if url.startswith(("postgres://", "postgresql://")):
         url = "postgresql+psycopg://" + url.split("://", 1)[1]
@@ -161,6 +330,7 @@ def create_database(url: str):
             "organization": "VARCHAR(255)",
             "purpose_of_use": "TEXT",
             "requested_plan": "VARCHAR(32)",
+            "must_change_password": "BOOLEAN DEFAULT FALSE",
         }
         for name, definition in additions.items():
             _add_column_if_missing(connection, "stx_users", name, definition, columns)
@@ -169,6 +339,7 @@ def create_database(url: str):
         for name, definition in {"avatar_url": "VARCHAR(1000)", "handle": "VARCHAR(255)", "segment": "VARCHAR(32) DEFAULT 'news'"}.items():
             _add_column_if_missing(connection, "stx_channels", name, definition, channel_columns)
         connection.execute(text("UPDATE stx_channels SET segment='news' WHERE segment IS NULL"))
+        _widen_observation_counters(connection)
         video_columns = {item["name"] for item in inspect(connection).get_columns("stx_videos")}
         for name, definition in {"thumbnail_url": "VARCHAR(1000)", "category_id": "VARCHAR(32)", "topic": "VARCHAR(64)", "live_started_at": "TIMESTAMP WITH TIME ZONE", "live_ended_at": "TIMESTAMP WITH TIME ZONE"}.items():
             _add_column_if_missing(connection, "stx_videos", name, definition, video_columns)
@@ -184,10 +355,24 @@ def create_database(url: str):
 
 
 def effective_channel_language(session: Session, channel: Channel, fallback: str = "unknown") -> str:
-    override = session.query(ChannelLanguageOverride).filter_by(channel_id=channel.id).one_or_none()
-    if override is not None:
-        return override.language
+    """A channel's language: the one an administrator set for it, else the one it was registered with.
+
+    The overrides are read once for the whole session and kept in ``session.info``. Reading them again for every video, sample or channel in a loop made the live screens take
+    many seconds (one database call for each of tens of thousands of rows); a change to an override clears the kept copy.
+    """
+    overrides = session.info.get("_language_overrides")
+    if overrides is None:
+        overrides = {row.channel_id: row.language for row in session.query(ChannelLanguageOverride).all()}
+        session.info["_language_overrides"] = overrides
+    if channel.id in overrides:
+        return overrides[channel.id]
     return channel.language or fallback
+
+
+@event.listens_for(Session, "after_flush")
+def _forget_language_overrides(session: Session, _context) -> None:
+    if any(isinstance(item, ChannelLanguageOverride) for item in (*session.new, *session.dirty, *session.deleted)):
+        session.info.pop("_language_overrides", None)
 
 
 def _parse_rfc3339(value: str | None) -> datetime | None:

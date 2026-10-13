@@ -7,11 +7,11 @@ remain missing; no synthetic market data is generated.
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any, Iterable
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy.orm import Session, aliased
 
 from collector.storage import Channel, Observation, Video, effective_channel_language
 from metrics.market_stx import build_market_stx
@@ -48,20 +48,24 @@ def market_report(
     start_at = _period_start(as_of, period)
     previous_end = start_at
     previous_start = _period_start(previous_end, period)
+    if period.lower() == "today":   # today so far, against yesterday over the same stretch of the day (the day before it, whole, would make today look small)
+        previous_start, previous_end = start_at - timedelta(days=1), as_of - timedelta(days=1)
     channels = _eligible_channels(session, language=language, region=region, market=market, segment=segment)
     channel_ids = [channel.id for channel in channels]
 
-    current_rows = _observation_rows(session, channel_ids, start_at, as_of)
     previous_query_end = previous_end - timedelta(microseconds=1)
-    previous_rows = _observation_rows(session, channel_ids, previous_start, previous_query_end)
-    current = _aggregate_by_channel(session, channels, current_rows, stream_scope)
-    previous = _aggregate_by_channel(session, channels, previous_rows, stream_scope)
+    current, current_videos = _aggregate_in_database(session, channels, start_at, as_of, stream_scope)
+    previous, previous_videos = _aggregate_in_database(session, channels, previous_start, previous_query_end, stream_scope)
     shorts_scope = _is_shorts_scope(stream_scope)
     stx = {} if shorts_scope else build_market_stx(
-        [row for row in current_rows if _scope_matches(row, stream_scope)],
-        [row for row in previous_rows if _scope_matches(row, stream_scope)],
+        _series_sample(session, channels, start_at, as_of, stream_scope, current_videos),
+        _series_sample(session, channels, previous_start, previous_query_end, stream_scope, previous_videos),
         channel_ids=channel_ids,
     )
+    for cid, item in stx.items():   # the sample feeds the signals; the counts shown are the real ones
+        if item.get("provenance"):
+            item["provenance"]["observation_count"] = current.get(cid, {}).get("observation_count", 0)
+            item["provenance"]["previous_observation_count"] = previous.get(cid, {}).get("observation_count", 0)
 
     ranked = sorted(
         current.values(),
@@ -105,8 +109,8 @@ def market_report(
         "channels": rows,
         "provenance": {
             "source": "persisted_stataxis_observations",
-            "observation_count": len(current_rows),
-            "previous_observation_count": len(previous_rows),
+            "observation_count": _count_rows(session, channel_ids, start_at, as_of),
+            "previous_observation_count": _count_rows(session, channel_ids, previous_start, previous_query_end),
             "missing_values_are_not_zero_filled": True,
             "stx_source": "persisted_stataxis_observations",
         },
@@ -128,15 +132,15 @@ def channel_media_intelligence(
         return None
     as_of = _utc(as_of or datetime.now(UTC))
     start_at = _period_start(as_of, period)
-    rows = _observation_rows(session, [channel_id], start_at, as_of)
-    aggregate = _aggregate_channel(channel, [row for row in rows if _scope_matches(row, stream_scope)], stream_scope)
-    videos = _video_performance([row for row in rows if _scope_matches(row, stream_scope)], top_videos)
+    aggregates, lines = _aggregate_in_database(session, [channel], start_at, as_of, stream_scope)   # counted by the database: a big channel has tens of thousands of readings in a week
+    aggregate = aggregates[channel.id]
+    videos = _video_performance_from_lines(lines, top_videos)
     shorts_scope = _is_shorts_scope(stream_scope)
-    stx = _no_stx(True) if shorts_scope else build_market_stx(
-        [row for row in rows if _scope_matches(row, stream_scope)],
-        [],
-        channel_ids=[channel_id],
-    )[channel_id]
+    stx = _no_stx(True) if shorts_scope else build_market_stx(_series_sample(session, [channel], start_at, as_of, stream_scope, lines, full=True), [], channel_ids=[channel_id])[channel_id]
+    window = and_(Observation.channel_id == channel_id, Observation.observed_at >= start_at, Observation.observed_at <= as_of)
+    total_rows, first_at, last_at = session.execute(select(func.count(), func.min(Observation.observed_at), func.max(Observation.observed_at)).where(window)).one()
+    sources = sorted(x for (x,) in session.execute(select(Observation.source).where(window).distinct()) if x)
+    versions = sorted(x for (x,) in session.execute(select(Observation.collector_version).where(window).distinct()) if x)
     return {
         "channel": {
             "id": channel.id,
@@ -172,11 +176,11 @@ def channel_media_intelligence(
         "counted_in_analysis": not shorts_scope,
         "note": SHORTS_NOTE if shorts_scope else None,
         "provenance": {
-            "observation_count": len(rows),
-            "source_values": sorted({row["source"] for row in rows if row["source"]}),
-            "collector_versions": sorted({row["collector_version"] for row in rows if row["collector_version"]}),
-            "first_observed_at": _iso(min((row["observed_at"] for row in rows), default=None)),
-            "last_observed_at": _iso(max((row["observed_at"] for row in rows), default=None)),
+            "observation_count": int(total_rows or 0),
+            "source_values": sources,
+            "collector_versions": versions,
+            "first_observed_at": _iso(_utc(first_at) if first_at else None),
+            "last_observed_at": _iso(_utc(last_at) if last_at else None),
             "missing_values_are_not_zero_filled": True,
         },
     }
@@ -194,6 +198,131 @@ def _eligible_channels(session: Session, *, language: str | None, region: str | 
         if segment_key and (channel.segment or "news") != segment_key: continue
         result.append(channel)
     return result
+
+
+def _scope_condition(stream_scope: str):
+    """The same rule as _scope_matches, as something the database can apply."""
+    scope = (stream_scope or "all").lower()
+    if scope == "all": return Observation.classification != "SHORT"
+    if scope == "live": return or_(Observation.is_live.is_(True), Observation.classification == "LIVE")
+    if scope == "replay": return Observation.classification == "COMPLETED_LIVE"
+    if scope == "video": return Observation.classification.in_(["REGULAR_VIDEO", "PREMIERE", "UNKNOWN"])
+    if scope == "shorts": return Observation.classification == "SHORT"
+    raise ValueError("stream_scope must be one of: all, live, replay, video, shorts")
+
+
+def _count_rows(session: Session, channel_ids: list[int], start_at: datetime, end_at: datetime) -> int:
+    if not channel_ids: return 0
+    return int(session.execute(select(func.count()).select_from(Observation).where(Observation.channel_id.in_(channel_ids), Observation.observed_at >= start_at, Observation.observed_at <= end_at)).scalar_one() or 0)
+
+
+def _aggregate_in_database(session: Session, channels: list[Channel], start_at: datetime, end_at: datetime, stream_scope: str) -> tuple[dict[int, dict[str, Any]], list[Any]]:
+    """The same per-channel numbers as _aggregate_by_channel, counted by the database instead of in Python.
+    For each video in the window the database finds its first and last reading and sums its concurrent viewers; only those few thousand lines (not the half a million readings) come back."""
+    ids = [channel.id for channel in channels]
+    if not ids:
+        return {}, []
+    where = and_(Observation.channel_id.in_(ids), Observation.observed_at >= start_at, Observation.observed_at <= end_at, _scope_condition(stream_scope))
+    live_flag = case((or_(Observation.is_live.is_(True), Observation.classification == "LIVE"), 1), else_=0)
+    agg = (select(Observation.channel_id.label("channel_id"), Observation.video_id.label("video_id"), func.count().label("n"), func.min(Observation.observed_at).label("t0"), func.max(Observation.observed_at).label("t1"),
+                  func.count(Observation.concurrent_viewers).label("conc_n"), func.sum(Observation.concurrent_viewers).label("conc_sum"), func.max(Observation.concurrent_viewers).label("conc_max"),
+                  func.sum(live_flag).label("live_n"), func.max(case((Observation.concurrent_viewers.is_not(None), Observation.observed_at))).label("tc"))
+           .where(where).group_by(Observation.channel_id, Observation.video_id).subquery())
+    first, last, latest_conc = aliased(Observation), aliased(Observation), aliased(Observation)
+    stmt = (select(agg.c.channel_id, agg.c.video_id, agg.c.n, agg.c.t0, agg.c.t1, agg.c.conc_n, agg.c.conc_sum, agg.c.conc_max, agg.c.live_n,
+                   first.id.label("id0"), first.view_count.label("v0"), first.like_count.label("l0"), first.comment_count.label("c0"),
+                   last.id.label("id1"), last.view_count.label("v1"), last.like_count.label("l1"), last.comment_count.label("c1"),
+                   latest_conc.concurrent_viewers.label("conc_last"), last.classification.label("cls1"), Video.published_at.label("published_at"), Video.youtube_video_id.label("youtube_video_id"), Video.title.label("title"))
+            .join(first, and_(first.video_id == agg.c.video_id, first.observed_at == agg.c.t0))
+            .join(last, and_(last.video_id == agg.c.video_id, last.observed_at == agg.c.t1))
+            .outerjoin(latest_conc, and_(latest_conc.video_id == agg.c.video_id, latest_conc.observed_at == agg.c.tc))
+            .join(Video, Video.id == agg.c.video_id))
+    by_channel: dict[int, list[Any]] = defaultdict(list)
+    lines = list(session.execute(stmt))
+    for line in lines:
+        by_channel[line.channel_id].append(line)
+    return {channel.id: _aggregate_channel_from_lines(channel, by_channel.get(channel.id, []), stream_scope) for channel in channels}, lines
+
+
+def _aggregate_channel_from_lines(channel: Channel, lines: list[Any], stream_scope: str) -> dict[str, Any]:
+    """_aggregate_channel, from per-video lines. Same definitions: a video's gain is its last reading minus its first, a channel's average is over all its readings,
+    and 'now' is the latest reading of the channel's highest-numbered video that has one."""
+    if not lines:
+        return _aggregate_channel(channel, [], stream_scope)
+    view_delta = like_delta = comment_delta = 0
+    view_seen = like_seen = comment_seen = False
+    velocity_seconds = 0.0
+    for line in lines:
+        t0, t1 = _utc(line.t0), _utc(line.t1)
+        if line.v0 is not None and line.v1 is not None:
+            view_delta += max(0, int(line.v1) - int(line.v0)); view_seen = True
+            velocity_seconds += max((t1 - t0).total_seconds(), 0)
+        if line.l0 is not None and line.l1 is not None:
+            like_delta += max(0, int(line.l1) - int(line.l0)); like_seen = True
+        if line.c0 is not None and line.c1 is not None:
+            comment_delta += max(0, int(line.c1) - int(line.c0)); comment_seen = True
+    conc_n = sum(int(line.conc_n or 0) for line in lines)
+    conc_sum = sum(float(line.conc_sum or 0) for line in lines)
+    peaks = [int(line.conc_max) for line in lines if line.conc_max is not None]
+    with_conc = [line for line in lines if line.conc_n and line.conc_last is not None]
+    current = int(max(with_conc, key=lambda line: line.video_id).conc_last) if with_conc else None
+    first_at, last_at = min(_utc(line.t0) for line in lines), max(_utc(line.t1) for line in lines)
+    total_rows = sum(int(line.n) for line in lines)
+    uploads = 0
+    for line in lines:
+        if not line.published_at: continue
+        try: published = _utc(datetime.fromisoformat(str(line.published_at).replace("Z", "+00:00")))
+        except (TypeError, ValueError): continue
+        if first_at <= published <= last_at: uploads += 1
+    elapsed_days = 1.0 if total_rows < 2 else max((last_at - first_at).total_seconds() / 86400, 1 / 24)
+    return {
+        "channel_id": channel.id,
+        "channel": channel.name,
+        "market": _market_name(channel),
+        "segment": channel.segment or "news",
+        "market_label": _channel_market_label(channel),
+        "view_delta": view_delta if view_seen else None,
+        "average_concurrent": round(conc_sum / conc_n, 2) if conc_n else None,
+        "peak_concurrent": max(peaks) if peaks else None,
+        "current_concurrent": current,
+        "view_velocity_per_minute": round(view_delta / max(velocity_seconds / 60, 1), 2) if view_seen and velocity_seconds > 0 else None,
+        "like_delta": like_delta if like_seen else None,
+        "comment_delta": comment_delta if comment_seen else None,
+        "engagement_velocity_per_minute": round((like_delta + comment_delta) / max(velocity_seconds / 60, 1), 2) if (like_seen or comment_seen) and velocity_seconds > 0 else None,
+        "videos_observed": len(lines),
+        "uploads_in_window": uploads,
+        "upload_cadence_per_week": round(uploads / max(elapsed_days, 1) * 7, 2),
+        "live_observation_count": sum(int(line.live_n or 0) for line in lines),
+        "observation_count": total_rows,
+        "stream_scope": stream_scope,
+    }
+
+
+SERIES_POINTS_PER_CHANNEL = 250     # the STX signals read each channel's series; this many evenly spread readings are plenty
+SERIES_TAIL = timedelta(minutes=20)  # ...plus every reading of the last twenty minutes, so 'right now' (velocity, acceleration) is exact
+
+
+def _series_sample(session: Session, channels: list[Channel], start_at: datetime, end_at: datetime, stream_scope: str, lines: list[Any], *, full: bool = False) -> list[dict[str, Any]]:
+    """A thin, evenly spread sample of each channel's readings (plus the latest twenty minutes and each video's first and last reading), in the shape build_market_stx reads."""
+    ids = [channel.id for channel in channels]
+    if not ids or not lines:
+        return []
+    names = {channel.id: channel.name for channel in channels}
+    total = sum(int(line.n) for line in lines)
+    step = 1 if full else max(1, -(-total // (len(ids) * SERIES_POINTS_PER_CHANNEL)))   # one channel's own screen reads every reading (a big channel has about 30,000 a week: fast, and the same numbers as always)
+    where = and_(Observation.channel_id.in_(ids), Observation.observed_at >= start_at, Observation.observed_at <= end_at, _scope_condition(stream_scope))
+    cols = (Observation.id, Observation.channel_id, Observation.video_id, Observation.observed_at, Observation.view_count, Observation.like_count, Observation.comment_count, Observation.concurrent_viewers)
+    seen: dict[int, Any] = {}
+    sampled = or_(Observation.observed_at >= end_at - SERIES_TAIL, (Observation.id % step) == 0) if step > 1 else True
+    for row in session.execute(select(*cols).where(where, sampled)):
+        seen[row.id] = row
+    edge_ids = [i for line in lines for i in (line.id0, line.id1) if i not in seen]
+    for k in range(0, len(edge_ids), 800):
+        for row in session.execute(select(*cols).where(Observation.id.in_(edge_ids[k:k + 800]))):
+            seen[row.id] = row
+    ordered = sorted(seen.values(), key=lambda row: (row.channel_id, row.video_id, row.observed_at, row.id))   # the order the readings have always been read in (it decides ties at the same instant)
+    return [{"channel_id": row.channel_id, "channel_name": names.get(row.channel_id), "video_id": row.video_id, "observed_at": _utc(row.observed_at), "view_count": row.view_count,
+             "like_count": row.like_count, "comment_count": row.comment_count, "concurrent_viewers": row.concurrent_viewers} for row in ordered]
 
 
 def _observation_rows(session: Session, channel_ids: list[int], start_at: datetime, end_at: datetime) -> list[dict[str, Any]]:
@@ -281,6 +410,22 @@ def _aggregate_channel(channel: Channel, rows: list[dict[str, Any]], stream_scop
     }
 
 
+def _video_performance_from_lines(lines: list[Any], limit: int) -> list[dict[str, Any]]:
+    """_video_performance, from the per-video lines the database counted."""
+    result = []
+    for line in lines:
+        t0, t1 = _utc(line.t0), _utc(line.t1)
+        view_delta = max(0, int(line.v1) - int(line.v0)) if line.v0 is not None and line.v1 is not None else None
+        duration = max((t1 - t0).total_seconds(), 0)
+        result.append({
+            "video_id": line.video_id, "youtube_video_id": line.youtube_video_id, "title": line.title, "classification": line.cls1, "view_delta": view_delta,
+            "view_velocity_per_minute": round(view_delta / max(duration / 60, 1), 2) if view_delta is not None and duration > 0 else None,
+            "first_observed_at": t0.isoformat(), "last_observed_at": t1.isoformat(), "observation_count": int(line.n),
+        })
+    result.sort(key=lambda item: (item["view_delta"] is not None, item["view_delta"] or -1), reverse=True)
+    return result[: max(1, min(int(limit), 50))]
+
+
 def _video_performance(rows: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
     grouped: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for row in rows: grouped[row["video_id"]].append(row)
@@ -330,7 +475,9 @@ def _scope_matches(row: dict[str, Any], stream_scope: str) -> bool:
 def _period_start(as_of: datetime, period: str) -> datetime:
     period = period.lower()
     if period not in PERIOD_DAYS: raise ValueError("period must be one of: 1h, 3h, 6h, today, 7d, week, 3w, month, quarter, year")
-    if period == "today": return as_of.replace(hour=0, minute=0, second=0, microsecond=0)
+    if period == "today":   # the day in India starts at midnight Indian time, which is 18:30 the evening before in UTC
+        ist = as_of.astimezone(timezone(timedelta(hours=5, minutes=30)))
+        return ist.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(UTC)
     return as_of - timedelta(days=float(PERIOD_DAYS[period]))
 
 

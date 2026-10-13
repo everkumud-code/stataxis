@@ -33,6 +33,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from api.live_monitor import LIVE_STREAM_FRESHNESS_SECONDS, language_group
+from api.ttl_cache import ttl_cache
 from collector.storage import Channel, Observation, Video, effective_channel_language
 from metrics.feeds import LiveStream, min_primary_hours, split_feeds
 from metrics.markets import market_label, normalize_segment
@@ -63,38 +64,41 @@ class _Stream:
 
 
 def _load_streams(
-    session: Session, *, start_at: datetime, end_at: datetime, language: str | None, segment: str | None,
+    session: Session, *, start_at: datetime, end_at: datetime, language: str | None, segment: str | None, topic: str | None = None,
 ) -> tuple[dict[int, dict[str, _Stream]], dict[int, Channel], dict[int, str]]:
     segment_key = normalize_segment(segment) if segment else None
+    active = {c.id: c for c in session.query(Channel).filter(Channel.active.is_(True)).all()}   # a few dozen objects; the samples below are plain columns (there can be 100,000 of them)
     stmt = (
-        select(Observation, Channel, Video)
-        .join(Channel, Channel.id == Observation.channel_id)
+        select(Observation.channel_id, Observation.observed_at, Observation.concurrent_viewers, Video.youtube_video_id, Video.live_started_at, Video.topic)
         .join(Video, Video.id == Observation.video_id)
         .where(
             Observation.observed_at >= start_at - timedelta(seconds=FRESHNESS_SECONDS),
             Observation.observed_at <= end_at,
             Observation.is_live.is_(True),
             Observation.concurrent_viewers.is_not(None),
-            Channel.active.is_(True),
+            Observation.channel_id.in_(list(active)),
         )
         .order_by(Observation.observed_at.asc(), Observation.id.asc())
     )
     rows = list(session.execute(stmt).all())
-    languages = {channel.id: effective_channel_language(session, channel) for _, channel, _ in rows}
+    languages = {cid: effective_channel_language(session, active[cid]) for cid in {row.channel_id for row in rows}}
     target = language.strip().lower() if language else None
     streams: dict[int, dict[str, _Stream]] = defaultdict(dict)
     channels: dict[int, Channel] = {}
-    for observation, channel, video in rows:
+    for row in rows:
+        channel = active[row.channel_id]
         if target and language_group(languages[channel.id]).lower() != target and languages[channel.id].lower() != target:
             continue
         if segment_key and (channel.segment or "news") != segment_key:
             continue
+        if topic and (row.topic or "Other") != topic:
+            continue
         channels[channel.id] = channel
         stream = streams[channel.id].setdefault(
-            video.youtube_video_id,
-            _Stream(video.youtube_video_id, video.live_started_at and _utc(video.live_started_at), []),
+            row.youtube_video_id,
+            _Stream(row.youtube_video_id, row.live_started_at and _utc(row.live_started_at), []),
         )
-        stream.samples.append((_utc(observation.observed_at), int(observation.concurrent_viewers or 0)))
+        stream.samples.append((_utc(row.observed_at), int(row.concurrent_viewers or 0)))
     return streams, channels, languages
 
 
@@ -132,6 +136,7 @@ def _feed_stats(values: list[int]) -> dict[str, Any]:
     return {"average": round(sum(values) / len(values), 1), "peak": max(values)}
 
 
+@ttl_cache(scale=0.4)
 def live_window_stats(
     session: Session,
     *,
@@ -140,6 +145,7 @@ def live_window_stats(
     language: str | None = None,
     segment: str | None = None,
     bucket_seconds: int = 60,
+    topic: str | None = None,
 ) -> dict[str, Any]:
     """Average and peak concurrent viewers for Primary / Secondary / All feeds over a window."""
     start_at, end_at = _utc(start_at), _utc(end_at)
@@ -155,7 +161,7 @@ def live_window_stats(
         raise ValueError("window is too long for this bucket size")
 
     threshold = min_primary_hours()
-    streams, channels, languages = _load_streams(session, start_at=start_at, end_at=end_at, language=language, segment=segment)
+    streams, channels, languages = _load_streams(session, start_at=start_at, end_at=end_at, language=language, segment=segment, topic=topic)
 
     rows: list[dict[str, Any]] = []
     combined: dict[datetime, dict[str, int]] = defaultdict(lambda: {"primary": 0, "secondary": 0, "all": 0})
@@ -186,6 +192,7 @@ def live_window_stats(
                 "all": _feed_stats(all_values),
             },
             "peak_at": series[peak_index][0].isoformat(),
+            "watch_hours": {key: round(sum(getattr(split, key) for _, split, _ in series) * bucket_seconds / 3600, 1) for key in ("all", "primary", "secondary")},   # viewer-hours of live viewing observed
             "streams_seen": len(seen),
             "observed_minutes": round(len(series) * bucket_seconds / 60, 1),
             "coverage_percent": round(len(series) / len(grid) * 100, 1),

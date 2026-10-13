@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="The StatAxis methodology: what is measured, how the STX Index is worked out, the definitions, and a dated changelog.">
+<title>Methodology — StatAxis</title><link rel="icon" href="assets/stataxis-favicon.svg"><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="tech.css">
+<style>.legal{max-width:900px;margin:auto;padding:48px 24px 80px}.legal-card{background:var(--sx-card);border:1px solid var(--sx-line);border-radius:18px;padding:34px}.legal h1{font-size:clamp(38px,6vw,58px);margin:10px 0 12px}.legal h2{font-size:24px;margin:32px 0 10px;color:var(--sx-ink)}.legal h3{font-size:17px;margin:18px 0 6px;color:var(--sx-ink)}.legal p,.legal li{color:var(--sx-muted)}.legal li{margin:7px 0}
+table.w{width:100%;border-collapse:collapse;margin:10px 0}table.w td,table.w th{padding:10px 8px;border-bottom:1px solid var(--sx-line);text-align:left;color:var(--sx-muted)}table.w th{color:var(--sx-ink)}.ver{display:inline-block;border:1px solid var(--sx-gold);color:var(--sx-gold);border-radius:99px;padding:3px 12px;font-weight:800;font-size:13px}.log{border-left:3px solid var(--sx-gold);padding:4px 0 4px 16px;margin:16px 0}.log b{color:var(--sx-ink)}</style>
+</head>
+<body class="sx-site"><div id="nav"></div>
+<main class="legal"><section class="legal-card">
+<span class="sx-kicker">STATAXIS · METHODOLOGY</span><h1>How StatAxis measures</h1>
+<p><span class="ver" id="ver">STX v0</span> <span id="intro"></span></p>
+<div id="body"><p>Loading the methodology…</p></div>
+</section></main><div id="footer"></div>
+<script>
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+fetch("/api/v1/public/methodology").then(r => r.json()).then(m => {
+  document.getElementById("ver").textContent = m.version;
+  document.getElementById("intro").textContent = "Everything below is read from the same settings the calculations use, so it cannot drift from them. Each change is listed in the changelog at the end.";
+  const w = Object.entries(m.stx.weights).map(([k, v]) => `<tr><td>${esc(k.replace(/_/g, " "))}</td><td>${Math.round(v * 100)}%</td><td>${esc((m.stx.signals.find(s => s.name === k) || {}).definition || "")}</td></tr>`).join("");
+  document.getElementById("body").innerHTML =
+    `<h2>The STX Index</h2><p>${esc(m.stx.formula)}</p><p>${esc(m.stx.scale)}</p><table class="w"><tr><th>Signal</th><th>Weight</th><th>How it is worked out</th></tr>${w}</table>
+     <h2>Collection</h2><p>${esc(m.collection.source)} ${esc(m.collection.live_reading)} ${esc(m.collection.uploads)}</p>
+     <h2>Primary, Secondary and All feeds</h2><ul><li><b>Primary.</b> ${esc(m.feeds.primary)}</li><li><b>Secondary.</b> ${esc(m.feeds.secondary)}</li><li><b>All.</b> ${esc(m.feeds.all)}</li></ul>
+     <h2>Shorts</h2><p>${esc(m.shorts)}</p>
+     <h2>Measures</h2><ul>${m.measures.map(x => `<li><b>${esc(x.name)}.</b> ${esc(x.definition)}</li>`).join("")}</ul>
+     <h2>Windows</h2><p>${esc(m.windows)}</p>
+     <h2>Forecasts</h2><p>${esc(m.forecasts)}</p>
+     <h2>Limits</h2><ul>${m.limits.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+     <h2>Changelog</h2>${[...m.changelog].reverse().map(c => `<div class="log"><b>${esc(c.date)} · ${esc(c.version)}</b><ul>${c.changes.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`).join("")}`;
+}).catch(() => { document.getElementById("body").innerHTML = "<p>The methodology could not be loaded. Please try again.</p>"; });
+</script><script src="site.js"></script></body></html>

@@ -7,11 +7,19 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 
 from api.access import require_capability
+from api.feature_access import require_export
 from api.auth_service import authenticate, policy_for_identity
 from api.errors import AuthenticationError, AuthorizationError
 from api.export import export_live_audience_xlsx, export_live_stats_xlsx
+from api.stamps import file_stamp
 from api.live_monitor import live_audience_window, sample_live_url
 from api.live_stats import live_snapshot, live_window_stats
+
+
+def _export_privilege(session_factory: Callable[[], Any], identity: Any) -> None:
+    """The Excel exports are a privilege of their own (see api/feature_access.py); an identity that is not a signed-in account record has nothing to check."""
+    if hasattr(identity, "user_id") and hasattr(identity, "plan"):
+        require_export(session_factory, user_id=identity.user_id, plan=identity.plan, is_admin=bool(getattr(identity, "is_admin", False)))
 
 
 def live_application(session_factory: Callable[[], Any]):
@@ -26,6 +34,7 @@ def live_application(session_factory: Callable[[], Any]):
             try:
                 identity = authenticate(environ.get("HTTP_AUTHORIZATION"))
                 require_capability(policy_for_identity(identity), "can_download_report")
+                _export_privilege(session_factory, identity)
                 query = _query(environ.get("QUERY_STRING", ""))
                 end_at = _parse_datetime(query.get("end")) or datetime.now(UTC)
                 start_at = _parse_datetime(query.get("start")) or end_at - timedelta(hours=1)
@@ -41,7 +50,7 @@ def live_application(session_factory: Callable[[], Any]):
                     session.close()
                 start_response("200 OK", [
                     ("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-                    ("Content-Disposition", "attachment; filename=stataxis-live-audience.xlsx"),
+                    ("Content-Disposition", f"attachment; filename=stataxis-live-audience-downloaded-{file_stamp()}.xlsx"),
                     ("Content-Length", str(len(body))),
                 ])
                 return [body]
@@ -81,6 +90,8 @@ def live_application(session_factory: Callable[[], Any]):
                 identity = authenticate(environ.get("HTTP_AUTHORIZATION"))
                 is_export = path.endswith("/export")
                 require_capability(policy_for_identity(identity), "can_download_report" if is_export else "can_evaluate_url")
+                if is_export:
+                    _export_privilege(session_factory, identity)
                 query = _query(environ.get("QUERY_STRING", ""))
                 language, segment = query.get("language"), query.get("segment")
                 session = session_factory()
@@ -95,7 +106,7 @@ def live_application(session_factory: Callable[[], Any]):
                         body = export_live_stats_xlsx(session, start_at=start_at, end_at=end_at, language=language, segment=segment, bucket_seconds=bucket)
                         start_response("200 OK", [
                             ("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-                            ("Content-Disposition", "attachment; filename=stataxis-live-feed-stats.xlsx"),
+                            ("Content-Disposition", f"attachment; filename=stataxis-live-feed-stats-downloaded-{file_stamp()}.xlsx"),
                             ("Content-Length", str(len(body))),
                         ])
                         return [body]

@@ -1,0 +1,1001 @@
+{
+ "source": "YouTube_Live_News_Feeds.xlsx, compiled 11 Oct 2026",
+ "channels": [
+  {
+   "category": "Hindi",
+   "name": "Aaj Tak",
+   "ref": "@aajtak",
+   "verified": true
+  },
+  {
+   "category": "Hindi",
+   "name": "ABP News",
+   "ref": "@abpnews",
+   "verified": true
+  },
+  {
+   "category": "Hindi",
+   "name": "ABP Live",
+   "ref": "@abplive",
+   "verified": false
+  },
+  {
+   "category": "Hindi",
+   "name": "India TV",
+   "ref": "@indiatv",
+   "verified": true
+  },
+  {
+   "category": "Hindi",
+   "name": "Zee News",
+   "ref": "@zeenews",
+   "verified": true
+  },
+  {
+   "category": "Hindi",
+   "name": "News18 India",
+   "ref": "@news18india",
+   "verified": true
+  },
+  {
+   "category": "Hindi",
+   "name": "Republic Bharat",
+   "ref": "@republicbharat",
+   "verified": true
+  },
+  {
+   "category": "Hindi",
+   "name": "News24",
+   "ref": "@News24thinkfirst",
+   "verified": true
+  },
+  {
+   "category": "Hindi",
+   "name": "TV9 Bharatvarsh",
+   "ref": "@tv9bharatvarsh",
+   "verified": true
+  },
+  {
+   "category": "Hindi",
+   "name": "NDTV India",
+   "ref": "@ndtvindia",
+   "verified": true
+  },
+  {
+   "category": "Hindi",
+   "name": "Times Now Navbharat",
+   "ref": "@timesnownavbharat",
+   "verified": true
+  },
+  {
+   "category": "Hindi",
+   "name": "The Lallantop",
+   "ref": "@thelallantop",
+   "verified": false
+  },
+  {
+   "category": "Hindi",
+   "name": "BBC News Hindi",
+   "ref": "@bbchindi",
+   "verified": true
+  },
+  {
+   "category": "Hindi",
+   "name": "Sansad TV",
+   "ref": "@sansadtv",
+   "verified": true
+  },
+  {
+   "category": "Hindi",
+   "name": "News18 Bihar Jharkhand",
+   "ref": "@news18biharjharkhand",
+   "verified": true
+  },
+  {
+   "category": "Hindi",
+   "name": "Zee Bihar Jharkhand",
+   "ref": "channel/UCZUjHLJivN0OZPC_Wj8JvkA",
+   "verified": true
+  },
+  {
+   "category": "India English",
+   "name": "Republic World",
+   "ref": "@republicworld",
+   "verified": true
+  },
+  {
+   "category": "India English",
+   "name": "India Today",
+   "ref": "@indiatoday",
+   "verified": false
+  },
+  {
+   "category": "India English",
+   "name": "NDTV",
+   "ref": "@NDTV",
+   "verified": false
+  },
+  {
+   "category": "India English",
+   "name": "Times Now",
+   "ref": "@TimesNow",
+   "verified": false
+  },
+  {
+   "category": "India English",
+   "name": "CNN-News18",
+   "ref": "@CNNNews18",
+   "verified": false
+  },
+  {
+   "category": "India English",
+   "name": "WION",
+   "ref": "@WION",
+   "verified": false
+  },
+  {
+   "category": "India English",
+   "name": "Mirror Now",
+   "ref": "@MirrorNow",
+   "verified": false
+  },
+  {
+   "category": "India English",
+   "name": "Firstpost",
+   "ref": "@Firstpost",
+   "verified": false
+  },
+  {
+   "category": "Bangla",
+   "name": "Jamuna TV",
+   "ref": "@jamunatvbd",
+   "verified": true
+  },
+  {
+   "category": "Bangla",
+   "name": "Somoy TV",
+   "ref": "@somoynews360",
+   "verified": true
+  },
+  {
+   "category": "Bangla",
+   "name": "News18 Bangla",
+   "ref": "@news18bangla",
+   "verified": true
+  },
+  {
+   "category": "Bangla",
+   "name": "Zee 24 Ghanta",
+   "ref": "@Zee24Ghanta",
+   "verified": true
+  },
+  {
+   "category": "Bangla",
+   "name": "ABP Ananda",
+   "ref": "@abpanandatv",
+   "verified": false
+  },
+  {
+   "category": "Bangla",
+   "name": "Republic Bangla",
+   "ref": "@republicbangla",
+   "verified": false
+  },
+  {
+   "category": "Bangla",
+   "name": "TV9 Bangla",
+   "ref": "@tv9bangla",
+   "verified": false
+  },
+  {
+   "category": "Bangla",
+   "name": "Channel 24",
+   "ref": "@channel24tv",
+   "verified": false
+  },
+  {
+   "category": "Tamil",
+   "name": "Thanthi TV",
+   "ref": "@thanthitv",
+   "verified": true
+  },
+  {
+   "category": "Tamil",
+   "name": "Polimer News",
+   "ref": "@polimernews",
+   "verified": false
+  },
+  {
+   "category": "Tamil",
+   "name": "Sun News",
+   "ref": "@sunnews",
+   "verified": false
+  },
+  {
+   "category": "Tamil",
+   "name": "Puthiya Thalaimurai",
+   "ref": "@puthiyathalaimuraitv",
+   "verified": false
+  },
+  {
+   "category": "Tamil",
+   "name": "News18 Tamil Nadu",
+   "ref": "@News18TamilNadu",
+   "verified": false
+  },
+  {
+   "category": "Tamil",
+   "name": "News7 Tamil",
+   "ref": "@News7Tamil",
+   "verified": false
+  },
+  {
+   "category": "Telugu",
+   "name": "TV9 Telugu",
+   "ref": "@tv9telugulive",
+   "verified": true
+  },
+  {
+   "category": "Telugu",
+   "name": "NTV Telugu",
+   "ref": "@ntvtelugu",
+   "verified": true
+  },
+  {
+   "category": "Telugu",
+   "name": "Prime9 News",
+   "ref": "@Prime9News",
+   "verified": false
+  },
+  {
+   "category": "Telugu",
+   "name": "ABN Telugu",
+   "ref": "@abntelugutv",
+   "verified": false
+  },
+  {
+   "category": "Telugu",
+   "name": "Sakshi TV",
+   "ref": "@sakshitv",
+   "verified": false
+  },
+  {
+   "category": "Telugu",
+   "name": "TV5 News",
+   "ref": "@TV5NewsNow",
+   "verified": false
+  },
+  {
+   "category": "Telugu",
+   "name": "10TV",
+   "ref": "@10TVNewsTelugu",
+   "verified": false
+  },
+  {
+   "category": "Telugu",
+   "name": "ETV Andhra Pradesh",
+   "ref": "@ETVAndhraPradesh",
+   "verified": false
+  },
+  {
+   "category": "Business",
+   "name": "CNBC Television",
+   "ref": "@cnbctelevision",
+   "verified": true
+  },
+  {
+   "category": "Business",
+   "name": "CNBC",
+   "ref": "@cnbc",
+   "verified": true
+  },
+  {
+   "category": "Business",
+   "name": "CNBC Awaaz",
+   "ref": "@CNBCAwaaz",
+   "verified": false
+  },
+  {
+   "category": "Business",
+   "name": "Zee Business",
+   "ref": "@ZeeBusiness",
+   "verified": false
+  },
+  {
+   "category": "Business",
+   "name": "ET Now",
+   "ref": "@ETNOW",
+   "verified": false
+  },
+  {
+   "category": "Business",
+   "name": "CNBC-TV18",
+   "ref": "@CNBCTV18",
+   "verified": false
+  },
+  {
+   "category": "Business",
+   "name": "Bloomberg",
+   "ref": "@Bloomberg",
+   "verified": false
+  },
+  {
+   "category": "Business",
+   "name": "Moneycontrol",
+   "ref": "@moneycontrol",
+   "verified": false
+  },
+  {
+   "category": "International",
+   "name": "Sky News",
+   "ref": "@skynews",
+   "verified": true
+  },
+  {
+   "category": "International",
+   "name": "BBC News",
+   "ref": "@BBCNews",
+   "verified": false
+  },
+  {
+   "category": "International",
+   "name": "Al Jazeera English",
+   "ref": "@aljazeeraenglish",
+   "verified": false
+  },
+  {
+   "category": "International",
+   "name": "DW News",
+   "ref": "@dwnews",
+   "verified": false
+  },
+  {
+   "category": "International",
+   "name": "France 24 English",
+   "ref": "@FRANCE24English",
+   "verified": false
+  },
+  {
+   "category": "International",
+   "name": "Euronews",
+   "ref": "@euronews",
+   "verified": true
+  },
+  {
+   "category": "International",
+   "name": "CNA",
+   "ref": "@ChannelNewsAsia",
+   "verified": false
+  },
+  {
+   "category": "International",
+   "name": "TRT World",
+   "ref": "@TRTWorld",
+   "verified": false
+  },
+  {
+   "category": "International",
+   "name": "NHK World",
+   "ref": "@NHKWORLDJAPAN",
+   "verified": false
+  },
+  {
+   "category": "International",
+   "name": "Reuters",
+   "ref": "@Reuters",
+   "verified": false
+  },
+  {
+   "category": "US",
+   "name": "CNN",
+   "ref": "@CNN",
+   "verified": false
+  },
+  {
+   "category": "US",
+   "name": "Fox News",
+   "ref": "@FoxNews",
+   "verified": false
+  },
+  {
+   "category": "US",
+   "name": "MS NOW (MSNBC)",
+   "ref": "@msnbc",
+   "verified": false
+  },
+  {
+   "category": "US",
+   "name": "ABC News",
+   "ref": "@ABCNews",
+   "verified": false
+  },
+  {
+   "category": "US",
+   "name": "CBS News",
+   "ref": "@CBSNews",
+   "verified": false
+  },
+  {
+   "category": "US",
+   "name": "NBC News",
+   "ref": "@NBCNews",
+   "verified": false
+  },
+  {
+   "category": "US",
+   "name": "Newsmax",
+   "ref": "@NEWSMAX",
+   "verified": false
+  },
+  {
+   "category": "US",
+   "name": "PBS NewsHour",
+   "ref": "@PBSNewsHour",
+   "verified": false
+  },
+  {
+   "category": "UK",
+   "name": "GB News",
+   "ref": "@GBNewsOnline",
+   "verified": false
+  },
+  {
+   "category": "UK",
+   "name": "Channel 4 News",
+   "ref": "@Channel4News",
+   "verified": false
+  },
+  {
+   "category": "UK",
+   "name": "ITV News",
+   "ref": "@itvnews",
+   "verified": false
+  },
+  {
+   "category": "UK",
+   "name": "TalkTV",
+   "ref": "@TalkTV",
+   "verified": false
+  },
+  {
+   "category": "UK",
+   "name": "LBC",
+   "ref": "@LBC",
+   "verified": false
+  },
+  {
+   "category": "UK",
+   "name": "Times Radio",
+   "ref": "@ListenToTimesRadio",
+   "verified": false
+  },
+  {
+   "category": "UK",
+   "name": "Guardian News",
+   "ref": "@guardiannews",
+   "verified": false
+  },
+  {
+   "category": "UK",
+   "name": "The Telegraph",
+   "ref": "@telegraph",
+   "verified": false
+  },
+  {
+   "category": "Europe",
+   "name": "France 24 (FR)",
+   "ref": "@FRANCE24",
+   "verified": false
+  },
+  {
+   "category": "Europe",
+   "name": "WELT",
+   "ref": "@WELTVideoTV",
+   "verified": false
+  },
+  {
+   "category": "Europe",
+   "name": "ZDFheute",
+   "ref": "@ZDFheute",
+   "verified": false
+  },
+  {
+   "category": "Europe",
+   "name": "BFMTV",
+   "ref": "@BFMTV",
+   "verified": false
+  },
+  {
+   "category": "Europe",
+   "name": "CNEWS",
+   "ref": "@CNEWS",
+   "verified": false
+  },
+  {
+   "category": "Europe",
+   "name": "Euronews Deutsch",
+   "ref": "@euronewsde",
+   "verified": false
+  },
+  {
+   "category": "Europe",
+   "name": "Euronews Français",
+   "ref": "@euronewsfr",
+   "verified": false
+  },
+  {
+   "category": "Europe",
+   "name": "RTVE Noticias",
+   "ref": "@rtvenoticias",
+   "verified": false
+  },
+  {
+   "category": "Kannada",
+   "name": "TV9 Kannada",
+   "ref": "@tv9kannada",
+   "verified": true
+  },
+  {
+   "category": "Kannada",
+   "name": "News18 Kannada",
+   "ref": "@News18Kannada",
+   "verified": true
+  },
+  {
+   "category": "Kannada",
+   "name": "Public TV",
+   "ref": "@publictvnewskannada",
+   "verified": false
+  },
+  {
+   "category": "Kannada",
+   "name": "Suvarna News",
+   "ref": "@SuvarnaNewsKannada",
+   "verified": false
+  },
+  {
+   "category": "Kannada",
+   "name": "NewsFirst Kannada",
+   "ref": "@NewsFirstKannada",
+   "verified": false
+  },
+  {
+   "category": "Kannada",
+   "name": "Prajaa TV",
+   "ref": "@prajaatv",
+   "verified": false
+  },
+  {
+   "category": "Kannada",
+   "name": "Zee Kannada News",
+   "ref": "@ZeeKannadaNews",
+   "verified": false
+  },
+  {
+   "category": "Kannada",
+   "name": "Vijay Karnataka",
+   "ref": "@VijayKarnataka",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Dhruv Rathee",
+   "ref": "@dhruvrathee",
+   "verified": true
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Ravish Kumar Official",
+   "ref": "@ravishkumar.official",
+   "verified": true
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Abhisar Sharma",
+   "ref": "@AbhisarSharma",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Ajit Anjum",
+   "ref": "@ajitanjum",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Punya Prasun Bajpai",
+   "ref": "@PunyaPrasunBajpai",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Deepak Sharma",
+   "ref": "@DeepakSharmaOfficial",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Sushant Sinha",
+   "ref": "@SushantSinha",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "The Deshbhakt (Akash Banerjee)",
+   "ref": "@TheDeshBhakt",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Nitish Rajput",
+   "ref": "@NitishRajput",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Mohak Mangal",
+   "ref": "@MohakMangal",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Faye D'Souza",
+   "ref": "@FayeDSouza",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Mojo Story (Barkha Dutt)",
+   "ref": "@TheMojoStory",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "The Sham Sharma Show",
+   "ref": "@TheShamSharmaShow",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "The Lallantop (Saurabh Dwivedi)",
+   "ref": "@thelallantop",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Sakshi Joshi",
+   "ref": "@SakshiJoshiOfficial",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Unfiltered by Samdish",
+   "ref": "@UnfilteredBySamdish",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Sudhir Chaudhary",
+   "ref": "@SudhirChaudhary",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Aap Ki Adalat (Rajat Sharma)",
+   "ref": "@AapKiAdalat",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Palki Sharma / Firstpost",
+   "ref": "@Firstpost",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "ThePrint (Shekhar Gupta)",
+   "ref": "@ThePrintIndia",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "The Wire",
+   "ref": "@TheWireNews",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Newslaundry",
+   "ref": "@NewslaundryIndia",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "The Quint",
+   "ref": "@TheQuint",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "4PM (Sanjay Sharma)",
+   "ref": "@4pmnewsnetwork",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "National Dastak",
+   "ref": "@NationalDastak",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Satya Hindi",
+   "ref": "@SatyaHindi",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Vinod Kapri",
+   "ref": "@VinodKapri",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Shyam Meera Singh",
+   "ref": "@ShyamMeeraSingh",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "ANI Podcast (Smita Prakash)",
+   "ref": "@ANIPodcastwithSmitaPrakash",
+   "verified": false
+  },
+  {
+   "category": "Journalists (Top 30)",
+   "name": "Alt News (Pratik Sinha)",
+   "ref": "@AltNews",
+   "verified": false
+  },
+  {
+   "category": "Podcasts (Top 10)",
+   "name": "Figuring Out – Raj Shamani",
+   "ref": "@rajshamani",
+   "verified": false
+  },
+  {
+   "category": "Podcasts (Top 10)",
+   "name": "BeerBiceps (The Ranveer Show)",
+   "ref": "@BeerBiceps",
+   "verified": false
+  },
+  {
+   "category": "Podcasts (Top 10)",
+   "name": "Ranveer Allahbadia",
+   "ref": "@RanveerAllahbadia",
+   "verified": false
+  },
+  {
+   "category": "Podcasts (Top 10)",
+   "name": "WTF is – Nikhil Kamath",
+   "ref": "@nikhil.kamath",
+   "verified": false
+  },
+  {
+   "category": "Podcasts (Top 10)",
+   "name": "Prakhar ke Pravachan",
+   "ref": "@PrakharkePravachan",
+   "verified": false
+  },
+  {
+   "category": "Podcasts (Top 10)",
+   "name": "Jay Shetty Podcast",
+   "ref": "@JayShettyPodcast",
+   "verified": false
+  },
+  {
+   "category": "Podcasts (Top 10)",
+   "name": "The Seen and the Unseen – Amit Varma",
+   "ref": "@amitvarma",
+   "verified": false
+  },
+  {
+   "category": "Podcasts (Top 10)",
+   "name": "Desi Crime Podcast",
+   "ref": "@DesiCrimePodcast",
+   "verified": false
+  },
+  {
+   "category": "Podcasts (Top 10)",
+   "name": "Paisa Vaisa – Anupam Gupta",
+   "ref": "@PaisaVaisa",
+   "verified": false
+  },
+  {
+   "category": "Podcasts (Top 10)",
+   "name": "Dostcast",
+   "ref": "@Dostcast",
+   "verified": false
+  },
+  {
+   "category": "Politicians (Top 10)",
+   "name": "Narendra Modi",
+   "ref": "@narendramodi",
+   "verified": true
+  },
+  {
+   "category": "Politicians (Top 10)",
+   "name": "Rahul Gandhi",
+   "ref": "@rahulgandhi",
+   "verified": false
+  },
+  {
+   "category": "Politicians (Top 10)",
+   "name": "Yogi Adityanath",
+   "ref": "@myogiadityanath",
+   "verified": false
+  },
+  {
+   "category": "Politicians (Top 10)",
+   "name": "Arvind Kejriwal",
+   "ref": "@ArvindKejriwal",
+   "verified": false
+  },
+  {
+   "category": "Politicians (Top 10)",
+   "name": "Shashi Tharoor",
+   "ref": "@ShashiTharoorOfficial",
+   "verified": false
+  },
+  {
+   "category": "Politicians (Top 10)",
+   "name": "Amit Shah",
+   "ref": "@amitshahofficial",
+   "verified": false
+  },
+  {
+   "category": "Politicians (Top 10)",
+   "name": "Akhilesh Yadav",
+   "ref": "@yadavakhilesh",
+   "verified": false
+  },
+  {
+   "category": "Politicians (Top 10)",
+   "name": "Tejashwi Yadav",
+   "ref": "@TejashwiYadav",
+   "verified": false
+  },
+  {
+   "category": "Politicians (Top 10)",
+   "name": "Mamata Banerjee",
+   "ref": "@MamataOfficial",
+   "verified": false
+  },
+  {
+   "category": "Politicians (Top 10)",
+   "name": "Nitin Gadkari",
+   "ref": "@nitingadkari",
+   "verified": false
+  },
+  {
+   "category": "Brands (Top 10)",
+   "name": "T-Series",
+   "ref": "@tseries",
+   "verified": false
+  },
+  {
+   "category": "Brands (Top 10)",
+   "name": "SET India",
+   "ref": "@SETIndia",
+   "verified": false
+  },
+  {
+   "category": "Brands (Top 10)",
+   "name": "Zee Music Company",
+   "ref": "@zeemusiccompany",
+   "verified": false
+  },
+  {
+   "category": "Brands (Top 10)",
+   "name": "Goldmines",
+   "ref": "@GoldminesTelefilms",
+   "verified": false
+  },
+  {
+   "category": "Brands (Top 10)",
+   "name": "Sony SAB",
+   "ref": "@sonysab",
+   "verified": false
+  },
+  {
+   "category": "Brands (Top 10)",
+   "name": "Zee TV",
+   "ref": "@zeetv",
+   "verified": false
+  },
+  {
+   "category": "Brands (Top 10)",
+   "name": "Colors TV",
+   "ref": "@colorstv",
+   "verified": false
+  },
+  {
+   "category": "Brands (Top 10)",
+   "name": "StarPlus",
+   "ref": "@StarPlus",
+   "verified": false
+  },
+  {
+   "category": "Brands (Top 10)",
+   "name": "Shemaroo Filmi Gaane",
+   "ref": "@ShemarooFilmiGaane",
+   "verified": false
+  },
+  {
+   "category": "Brands (Top 10)",
+   "name": "Tips Official",
+   "ref": "@tipsofficial",
+   "verified": false
+  },
+  {
+   "category": "Influencers (Top 10)",
+   "name": "CarryMinati",
+   "ref": "@CarryMinati",
+   "verified": true
+  },
+  {
+   "category": "Influencers (Top 10)",
+   "name": "Technical Guruji",
+   "ref": "@TechnicalGuruji",
+   "verified": false
+  },
+  {
+   "category": "Influencers (Top 10)",
+   "name": "BB Ki Vines",
+   "ref": "@BBKiVines",
+   "verified": false
+  },
+  {
+   "category": "Influencers (Top 10)",
+   "name": "Ashish Chanchlani Vines",
+   "ref": "@ashishchanchlani",
+   "verified": false
+  },
+  {
+   "category": "Influencers (Top 10)",
+   "name": "Sourav Joshi Vlogs",
+   "ref": "@souravjoshivlogs7028",
+   "verified": false
+  },
+  {
+   "category": "Influencers (Top 10)",
+   "name": "MR. INDIAN HACKER",
+   "ref": "@MRINDIANHACKER",
+   "verified": false
+  },
+  {
+   "category": "Influencers (Top 10)",
+   "name": "Total Gaming",
+   "ref": "@TotalGaming093",
+   "verified": false
+  },
+  {
+   "category": "Influencers (Top 10)",
+   "name": "Amit Bhadana",
+   "ref": "@AmitBhadana",
+   "verified": false
+  },
+  {
+   "category": "Influencers (Top 10)",
+   "name": "Triggered Insaan",
+   "ref": "@TriggeredInsaan",
+   "verified": false
+  },
+  {
+   "category": "Influencers (Top 10)",
+   "name": "Round2hell",
+   "ref": "@Round2hell",
+   "verified": false
+  }
+ ]
+}
