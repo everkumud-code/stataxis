@@ -390,3 +390,28 @@ def test_dip_stats_counts_breaks_and_stays_quiet_on_short_or_small_streams():
     assert broken and 12 <= broken["dips"] <= 17 and 0.9 <= broken["per_hour"] <= 4.5          # about one break every quarter hour
     assert authenticity.dip_stats(rows([8000] * 240))["dips"] == 0
     assert authenticity.dip_stats(rows([8000] * 100)) is None and authenticity.dip_stats(rows([300] * 240)) is None   # too short, too small
+
+
+def test_every_radar_flag_says_how_long_it_lasted_and_when_in_indian_time():
+    s = make_session()
+    spike, flat = channel(s, "p", "Spike"), channel(s, "f", "Flat")
+    start = NOW - timedelta(hours=5)
+
+    def stream(ch, key, values):
+        v = Video(youtube_video_id=key, channel_id=ch.id, title=key, live_started_at=start - timedelta(days=30))
+        s.add(v)
+        s.flush()
+        for i, val in enumerate(values):
+            s.add(Observation(video_id=v.id, channel_id=ch.id, observed_at=start + timedelta(seconds=30 * i), view_count=1, concurrent_viewers=val, is_live=True, classification="LIVE", source="test"))
+
+    stream(spike, "sp", [5000] * 12 + [20_000, 21_000] + [5200] * 10)
+    stream(flat, "fl", [3000] * 70)
+    s.commit()
+    res = authenticity.scan(s, days=7, now=NOW, use_cache=False)
+    burst = next(x for x in codes(res, "Spike")[0]["signals"] if x["code"] == "live_spike")
+    assert burst["lasted"] == "60 seconds" and burst["lasted_seconds"] == 60 and burst["from_ist"] and burst["to_ist"] and burst["episodes"][0]["lasted"] == "60 seconds"
+    line = next(x for x in codes(res, "Flat")[0]["signals"] if x["code"] == "live_flatline")
+    assert line["lasted_seconds"] == 69 * 30 and line["lasted"] == "34 minutes" and line["from_ist"].endswith(("AM", "PM")) and line["to_ist"].endswith(("AM", "PM"))
+    assert authenticity.lasted_text(40) == "40 seconds" and authenticity.lasted_text(720) == "12 minutes" and authenticity.lasted_text(6.5 * 3600) == "6.5 hours" and authenticity.lasted_text(3 * 86400) == "3 days"
+    ist = authenticity._ist_label(datetime(2026, 10, 12, 13, 30, tzinfo=UTC))
+    assert ist == "12 Oct, 7:00 PM"                                                                                          # 13:30 UTC is 7 pm in India

@@ -25,7 +25,10 @@ from sqlalchemy.orm import Session
 
 from api.ttl_cache import ttl_cache
 from api.market_common import channel_videos, latest_observations, mean, now_utc, parse_published, pick_channels, robust_z, rnd, stdev, utc
+from api.stamps import IST as _IST
 from collector.storage import AuthenticityReview, Observation, Video
+
+IST = _IST
 
 SIGNALS = {
     "low_engagement": "Very few likes for the views",
@@ -54,8 +57,34 @@ def _series(rows: list[Observation]) -> list[tuple[datetime, Observation]]:
     return [(utc(o.observed_at), o) for o in rows]
 
 
-def _flag(code: str, severity: str, detail: str, evidence: dict[str, Any]) -> dict[str, Any]:
-    return {"code": code, "title": SIGNALS[code], "severity": severity, "detail": detail, "evidence": evidence}
+def lasted_text(seconds: float) -> str:
+    """How long, in words anyone can read: 40 seconds, 12 minutes, 6.5 hours, 3 days."""
+    seconds = max(0.0, float(seconds))
+    if seconds < 90:
+        return f"{max(1, round(seconds))} second{'s' if round(seconds) != 1 else ''}"
+    minutes = seconds / 60
+    if minutes < 90:
+        return f"{round(minutes)} minutes"
+    hours = minutes / 60
+    if hours < 48:
+        return f"{hours:.1f} hours".replace(".0 ", " ")
+    return f"{hours / 24:.1f} days".replace(".0 ", " ")
+
+
+def _ist_label(moment: datetime) -> str:
+    t = utc(moment).astimezone(IST)
+    return f"{t.day} {t:%b}, {t.hour % 12 or 12}:{t:%M} {'AM' if t.hour < 12 else 'PM'}"
+
+
+def _flag(code: str, severity: str, detail: str, evidence: dict[str, Any], *, start: datetime | None = None, end: datetime | None = None, lasted: str | None = None) -> dict[str, Any]:
+    """A flag always says how long the pattern lasted and when (Indian time): from ``start`` to ``end`` when it is one episode, or a plain-words ``lasted`` for a pattern measured over a period."""
+    window: dict[str, Any] = {}
+    if start is not None and end is not None:
+        seconds = (utc(end) - utc(start)).total_seconds()
+        window = {"lasted": lasted or lasted_text(seconds), "lasted_seconds": round(seconds), "from_ist": _ist_label(start), "to_ist": _ist_label(end), "from": utc(start).isoformat(), "to": utc(end).isoformat()}
+    elif lasted:
+        window = {"lasted": lasted, "lasted_seconds": None, "from_ist": None, "to_ist": None}
+    return {"code": code, "title": SIGNALS[code], "severity": severity, "detail": detail, "evidence": evidence, **window}
 
 
 @ttl_cache(scale=10, stale=True, key=_question)   # about 7 minutes fresh, then handed out stale while it is worked out again
@@ -108,14 +137,14 @@ def scan(session: Session, *, days: int = 7, segment: str | None = None, languag
             med = median(peers)
             if z is not None and z <= -3 and like_rate[c.id] < 0.4 * med:
                 flags[c.id].append(_flag("low_engagement", "review", f"{like_rate[c.id] * 100:.2f}% likes per view against {med * 100:.2f}% for comparable channels.",
-                                         {"like_percent": rnd(like_rate[c.id] * 100, 2), "peer_median_percent": rnd(med * 100, 2), "videos": measured[c.id], "z": rnd(z, 1)}))
+                                         {"like_percent": rnd(like_rate[c.id] * 100, 2), "peer_median_percent": rnd(med * 100, 2), "videos": measured[c.id], "z": rnd(z, 1)}, lasted=f"Measured over the last {days} days"))
         pgroup = [pull[k] for k in pull if k != c.id and (next(x for x in channels if x.id == k).segment or "news") == (c.segment or "news")]
         if c.id in pull and len(pgroup) >= 4:
             z = robust_z(pull[c.id], pgroup)
             med = median(pgroup)
             if z is not None and z >= 3.5 and pull[c.id] >= 3 * med:
                 flags[c.id].append(_flag("views_vs_audience", "review", f"A recent video draws {pull[c.id] * 100:.0f}% of the subscriber count against {med * 100:.0f}% for comparable channels.",
-                                         {"pull_percent": rnd(pull[c.id] * 100, 0), "peer_median_percent": rnd(med * 100, 0), "videos": measured[c.id], "z": rnd(z, 1)}))
+                                         {"pull_percent": rnd(pull[c.id] * 100, 0), "peer_median_percent": rnd(med * 100, 0), "videos": measured[c.id], "z": rnd(z, 1)}, lasted=f"Measured over the last {days} days"))
 
     # --- video level: bursts and mechanical steps on each channel's most viewed recent videos
     top_ids: dict[int, list[Video]] = {}
@@ -156,7 +185,7 @@ def scan(session: Session, *, days: int = 7, segment: str | None = None, languag
             if len(peers) >= 4 and median(peers) >= 0.8 and stats["per_hour"] <= 0.15 * median(peers):
                 flags[cid].append(_flag("no_ad_dips", "review", f"Over {stats['hours']:.0f} hours this stream's audience dipped {stats['per_hour']:.2f} times an hour, against about {median(peers):.1f} for comparable channels. "
                                         "Real viewers usually leave at a commercial break or a change of programme; an audience that stays level through the day is worth a look.",
-                                        {"dips_per_hour": rnd(stats["per_hour"], 2), "peer_median_per_hour": rnd(median(peers), 1), "hours": round(stats["hours"], 1), "average_viewers": round(stats["average"]), "peers": len(peers)}))
+                                        {"dips_per_hour": rnd(stats["per_hour"], 2), "peer_median_per_hour": rnd(median(peers), 1), "hours": round(stats["hours"], 1), "average_viewers": round(stats["average"]), "peers": len(peers)}, start=stats["start"], end=stats["end"]))
 
     reviews = {(r.channel_id, r.signal): r for r in session.query(AuthenticityReview).filter(AuthenticityReview.channel_id.in_(ids)).all()} if ids else {}
     out = []
@@ -166,9 +195,10 @@ def scan(session: Session, *, days: int = 7, segment: str | None = None, languag
         for f in flags.get(c.id, []):
             cur = merged.get(f["code"])
             if cur is None:
-                merged[f["code"]] = {**f, "occurrences": 1}
+                merged[f["code"]] = {**f, "occurrences": 1, "episodes": [_episode(f)]}
             else:
                 cur["occurrences"] += 1
+                cur["episodes"].append(_episode(f))
                 if f["severity"] == "high":
                     cur["severity"] = "high"
         signals = []
@@ -186,6 +216,10 @@ def scan(session: Session, *, days: int = 7, segment: str | None = None, languag
     out.sort(key=lambda r: (order[r["risk"]], -len(r["signals"]), r["name"].lower()))
     result = {"days": days, "filters": {"segment": segment, "language": language}, "method": METHOD, "summary": counts, "channels": out, "signals": SIGNALS, "generated_at": now.isoformat()}
     return result
+
+
+def _episode(f: dict[str, Any]) -> dict[str, Any]:
+    return {k: f.get(k) for k in ("lasted", "lasted_seconds", "from_ist", "to_ist", "from", "to")} | {"detail": f["detail"]}
 
 
 def _burst_and_steps(sink: list[dict[str, Any]], rows: list[Observation], title: str) -> None:
@@ -208,16 +242,19 @@ def _burst_and_steps(sink: list[dict[str, Any]], rows: list[Observation], title:
             base = median([r for k, r in enumerate(rates) if k != i]) or 0
             if dv >= max(5000, 0.03 * total_views) and dv / dt >= max(8 * base, 5000) and (dl <= 0 or dl / dv < 0.2 * like_per_view):
                 sink.append(_flag("view_burst", "review", f"{dv:,} views arrived in {dt * 60:.0f} minutes ({dv / dt:,.0f} an hour against a usual {base:,.0f}) with {max(dl, 0):,} new likes.",
-                                  {"video": title[:90], "from": utc(a.observed_at).isoformat(), "views_added": dv, "minutes": round(dt * 60), "usual_views_per_hour": round(base), "new_likes": max(dl, 0)}))
+                                  {"video": title[:90], "from": utc(a.observed_at).isoformat(), "views_added": dv, "minutes": round(dt * 60), "usual_views_per_hour": round(base), "new_likes": max(dl, 0)}, start=a.observed_at, end=b.observed_at))
                 break
     deltas = [(b.view_count or 0) - (a.view_count or 0) for a, b in zip(rows, rows[1:])]
     run = best = 1
-    for x, y in zip(deltas, deltas[1:]):
+    best_end = 0
+    for k, (x, y) in enumerate(zip(deltas, deltas[1:]), start=1):
         run = run + 1 if x == y and x >= 100 else 1
-        best = max(best, run)
+        if run > best:
+            best, best_end = run, k
     if best >= 6:
         step = next(x for x, y in zip(deltas, deltas[1:]) if x == y and x >= 100)
-        sink.append(_flag("mechanical_steps", "review", f"Views grew by exactly {step:,} for {best + 1} samples in a row.", {"video": title[:90], "step": step, "samples_in_a_row": best + 1}))
+        first, last = max(0, best_end - best + 1), min(len(rows) - 1, best_end + 1)   # the samples the identical steps run across
+        sink.append(_flag("mechanical_steps", "review", f"Views grew by exactly {step:,} for {best + 1} samples in a row.", {"video": title[:90], "step": step, "samples_in_a_row": best + 1}, start=rows[first].observed_at, end=rows[last].observed_at))
 
 
 def dip_stats(rows: list[Any]) -> dict[str, float] | None:
@@ -244,7 +281,7 @@ def dip_stats(rows: list[Any]) -> dict[str, float] | None:
                 dips += 1
         elif v >= 0.97 * level or (t - started).total_seconds() > 900:
             in_dip = False
-    return {"dips": dips, "hours": hours, "per_hour": dips / hours, "average": average}
+    return {"dips": dips, "hours": hours, "per_hour": dips / hours, "average": average, "start": points[0][0], "end": points[-1][0]}
 
 
 def _live_signals(sink: list[dict[str, Any]], rows: list[Observation]) -> None:
@@ -255,7 +292,7 @@ def _live_signals(sink: list[dict[str, Any]], rows: list[Observation]) -> None:
         cv = sd / mean(values)
         if cv < 0.004:
             sink.append(_flag("live_flatline", "review", f"{len(values)} samples over {(times[-1] - times[0]).total_seconds() / 3600:.1f} hours stayed within {cv * 100:.2f}% of {mean(values):,.0f} viewers.",
-                              {"samples": len(values), "hours": round((times[-1] - times[0]).total_seconds() / 3600, 1), "average": round(mean(values)), "variation_percent": rnd(cv * 100, 2)}))
+                              {"samples": len(values), "hours": round((times[-1] - times[0]).total_seconds() / 3600, 1), "average": round(mean(values)), "variation_percent": rnd(cv * 100, 2)}, start=times[0], end=times[-1]))
     for i in range(6, len(values)):
         base = median(values[max(0, i - 10):i])
         if base <= 0 or values[i] < 3 * base or values[i] - base < 2000:
@@ -265,7 +302,7 @@ def _live_signals(sink: list[dict[str, Any]], rows: list[Observation]) -> None:
                 break
             if values[j] <= 1.5 * base:
                 sink.append(_flag("live_spike", "review", f"Viewers jumped from about {base:,.0f} to {values[i]:,} and were back near {values[j]:,} within {(times[j] - times[i]).total_seconds() / 60:.0f} minutes.",
-                                  {"at": times[i].isoformat(), "before": round(base), "peak": values[i], "after": values[j], "minutes": round((times[j] - times[i]).total_seconds() / 60)}))
+                                  {"at": times[i].isoformat(), "before": round(base), "peak": values[i], "after": values[j], "minutes": round((times[j] - times[i]).total_seconds() / 60)}, start=times[i], end=times[j]))
                 return
         # a spike that is still up at the end of the data is not judged yet
 

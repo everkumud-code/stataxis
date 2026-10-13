@@ -164,7 +164,7 @@ def test_alerts_fire_once_per_pause_and_belong_to_their_owner():
     assert alerts.evaluate_alerts(s, now=now) == 2
     assert alerts.evaluate_alerts(s, now=now + timedelta(minutes=1)) == 0                   # inside the pause
     listing = alerts.list_alerts(s, me.id)
-    assert listing["unseen"] == 2 and any("rose 140%" in e["message"] for e in listing["events"]) and "not set up" in listing["delivery"]
+    assert listing["unseen"] == 2 and any("went up 140%" in e["message"] for e in listing["events"]) and "not set up" in listing["delivery"]
     alerts.mark_seen(s, me.id)
     assert alerts.list_alerts(s, me.id)["unseen"] == 0 and alerts.list_alerts(s, other.id)["events"] == []
     with pytest.raises(LookupError):

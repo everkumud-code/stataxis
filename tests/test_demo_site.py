@@ -55,7 +55,7 @@ def test_the_real_screens_run_on_the_demo_data(secret, token):
     status, radar, _ = call("GET", "/demo-api/v1/market/authenticity", token)
     assert status == 200 and any(c["name"] == demo_data.FLAT for c in radar["channels"] if c["risk"] != "low")      # the flat line is found, by the real radar
     status, ifx, _ = call("GET", "/demo-api/v1/market/creator-index?segment=creator", token)
-    assert status == 200 and len([c for c in ifx["channels"] if c["index_score"] is not None]) >= 3 and len(ifx["part_labels"]) == 12
+    assert status == 200 and len([c for c in ifx["channels"] if c["index_score"] is not None]) >= 3 and len(ifx["part_labels"]) == 16
 
 
 def test_the_demo_can_look_at_everything_and_change_nothing(secret, token):

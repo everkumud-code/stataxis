@@ -137,7 +137,7 @@ def test_the_coverage_plan_is_stated_the_way_the_owner_gave_it_and_the_weights_a
     stx = text(DASH / "stx.html")
     assert sum(int(x) for x in re.findall(r"<em>(\d+)%</em>", stx)) == 100
     ifx_bars = re.findall(r"<em>(\d+)%</em>", text(DASH / "ifx.html"))
-    assert len(ifx_bars) == 15 and sum(int(x) for x in ifx_bars[:3]) == 100 and sum(int(x) for x in ifx_bars[3:]) == 100   # the three pillars, then the twelve parts: each bar adds up to 100
+    assert len(ifx_bars) == 19 and sum(int(x) for x in ifx_bars[:3]) == 100 and sum(int(x) for x in ifx_bars[3:]) == 100   # the three pillars, then the sixteen parts: each bar adds up to 100
 
 
 def test_the_scripts_define_the_scenes_the_pages_ask_for():

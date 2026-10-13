@@ -2,9 +2,13 @@
 
 The STX Index for channels leans on live audiences. A creator has none, so the IFX Score is built from what a creator does have in public, under three pillars:
 
-  Impact        how strongly the content lands: depth of reaction (likes and comments per view), conversation (comments per 1,000 views) and staying power (old videos still earning)
-  Followership  the audience behind the creator: its size, its loyalty (views per subscriber), its growth and, for those who go live, the turnout at a live stream
-  eXposure      how far and how often the creator is seen: reach per upload, regular publishing, steady results, hit rate (how often an upload beats the typical peer upload) and fresh uploads
+  Impact        how strongly the content lands: depth of reaction (likes and comments per view), conversation (comments per 1,000 views), staying power (old videos still earning) and the best upload against the size of the audience
+  Followership  the audience behind the creator: its size, its loyalty (views per subscriber), its growth, reaching beyond the creator's own subscribers and, for those who go live, the turnout at a live stream
+  eXposure      how far and how often the creator is seen: reach per upload, regular publishing, steady results, hit rate (how often an upload beats the typical peer upload), fresh uploads, momentum (are newer uploads doing better
+                than older ones) and the early pull of new uploads
+
+Four of the sixteen parts (best upload against audience size, reaching beyond subscribers, momentum, early pull of new uploads) do not depend on how big the creator already is, so a small creator who makes things people
+want can score well on them; the pillars keep their 35 / 35 / 30 weights.
 
 Each part is ranked against the other creators in the same comparison (not against a fixed scale), the parts are combined, and the result is pulled toward 50 when STAXIS has little data,
 exactly as the channel index does. Saves, shares and conversions are not public on YouTube, so they are not used, and exposure on other platforms is not seen: this score is YouTube only
@@ -31,21 +35,23 @@ from collector.storage import Observation, Video
 INDEX_NAME = "IFX Score"  # the one place the name is set
 TAGLINE = "Impact · Followership · eXposure"
 PARTS = {  # part: (pillar, weight)
-    "engagement": ("impact", 0.12), "conversation": ("impact", 0.08), "staying": ("impact", 0.15),
-    "size": ("followership", 0.08), "loyalty": ("followership", 0.12), "growth": ("followership", 0.08), "live": ("followership", 0.07),
-    "reach": ("exposure", 0.10), "cadence": ("exposure", 0.08), "steadiness": ("exposure", 0.04), "hitrate": ("exposure", 0.05), "freshness": ("exposure", 0.03),
+    "engagement": ("impact", 0.09), "conversation": ("impact", 0.06), "staying": ("impact", 0.12), "bestshot": ("impact", 0.08),
+    "size": ("followership", 0.04), "loyalty": ("followership", 0.10), "growth": ("followership", 0.08), "live": ("followership", 0.06), "beyond": ("followership", 0.07),
+    "reach": ("exposure", 0.06), "cadence": ("exposure", 0.07), "steadiness": ("exposure", 0.04), "hitrate": ("exposure", 0.05), "freshness": ("exposure", 0.03), "momentum": ("exposure", 0.03), "earlypull": ("exposure", 0.02),
 }
 WEIGHTS = {k: w for k, (_p, w) in PARTS.items()}
 PILLARS = {"impact": "Impact", "followership": "Followership", "exposure": "eXposure"}
 PILLAR_WEIGHTS = {p: round(sum(w for _k, (pp, w) in PARTS.items() if pp == p), 2) for p in PILLARS}
 LABELS = {"engagement": "Depth of reaction", "conversation": "Conversation in the comments", "staying": "Old videos still earn", "size": "Audience size", "loyalty": "Views per subscriber",
-          "growth": "Audience growth", "live": "Live turnout", "reach": "Reach per upload", "cadence": "Regular publishing", "steadiness": "Steady results", "hitrate": "Hit rate", "freshness": "Fresh uploads"}
+          "growth": "Audience growth", "live": "Live turnout", "reach": "Reach per upload", "cadence": "Regular publishing", "steadiness": "Steady results", "hitrate": "Hit rate", "freshness": "Fresh uploads",
+          "bestshot": "Best upload against audience size", "beyond": "Reaching beyond own subscribers", "momentum": "Momentum (newer uploads against older)", "earlypull": "Early pull of new uploads"}
 NOT_MEASURED = ["Saves, shares and conversions (YouTube does not publish them for other people's videos)", "Exposure on other platforms (this score is YouTube only)"]
 METHOD = (
-    f"The {INDEX_NAME} ({TAGLINE}) ranks each creator against the others in the comparison on twelve measured parts under three pillars. "
-    "Impact: depth of reaction ((likes + 5 x comments) / views), conversation (comments per 1,000 views) and staying power (how fast videos older than 10 days keep gaining views). "
-    "Followership: audience size (subscribers), loyalty (median views of a mature upload / subscribers), growth (subscriber change, needs 3+ days of history) and live turnout (median peak viewers of the creator's own live streams / subscribers; only for creators who went live). "
-    "eXposure: reach per upload (median views), regular publishing (uploads per week and how even the gaps are), steady results (how little views vary from upload to upload), hit rate (the share of mature uploads that reach at least the typical peer upload) and fresh uploads (how recently the creator last published). "
+    f"The {INDEX_NAME} ({TAGLINE}) ranks each creator against the others in the comparison on sixteen measured parts under three pillars. "
+    "Impact: depth of reaction ((likes + 5 x comments) / views), conversation (comments per 1,000 views) and staying power (how fast videos older than 10 days keep gaining views) and best upload against audience size (the most-viewed upload / subscribers). "
+    "Followership: audience size (subscribers), loyalty (median views of a mature upload / subscribers), growth (subscriber change, needs 3+ days of history) live turnout (median peak viewers of the creator's own live streams / subscribers; only for creators who went live) and reaching beyond subscribers (the share of mature uploads watched more times than the creator has subscribers). "
+    "eXposure: reach per upload (median views), regular publishing (uploads per week and how even the gaps are), steady results (how little views vary from upload to upload), hit rate (the share of mature uploads that reach at least the typical peer upload) fresh uploads (how recently the creator last published), momentum (median views of the newest third of mature uploads / the oldest third; needs 6+ uploads) and early pull (median views of uploads 2 to 10 days old / subscribers). "
+    "Four of these parts (best upload, beyond subscribers, momentum, early pull) do not depend on how big the creator already is, so small creators are judged on what their content does, not on how many people follow. "
     "A part STAXIS cannot measure is left out and the others are re-weighted. Live streams are excluded. "
     "The shown score is pulled toward 50 by (1 - confidence), so thin data cannot give a confident-looking score. A creator with open high-risk unusual-viewership flags loses 10 points; "
     "one whose flag an admin confirmed is not scored. Not measured: saves, shares and conversions, and exposure on other platforms."
@@ -122,7 +128,14 @@ def creator_index(session: Session, *, segment: str | None = None, language: str
         own_peaks = [live_peaks[v.id] for v in live_vids if v.channel_id == c.id and v.id in live_peaks]
         last_up = parse_published(vs[-1].published_at) if vs else None
         days_since = max(0.0, (now - last_up).total_seconds() / 86400) if last_up else None
+        recent = [int(latest[v.id].view_count) for v in vs if now - timedelta(days=10) <= (parse_published(v.published_at) or now) <= now - timedelta(days=2)]
+        third = len(mviews) // 3
+        momentum = (median(mviews[-third:]) / median(mviews[:third])) if len(mviews) >= 6 and third >= 2 and median(mviews[:third]) else None   # newest third against oldest third; newer uploads have had less time, so a ratio of 1 or more is convincing
         raw[c.id] = {
+            "bestshot": (max(mviews) / subs_now) if len(mviews) >= 3 and subs_now else None,
+            "beyond": (sum(1 for x in mviews if x >= subs_now) / len(mviews)) if len(mviews) >= 5 and subs_now else None,
+            "momentum": momentum,
+            "earlypull": (median(recent) / subs_now) if len(recent) >= 2 and subs_now else None,
             "conversation": (comments / react_views) if react_views else None,
             "live": (median(own_peaks) / subs_now) if own_peaks and subs_now else None, "live_streams": len(own_peaks), "live_peak_median": median(own_peaks) if own_peaks else None,
             "freshness": (1 / (1 + days_since / 7)) if days_since is not None else None, "days_since_last_upload": days_since, "_mviews": mviews,
@@ -192,6 +205,8 @@ def creator_index(session: Session, *, segment: str | None = None, language: str
             "median_views": rnd(r["median_views"], 0), "pull_percent": rnd(r["pull"] * 100, 1) if r["pull"] is not None else None,
             "pull_video_percent": rnd(r["pull_video"] * 100, 1) if r["pull_video"] is not None else None, "pull_shorts_percent": rnd(r["pull_shorts"] * 100, 1) if r["pull_shorts"] is not None else None,
             "engagement_percent": rnd(r["engagement"] * 100, 2) if r["engagement"] is not None else None, "uploads_per_week": rnd(r["uploads_per_week"], 1),
+            "best_upload_vs_subscribers_percent": rnd(r["bestshot"] * 100, 0) if r["bestshot"] is not None else None, "beyond_subscribers_percent": rnd(r["beyond"] * 100, 0) if r["beyond"] is not None else None,
+            "momentum_percent": rnd((r["momentum"] - 1) * 100, 0) if r["momentum"] is not None else None, "early_pull_percent": rnd(r["earlypull"] * 100, 1) if r["earlypull"] is not None else None,
             "comments_per_1000_views": rnd(r["conversation"] * 1000, 1) if r["conversation"] is not None else None, "hit_rate_percent": rnd(r["hitrate"] * 100, 0) if r["hitrate"] is not None else None,
             "live_streams": r["live_streams"], "live_peak_median": rnd(r["live_peak_median"], 0), "days_since_last_upload": rnd(r["days_since_last_upload"], 1),
             "authenticity_risk": rk["risk"] if rk else "not_checked", "withheld_reason": "An admin confirmed unusual viewership for this channel." if confirmed else None,

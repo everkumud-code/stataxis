@@ -297,10 +297,10 @@ def test_channel_group_can_be_chosen_when_adding_and_changed_later():
         set_channel_segment(s, AuthIdentity(2, "u@x.com", "sx_pro", False), c.id, "news")
 
 
-def test_ifx_has_twelve_parts_with_the_pillars_still_35_35_30_and_scores_the_new_ones():
+def test_ifx_has_sixteen_parts_with_the_pillars_still_35_35_30_and_scores_the_new_ones():
     from api import creator_index as ci
-    assert len(ci.PARTS) == 12 and abs(sum(ci.WEIGHTS.values()) - 1) < 1e-9 and ci.PILLAR_WEIGHTS == {"impact": 0.35, "followership": 0.35, "exposure": 0.3}
-    assert {"conversation", "live", "hitrate", "freshness"} <= set(ci.PARTS) and set(ci.LABELS) == set(ci.PARTS) and "twelve measured parts" in ci.METHOD
+    assert len(ci.PARTS) == 16 and abs(sum(ci.WEIGHTS.values()) - 1) < 1e-9 and ci.PILLAR_WEIGHTS == {"impact": 0.35, "followership": 0.35, "exposure": 0.3}
+    assert {"conversation", "live", "hitrate", "freshness"} <= set(ci.PARTS) and set(ci.LABELS) == set(ci.PARTS) and "sixteen measured parts" in ci.METHOD
     s, _ = make_session()
     for i, (name, subs, views, comments, gap) in enumerate([("Talker", 100_000, 30_000, 400, 2), ("Quiet", 100_000, 30_000, 20, 2), ("Big", 100_000, 90_000, 100, 2), ("Small", 100_000, 6_000, 60, 2), ("Stale", 100_000, 30_000, 100, 2), ("Live", 100_000, 30_000, 100, 2)]):
         c = channel(s, f"i{i}", name, segment="creator")
@@ -337,3 +337,31 @@ def test_last_hour_is_the_sixty_minutes_before_now_and_today_starts_at_midnight_
     assert _period_start(now, "today") == datetime(2026, 10, 11, 18, 30, tzinfo=UTC)       # 00:00 on 12 Oct in India
     late = datetime(2026, 10, 12, 20, 0, tzinfo=UTC)                     # 1:30 am on 13 Oct in India: a new day there
     assert _period_start(late, "today") == datetime(2026, 10, 12, 18, 30, tzinfo=UTC)
+
+
+def test_the_four_parts_that_help_small_creators_reward_what_the_content_does_not_the_size():
+    from api import creator_index as ci
+    small = {"bestshot", "beyond", "momentum", "earlypull"}
+    assert small <= set(ci.PARTS) and set(ci.LABELS) == set(ci.PARTS) and ci.PILLAR_WEIGHTS == {"impact": 0.35, "followership": 0.35, "exposure": 0.3}
+    assert sum(ci.WEIGHTS[k] for k in small) >= 0.15 and ci.WEIGHTS["size"] <= 0.05                       # size counts for little; the new parts count for more
+    s, _ = make_session()
+    # five creators with 10 uploads each; "Tiny" has few followers, and its uploads travel far and keep improving
+    spec = {"Tiny": (800, [3_000 + 600 * k for k in range(10)]), "Mid": (50_000, [4_000] * 10), "Big": (900_000, [20_000] * 10), "Big2": (700_000, [25_000] * 10), "Mid2": (60_000, [5_000] * 10)}
+    for i, (name, (subs, views)) in enumerate(spec.items()):
+        c = channel(s, f"k{i}", name, segment="creator")
+        s.add(ChannelStats(channel_id=c.id, observed_at=NOW - timedelta(hours=1), subscribers=subs, total_views=1))
+        for k, vw in enumerate(views):
+            age = (9 - k) * 2 + 3                                                                              # older uploads first: k=9 is the newest
+            v = Video(youtube_video_id=f"{name}{k}", channel_id=c.id, title="t", topic="Other", published_at=(NOW - timedelta(days=age)).strftime("%Y-%m-%dT%H:%M:%SZ"))
+            s.add(v)
+            s.flush()
+            s.add(Observation(video_id=v.id, channel_id=c.id, observed_at=NOW - timedelta(hours=1), view_count=vw, like_count=vw // 25, comment_count=20, concurrent_viewers=None, is_live=False, classification="REGULAR_VIDEO", source="t"))
+    s.commit()
+    rows = {r["name"]: r for r in creator_index(s, segment="creator", days=30, now=NOW, with_authenticity=False)["channels"]}
+    tiny, big = rows["Tiny"], rows["Big"]
+    assert tiny["beyond_subscribers_percent"] == 100 and big["beyond_subscribers_percent"] == 0                    # every Tiny upload was watched by more people than follow Tiny
+    assert tiny["best_upload_vs_subscribers_percent"] > 500 and big["best_upload_vs_subscribers_percent"] < 5
+    assert tiny["momentum_percent"] > 0 and big["momentum_percent"] == 0 and tiny["early_pull_percent"] is not None
+    for part in small:
+        assert tiny["parts"][part] > big["parts"][part]                                                         # the small creator out-ranks the big one on each of them
+    assert tiny["parts"]["size"] < big["parts"]["size"]                                                         # and is still honestly behind on size

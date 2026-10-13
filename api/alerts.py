@@ -75,7 +75,7 @@ def evaluate_alerts(session: Session, *, now: datetime | None = None) -> int:
             if before and before >= 200:
                 change = 100.0 * (value - before) / before
                 if alert.kind == "rise_percent" and change >= alert.threshold:
-                    message = f"{name} rose {change:.0f}% in {alert.window_minutes} minutes, from {before:,} to {value:,} live viewers."
+                    message = f"{name} went up {change:.0f}% in {alert.window_minutes} minutes, from {before:,} to {value:,} live viewers."
                 elif alert.kind == "drop_percent" and -change >= alert.threshold:
                     message = f"{name} fell {-change:.0f}% in {alert.window_minutes} minutes, from {before:,} to {value:,} live viewers."
         if message:

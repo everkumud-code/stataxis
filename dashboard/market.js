@@ -269,6 +269,8 @@
           {h: "Confidence", n: 1, v: r => r.confidence + "% " + r.confidence_label}, {h: "Strong on", v: r => r.strengths.join(", ") || "—"}, {h: "Watch", v: r => r.watch.join(", ") || "—"},
           {h: "Uploads", n: 1, v: r => `${r.uploads} (${r.uploads_video} video, ${r.uploads_shorts} Shorts)`}, {h: "Views per subscriber", n: 1, v: r => r.pull_percent == null ? "—" : r.pull_percent + "%"},
           {h: "Comments per 1,000 views", n: 1, v: r => r.comments_per_1000_views == null ? "—" : r.comments_per_1000_views}, {h: "Hit rate", n: 1, v: r => r.hit_rate_percent == null ? "—" : r.hit_rate_percent + "%"},
+          {h: "Best upload vs subscribers", n: 1, v: r => r.best_upload_vs_subscribers_percent == null ? "—" : r.best_upload_vs_subscribers_percent + "%"}, {h: "Uploads beyond subscribers", n: 1, v: r => r.beyond_subscribers_percent == null ? "—" : r.beyond_subscribers_percent + "%"},
+          {h: "Momentum", n: 1, v: r => r.momentum_percent == null ? "—" : (r.momentum_percent > 0 ? "+" : "") + r.momentum_percent + "%"}, {h: "Early pull of new uploads", n: 1, v: r => r.early_pull_percent == null ? "—" : r.early_pull_percent + "%"},
           {h: "Live turnout (median peak)", n: 1, v: r => r.live_streams ? `${whole(r.live_peak_median)} (${r.live_streams} live)` : "—"}, {h: "Last upload", n: 1, v: r => r.days_since_last_upload == null ? "—" : (r.days_since_last_upload < 1 ? "today" : Math.round(r.days_since_last_upload) + " d ago")},
           {h: "Best format", v: r => r.best_format || "—"}], d.channels, "No creators in this group yet. Admins can put channels in the Creators or Independent journalists group under Channel groups.", {group: r => r.language})}</section>
           <section class="card" style="margin-top:14px"><h2>What the three pillars are</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
@@ -331,6 +333,11 @@
       `<form class="card" id="af" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin:12px 0"><label>Group<br><select name="segment">${opt(SEGMENTS, (SP.auth || {}).segment || "")}</select></label>
       <label>Language<br><select name="language">${opt(LANGS, (SP.auth || {}).language || "")}</select></label><label>Look back<br><select name="days">${opt([["3", "3 days"], ["7", "7 days"], ["14", "14 days"], ["28", "28 days"]], (SP.auth || {}).days || "7")}</select></label>
       ${filterFields((SP.auth || {}), {place: false, age: false, known: false})}<button class="btn primary" type="submit">Scan</button></form><div id="aout"></div>`;
+    /* how long the pattern lasted and when (Indian time): one line per episode, the longest few */
+    const episodes = s => {
+      const list = (s.episodes && s.episodes.length ? s.episodes : [s]).filter(x => x.lasted).slice().sort((a, b) => (b.lasted_seconds || 0) - (a.lasted_seconds || 0)).slice(0, 3);
+      return list.map(x => `<p class="muted"><strong>Lasted ${esc(x.lasted.replace(/^Measured over the last /, ""))}</strong>${x.from_ist ? ` · ${esc(x.from_ist)} to ${esc(x.to_ist)} IST` : " (the period scanned)"}</p>`).join("");
+    };
     const colors = {high: "red", review: "", low: "green"}, words = {high: "Review now", review: "Check", low: "Nothing unusual"};
     const run = async () => {
       const v = formValues($("#af", el)); keep("auth", v); const out = $("#aout", el); out.innerHTML = `<p class="muted">Scanning…</p>`;
@@ -338,7 +345,7 @@
         const d = await api("/api/v1/market/authenticity", v);
         out.innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">${kpi("Review now", d.summary.high, "channels", d.summary.high ? "red" : "")}${kpi("Check", d.summary.review, "channels")}${kpi("Nothing unusual", d.summary.low, "channels", "green")}</div>` +
           d.channels.filter(c => c.signals.length).map(c => `<section class="card" style="margin-top:12px"><h2>${esc(c.name)} <span class="tag ${colors[c.risk]}">${words[c.risk]}</span></h2>${c.signals.map(s => `<div style="padding:8px 0;border-top:1px solid #152c40"><strong>${esc(s.title)}</strong>${s.occurrences > 1 ? ` <span class="muted">(seen ${s.occurrences} times)</span>` : ""}
-            <p class="muted">${esc(s.detail)}</p>${s.review ? `<p><span class="tag">${esc(s.review.status)}</span> <span class="muted">${esc(s.review.by || "")} ${s.review.note ? "· " + esc(s.review.note) : ""}</span></p>` : ""}
+            <p class="muted">${esc(s.detail)}</p>${episodes(s)}${s.review ? `<p><span class="tag">${esc(s.review.status)}</span> <span class="muted">${esc(s.review.by || "")} ${s.review.note ? "· " + esc(s.review.note) : ""}</span></p>` : ""}
             ${isAdmin ? `<div class="btnrow">${["cleared", "watching", "confirmed"].map(st => `<button class="btn" type="button" data-rev="${esc(st)}" data-ch="${esc(c.channel_id)}" data-sig="${esc(s.code)}">Mark ${st}</button>`).join("")}</div>` : ""}</div>`).join("")}</section>`).join("") +
           (d.channels.some(c => c.signals.length) ? "" : state("Nothing unusual found", "No channel shows an unusual pattern in these days.")) + method(d.method);
         out.querySelectorAll("[data-rev]").forEach(b => b.onclick = async () => {
@@ -681,8 +688,8 @@
         out.innerHTML = `<section class="card"><h2>Spikes in the last ${esc(sp.hours)} ${Number(sp.hours) === 1 ? "hour" : "hours"}</h2>` + (sp.spikes.length ? table([
           {h: "Channel", html: 1, v: r => `<strong>${esc(r.channel)}</strong>`}, {h: "Started (IST)", v: r => r.started_ist}, {h: "Before", n: 1, v: r => whole(r.before)}, {h: "Peak", n: 1, v: r => whole(r.peak)},
           {h: "Rise", n: 1, v: r => whole(r.rise)}, {h: "Stream that carried it", html: 1, v: lead}, {h: "Share of the rise", n: 1, v: r => r.lead_stream && r.lead_stream.share_of_rise_percent != null ? r.lead_stream.share_of_rise_percent + "%" : "—"}], sp.spikes)
-          : `<p class="muted">No channel rose suddenly in these hours.</p>`) + `<p class="muted" style="margin-top:8px">${esc(sp.rule)} ${esc(sp.note)}</p></section>
-          <div class="grid kpis" style="margin-top:14px">${kpi("Gained", whole(mv.gained_total), "viewers, channels that rose")}${kpi("Lost", whole(mv.lost_total), "viewers, channels that fell")}${kpi("Matched shift", whole(mv.matched_shift), "the part of both that lines up", "gold")}</div>
+          : `<p class="muted">No channel went up suddenly in these hours.</p>`) + `<p class="muted" style="margin-top:8px">${esc(sp.rule)} ${esc(sp.note)}</p></section>
+          <div class="grid kpis" style="margin-top:14px">${kpi("Gained", whole(mv.gained_total), "viewers, channels that went up")}${kpi("Lost", whole(mv.lost_total), "viewers, channels that fell")}${kpi("Matched shift", whole(mv.matched_shift), "the part of both that lines up", "gold")}</div>
           <section class="card" style="margin-top:14px"><h2>Who gained and who lost in the last ${esc(mv.minutes)} minutes</h2>` + table([
           {h: "Channel", html: 1, v: r => `<strong>${esc(r.channel)}</strong>`}, {h: "Before", n: 1, v: r => whole(r.before)}, {h: "Now", n: 1, v: r => whole(r.after)}, {h: "Change", n: 1, v: r => (r.change > 0 ? "+" : "") + whole(r.change)}, {h: "Change %", n: 1, v: r => r.change_percent == null ? "—" : (r.change_percent > 0 ? "+" : "") + r.change_percent + "%"}],
           [...mv.channels.slice(0, 8), ...mv.channels.slice(-8).filter(r => r.change < 0)].filter((r, i, a) => a.findIndex(x => x.channel_id === r.channel_id) === i), "Nothing is live.") + `</section>

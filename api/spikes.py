@@ -86,11 +86,11 @@ def spikes(session: Session, *, hours: int = 6, language: str | None = None, seg
             lead["title"] = titles.get(lead["video_id"])
             share = f", {lead['share_of_rise_percent']:.0f}% of the rise" if lead["share_of_rise_percent"] is not None else ""
             new = " (a stream that had just started)" if lead["was_new"] else ""
-            row["text"] = f"{row['channel']} rose from about {row['before']:,} to {row['peak']:,} viewers in {row['minutes_to_peak']} minutes from {row['started_ist']}. Most of it came from “{lead['title'] or lead['video_id']}”{new}{share}."
+            row["text"] = f"{row['channel']} went up from about {row['before']:,} to {row['peak']:,} viewers in {row['minutes_to_peak']} minutes from {row['started_ist']}. Most of it came from “{lead['title'] or lead['video_id']}”{new}{share}."
         else:
-            row["text"] = f"{row['channel']} rose from about {row['before']:,} to {row['peak']:,} viewers from {row['started_ist']}."
+            row["text"] = f"{row['channel']} went up from about {row['before']:,} to {row['peak']:,} viewers from {row['started_ist']}."
     return {"hours": hours, "window": {"from": start.isoformat(), "to": end.isoformat()}, "rule": f"A rise of at least {FACTOR:g} times the level of the previous {LOOKBACK} minutes and at least {MIN_RISE:,} viewers.", "spikes": found,
-            "note": "A spike shows where the audience rose and which stream carried it; it does not say why viewers came."}
+            "note": "A spike shows where the audience went up and which stream carried it; it does not say why viewers came."}
 
 
 @ttl_cache(stale=True)
