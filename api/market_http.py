@@ -121,6 +121,7 @@ def market_application(session_factory: Callable[[], Any]):
                                                                    target=target, profiles=profiles, known_only=known_only))
                 if (method, path) in {("GET", "/api/v1/market/report"), ("GET", "/api/v1/market/report.pdf")}:
                     report = build_report(session, start_date=week_from, end_date=week_to, start_hour=_int(q.get("start_hour"), "start_hour", 9), end_hour=_int(q.get("end_hour"), "end_hour", 12),
+                                          start_time=q.get("start_time") or None, end_time=q.get("end_time") or None, whole_day=q.get("whole_day") in {"1", "true", "yes"}, day_wise=q.get("day_wise") in {"1", "true", "yes"},
                                           feed=q.get("feed") or "all", scope=q.get("scope") or "live", genre=q.get("genre") or None, language=language, segment=segment,
                                           by_genre=q.get("by_genre") in {"1", "true", "yes"}, channel_ids=cids, target=target, profiles=profiles, known_only=known_only)
                     if path.endswith(".pdf"):

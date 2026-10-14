@@ -365,3 +365,30 @@ def test_the_four_parts_that_help_small_creators_reward_what_the_content_does_no
     for part in small:
         assert tiny["parts"][part] > big["parts"][part]                                                         # the small creator out-ranks the big one on each of them
     assert tiny["parts"]["size"] < big["parts"]["size"]                                                         # and is still honestly behind on size
+
+
+def test_report_builder_takes_times_to_the_minute_the_entire_day_and_a_day_by_day_view():
+    s, _ = make_session()
+    a = channel(s, "a", "Alpha")
+    for i in (9, 10, 11):
+        d = datetime(2026, 10, i).date()
+        live(s, a, "a-main", d, 9, 10, 5_000)                  # 09:00-10:00 at 5,000
+        live(s, a, "a-main", d, 10, 11, 9_000 if i == 11 else 7_000)  # 10:00-11:00 at 7,000 (9,000 on the 11th)
+    s.commit()
+    first = build_report(s, start_date="2026-10-09", end_date="2026-10-11", start_time="09:00", end_time="10:00", scope="live", now=NOW)
+    assert first["start_time"] == "09:00" and first["end_time"] == "10:00" and first["rows"][0]["average"] == pytest.approx(5_000, rel=0.02) and first["whole_day"] is False
+    half = build_report(s, start_date="2026-10-09", end_date="2026-10-09", start_time="09:30", end_time="10:30", scope="live", now=NOW)
+    assert half["rows"][0]["average"] == pytest.approx(6_000, rel=0.02) and half["start_time"] == "09:30"                                    # half an hour at 5,000 and half an hour at 7,000
+    whole = build_report(s, start_date="2026-10-09", end_date="2026-10-11", whole_day=True, scope="live", day_wise=True, now=NOW)
+    assert whole["whole_day"] is True and (whole["start_time"], whole["end_time"]) == ("00:00", "24:00")
+    assert [d["date"] for d in whole["by_day"]] == ["2026-10-09", "2026-10-10", "2026-10-11"]                       # one table per date
+    assert [d["rows"][0]["average"] for d in whole["by_day"]] == pytest.approx([6_000, 6_000, 7_000], rel=0.02) and whole["rows"][0]["average"] == pytest.approx(19_000 / 3, rel=0.02)
+    assert "by_day" not in build_report(s, start_date="2026-10-09", end_date="2026-10-11", whole_day=True, scope="live", now=NOW)
+    for bad in (dict(start_time="12:00", end_time="09:00"), dict(start_time="9am", end_time="10:00"), dict(start_time="09:00", end_time="25:00"), dict(start_time="09:61", end_time="10:00")):
+        with pytest.raises(ValueError):
+            build_report(s, start_date="2026-10-10", end_date="2026-10-10", scope="live", now=NOW, **bad)
+    today = datetime(2026, 10, 12, 8, 0, tzinfo=UTC)                                                                # 13:30 IST on the 12th
+    live(s, a, "a-main", datetime(2026, 10, 12).date(), 9, 11, 4_000)
+    s.commit()
+    so_far = build_report(s, start_date="2026-10-12", end_date="2026-10-12", whole_day=True, day_wise=True, scope="live", now=today)
+    assert so_far["partial_until_ist"] and so_far["by_day"][0]["partial"] is True and so_far["by_day"][0]["to_time"] == "13:30" and so_far["rows"][0]["average"] == 4_000   # the running day is counted up to now

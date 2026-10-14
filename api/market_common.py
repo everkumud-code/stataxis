@@ -51,6 +51,29 @@ def ist_hours(day: date, start_hour: int, end_hour: int) -> tuple[datetime, date
     return start.astimezone(UTC), end.astimezone(UTC)
 
 
+def ist_minutes(day: date, start_minute: int, end_minute: int) -> tuple[datetime, datetime]:
+    """UTC start and end of ``start_minute`` .. ``end_minute`` (minutes after midnight, Indian time; 1440 is the end of the day) on an Indian day."""
+    midnight = datetime(day.year, day.month, day.day, tzinfo=IST)
+    return (midnight + timedelta(minutes=start_minute)).astimezone(UTC), (midnight + timedelta(minutes=end_minute)).astimezone(UTC)
+
+
+def parse_clock(value: Any, field: str) -> int:
+    """'09:30' -> 570 minutes after midnight; '24:00' (the end of the day) -> 1440."""
+    text = str(value or "").strip()
+    try:
+        hours, minutes = text.split(":")[:2] if ":" in text else (text, "0")
+        h, m = int(hours), int(minutes)
+    except ValueError as exc:
+        raise ValueError(f"{field} must look like 09:30") from exc
+    if not (0 <= m < 60 and 0 <= h <= 24 and (h < 24 or m == 0)):
+        raise ValueError(f"{field} must be a time between 00:00 and 24:00")
+    return h * 60 + m
+
+
+def clock(minutes: int) -> str:
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
 def today_ist(now: datetime | None = None) -> date:
     return (now or now_utc()).astimezone(IST).date()
 

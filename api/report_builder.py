@@ -1,4 +1,4 @@
-"""Report builder: pick the hours of the day, the dates, the feed (all / primary / secondary), the kind of content (live, videos, shorts, live replays) and the genre,
+"""Report builder: pick the times of the day (HH:MM to HH:MM, or the entire day), the dates, the feed (all / primary / secondary), the kind of content (live, videos, shorts, live replays) and the genre,
 and get the measured ranking back, ready to turn into a PDF (api/report_pdf.py).
 
 Live scope  -> average and peak concurrent viewers per channel in those hours (the feed decides which streams are counted).
@@ -9,7 +9,7 @@ Nothing is estimated: a video that STAXIS did not measure close to both ends of 
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -17,12 +17,13 @@ from sqlalchemy.orm import Session
 
 from api import audience as audience_mod
 from api.live_stats import live_window_stats
-from api.market_common import MAX_RANGE_DAYS, ist_hours, mean, now_utc, parse_day, parse_published, pick_channels, rnd, today_ist, utc
+from api.market_common import MAX_RANGE_DAYS, clock, ist_minutes, mean, now_utc, parse_clock, parse_day, parse_published, pick_channels, rnd, today_ist, utc
 from api.ttl_cache import ttl_cache
 from api.media_intelligence import _scope_matches
 from collector.storage import Observation, Video
 from collector.topics import load_topic_keywords
 
+IST_TZ = timezone(timedelta(hours=5, minutes=30))
 FEEDS = ("all", "primary", "secondary")
 SCOPES = {"live": "Live streams", "video": "Videos (VOD)", "shorts": "Shorts", "replay": "Live replays"}
 GENRES = list(load_topic_keywords().keys()) + ["Other"]
@@ -34,7 +35,7 @@ TARGET_NOTE = (
 )
 
 LIVE_METHOD = (
-    "For each chosen day, STAXIS cuts the chosen hours (Indian time) into one-minute steps and, at every step, adds up the concurrent viewers of the channel's live streams in the chosen feed "
+    "For each chosen day, STAXIS cuts the chosen times (Indian time) into one-minute steps and, at every step, adds up the concurrent viewers of the channel's live streams in the chosen feed "
     "(All = Primary + Secondary; Primary = the long-running main stream; Secondary = other streams live at the same time). The average is taken over the minutes the channel was live; "
     "the peak is the highest minute. Across days, the daily averages are averaged over the days the channel was live in those hours. Nothing is interpolated."
 )
@@ -44,15 +45,15 @@ VIEWS_METHOD = (
 )
 
 
-def _check(feed: str, scope: str, genre: str | None, start_hour: int, end_hour: int) -> None:
+def _check(feed: str, scope: str, genre: str | None, start_minute: int, end_minute: int) -> None:
     if feed not in FEEDS:
         raise ValueError("feed must be all, primary or secondary")
     if scope not in SCOPES:
         raise ValueError("content must be live, video, shorts or replay")
     if genre and genre not in GENRES:
         raise ValueError("genre must be one of: " + ", ".join(GENRES))
-    if not (0 <= start_hour < 24 and 1 <= end_hour <= 24 and end_hour > start_hour):
-        raise ValueError("choose hours like 9 to 12 (Indian time)")
+    if not (0 <= start_minute < 1440 and 1 <= end_minute <= 1440 and end_minute > start_minute):
+        raise ValueError("choose times like 09:30 to 12:00 (Indian time), the end after the start; for the whole day choose 'Entire day'")
 
 
 def _fresh_for(*_args: Any, end_date: str = "", **_kwargs: Any) -> float:
@@ -66,11 +67,20 @@ def _fresh_for(*_args: Any, end_date: str = "", **_kwargs: Any) -> float:
 @ttl_cache(stale=True, snapshot=_fresh_for)
 def build_report(session: Session, *, start_date: str, end_date: str, start_hour: int = 9, end_hour: int = 12, feed: str = "all", scope: str = "live", genre: str | None = None,
                  language: str | None = None, segment: str | None = None, by_genre: bool = False, top: int = 50, channel_ids: list[int] | None = None,
-                 target: dict[str, Any] | None = None, profiles: dict[int, dict[str, Any]] | None = None, known_only: bool = False, now: datetime | None = None) -> dict[str, Any]:
+                 target: dict[str, Any] | None = None, profiles: dict[int, dict[str, Any]] | None = None, known_only: bool = False, now: datetime | None = None,
+                 start_time: str | None = None, end_time: str | None = None, whole_day: bool = False, day_wise: bool = False) -> dict[str, Any]:
     start_day, end_day = parse_day(start_date, "from"), parse_day(end_date, "to")
-    start_hour, end_hour = int(start_hour), int(end_hour)
+    if whole_day:
+        start_minute, end_minute = 0, 1440
+    elif start_time or end_time:
+        start_minute, end_minute = parse_clock(start_time or "00:00", "from time"), parse_clock(end_time or "24:00", "to time")
+        if end_minute == 0 and start_minute > 0:
+            end_minute = 1440     # "to 00:00" means midnight at the end of the day
+    else:
+        start_minute, end_minute = int(start_hour) * 60, int(end_hour) * 60
     genre = genre or None
-    _check(feed, scope, genre, start_hour, end_hour)
+    _check(feed, scope, genre, start_minute, end_minute)
+    start_hour, end_hour = start_minute // 60, -(-end_minute // 60)
     if end_day < start_day:
         raise ValueError("the end date cannot be before the start date")
     span = (end_day - start_day).days + 1
@@ -78,9 +88,21 @@ def build_report(session: Session, *, start_date: str, end_date: str, start_hour
         raise ValueError(f"choose at most {MAX_RANGE_DAYS if scope == 'live' else MAX_VIEW_DAYS} days for this kind of report")
     now = utc(now) if now else now_utc()
     days = [start_day + timedelta(days=i) for i in range(span)]
-    windows = [(d, *ist_hours(d, start_hour, end_hour)) for d in days]
-    windows = [w for w in windows if w[2] <= now]
+    windows = [(d, *ist_minutes(d, start_minute, end_minute)) for d in days]
+    partial_until = None
+    clipped = []
+    for d, s, e in windows:
+        if s >= now:
+            continue                     # a window that has not started has nothing to measure
+        if e > now:                      # today's window is still running: it is measured up to now, and the report says so
+            e = now.replace(second=0, microsecond=0)
+            partial_until = e
+            if e <= s:
+                continue
+        clipped.append((d, s, e))
+    windows = clipped
     base = {"scope": scope, "scope_label": SCOPES[scope], "feed": feed if scope == "live" else None, "genre": genre, "start_hour": start_hour, "end_hour": end_hour,
+            "start_time": clock(start_minute), "end_time": clock(end_minute), "whole_day": bool(whole_day) or (start_minute == 0 and end_minute == 1440), "partial_until_ist": partial_until.astimezone(IST_TZ).strftime("%d %b %H:%M") if partial_until else None,
             "from": start_day.isoformat(), "to": end_day.isoformat(), "timezone": "IST", "filters": {"language": language, "segment": segment, "channel_ids": channel_ids or []}, "target": target,
             "generated_at": now.isoformat(),
             "days_with_data_possible": len(windows)}
@@ -95,7 +117,25 @@ def build_report(session: Session, *, start_date: str, end_date: str, start_hour
     if target and target.get("active"):
         out["rows"] = audience_mod.apply_target(out["rows"], value_key, profiles, target, known_only=known_only)
         out["method"] += " " + TARGET_NOTE
+    if partial_until is not None:
+        out["method"] += f" The window of a day that is still running is counted up to {partial_until.astimezone(IST_TZ):%H:%M} IST, when the report was made."
+    if day_wise and len(windows) >= 1:
+        out["by_day"] = _by_day(session, windows, scope=scope, feed=feed, genre=genre, language=language, segment=segment, top=top, channel_ids=channel_ids, now=now)
     return {**base, **out}
+
+
+def _by_day(session: Session, windows: list, *, scope: str, feed: str, genre: str | None, language: str | None, segment: str | None, top: int, channel_ids: list[int] | None, now: datetime) -> list[dict[str, Any]]:
+    """The same ranking, one day at a time, so a range of dates can be read day by day."""
+    days = []
+    stamp = now.replace(second=0, microsecond=0)
+    for window in windows:
+        day, s, e = window
+        one = (_live(session, [window], feed=feed, genre=genre, language=language, segment=segment, by_genre=False, top=top, channel_ids=channel_ids) if scope == "live"
+               else _views(session, [window], scope=scope, genre=genre, language=language, segment=segment, by_genre=False, top=top, channel_ids=channel_ids))
+        end_text = e.astimezone(IST_TZ).strftime("%H:%M")
+        days.append({"date": day.isoformat(), "from_time": s.astimezone(IST_TZ).strftime("%H:%M"), "to_time": "24:00" if end_text == "00:00" else end_text, "partial": e == stamp,
+                     "rows": one["rows"], "channel_count": one["channel_count"], "totals": one["totals"]})
+    return days
 
 
 def _live(session: Session, windows: list, *, feed: str, genre: str | None, language: str | None, segment: str | None, by_genre: bool, top: int, channel_ids: list[int] | None = None) -> dict[str, Any]:

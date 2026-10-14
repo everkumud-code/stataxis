@@ -189,6 +189,10 @@ def _put(canvas: Any, x: float, y: float, text: str, font: str, size: float, col
 
 
 def _hours(r: dict[str, Any]) -> str:
+    if r.get("whole_day"):
+        return "Entire day (00:00-24:00) IST"
+    if r.get("start_time"):
+        return f"{r['start_time']}-{r['end_time']} IST"
     return f"{r['start_hour']:02d}:00-{r['end_hour']:02d}:00 IST"
 
 
@@ -205,11 +209,16 @@ def report_title(r: dict[str, Any]) -> str:
     return f"{what}, {_hours(r)}"
 
 
+def _clock_part(text: str) -> str:
+    """09:00 -> 09, 09:30 -> 0930: a file name that stays short for whole hours and exact for minutes."""
+    return text[:2] if text.endswith(":00") else text.replace(":", "")
+
+
 def filename(r: dict[str, Any]) -> str:
     stamp = file_stamp()   # the download time is part of the name, so two downloads never overwrite each other
     if r.get("kind") == "briefing":
         return f"stataxis-briefing-{r['persona']}-{r['from']}-to-{r['to']}-downloaded-{stamp}.pdf"
-    return f"stataxis-{r['scope']}-{r['from']}-to-{r['to']}-{r['start_hour']:02d}-{r['end_hour']:02d}-downloaded-{stamp}.pdf"
+    return f"stataxis-{r['scope']}-{r['from']}-to-{r['to']}-{_clock_part(r.get('start_time', f"{r['start_hour']:02d}:00"))}-{_clock_part(r.get('end_time', f"{r['end_hour']:02d}:00"))}-downloaded-{stamp}.pdf"
 
 
 def _bars(rows: list[dict[str, Any]], key: str, width: float, label: str) -> Drawing:
@@ -312,6 +321,17 @@ def report_pdf(r: dict[str, Any], protect: bool = True) -> bytes:
         story.append(Spacer(1, 8))
         data = [["#", "Channel", "Views gained", "Share %", "Videos", "New uploads"]] + [[str(x["rank"]), x["name"][:34], _n(x["views"]), _n(x["share_percent"]), _n(x["videos"]), _n(x["uploads"])] for x in rows]
         story.append(_table(data, [10 * mm, 70 * mm, 28 * mm, 20 * mm, 20 * mm, 20 * mm]))
+    for d in r.get("by_day") or []:
+        label = datetime.fromisoformat(d["date"]).strftime("%A, %d %b %Y").replace(" 0", " ")
+        story.append(_para(escape(f"{label}, {d['from_time']}-{d['to_time']} IST" + (" (so far)" if d.get("partial") else "")), h2))
+        if not d["rows"]:
+            story.append(_para("No channel was measured on this day.", body))
+        elif r["kind"] == "audience":
+            data = [["#", "Channel", "Average", "Peak", "Share %"]] + [[str(x["rank"]), x["name"][:34], _n(x["average"]), _n(x["peak"]), _n(x["share_percent"])] for x in d["rows"][:20]]
+            story.append(_table(data, [10 * mm, 80 * mm, 28 * mm, 28 * mm, 24 * mm]))
+        else:
+            data = [["#", "Channel", "Views gained", "Share %"]] + [[str(x["rank"]), x["name"][:34], _n(x["views"]), _n(x["share_percent"])] for x in d["rows"][:20]]
+            story.append(_table(data, [10 * mm, 90 * mm, 30 * mm, 30 * mm]))
     for g in r.get("by_genre") or []:
         story.append(_para(escape(f"Genre: {g['genre']}"), h2))
         if r["kind"] == "audience":

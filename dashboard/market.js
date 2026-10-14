@@ -137,9 +137,9 @@
   const nth = n => n + (n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th");
   const longDay = iso => { const d = new Date(iso + "T00:00:00+05:30"); return `${nth(+d.toLocaleDateString("en-GB", {day: "numeric", timeZone: "Asia/Kolkata"}))} ${d.toLocaleDateString("en-GB", {month: "long", year: "numeric", timeZone: "Asia/Kolkata"})}`; };
   const cmpTitle = (all, v) => {
-    const days = all.from === all.to ? longDay(all.from) : `${longDay(all.from)} to ${longDay(all.to)}`, pad = h => String(h).padStart(2, "0") + ":00";
+    const days = all.from === all.to ? longDay(all.from) : `${longDay(all.from)} to ${longDay(all.to)}`, pad = h => String(h).padStart(2, "0") + ":00", t = x => all.whole_day ? (x ? "24:00" : "00:00") : (x ? all.end_time : all.start_time);
     const who = v.language ? v.language + " " : "", seg = (SEGMENTS.find(([k]) => k && k === v.segment) || [])[1];
-    return `${days} | ${pad(all.start_hour)} - ${pad(all.end_hour)} Hrs | ${who}${seg && seg !== "News" ? seg : "News"} Channels`;
+    return `${days} | ${all.start_time ? t(0) : pad(all.start_hour)} - ${all.end_time ? t(1) : pad(all.end_hour)} Hrs | ${who}${seg && seg !== "News" ? seg : "News"} Channels`;
   };
   function wrapText(x, text, width) {
     const out = []; let line = "";
@@ -208,12 +208,15 @@
 
   /* ---------- report builder ---------- */
   add("builder", "Market tools", "Report builder", async el => {
-    const f = SP.builder || {from: istDay(-7), to: istDay(-1), start_hour: 9, end_hour: 12, scope: "live", feed: "all", genre: "", segment: "", language: "", by_genre: false};
+    const f = SP.builder || {from: istDay(-7), to: istDay(-1), start_time: "09:00", end_time: "12:00", whole_day: false, day_wise: false, scope: "live", feed: "all", genre: "", segment: "", language: "", by_genre: false};
+    f.start_time = f.start_time || (f.start_hour != null ? String(f.start_hour).padStart(2, "0") + ":00" : "09:00"); f.end_time = f.end_time || (f.end_hour != null && f.end_hour < 24 ? String(f.end_hour).padStart(2, "0") + ":00" : "12:00");
     f.from = f.from || istDay(-7); f.to = f.to || istDay(-1);
     const hours = sel => Array.from({length: 25}, (_, h) => [String(h), String(h).padStart(2, "0") + ":00"]).map(([v, l]) => `<option value="${v}"${String(sel) === v ? " selected" : ""}>${l}</option>`).join("");
     el.innerHTML = head("Report builder", "Choose the days, the hours, what to count and the genre. See the ranking, then download it as a PDF.") + `<form class="card" id="bf" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;align-items:end">
       <label>From<br><input type="date" name="from" value="${esc(f.from)}"></label><label>To<br><input type="date" name="to" value="${esc(f.to)}"></label>
-      <label>Hours from (IST)<br><select name="start_hour">${hours(f.start_hour)}</select></label><label>Hours to (IST)<br><select name="end_hour">${hours(f.end_hour)}</select></label>
+      <label>Time of day<br><select name="day_part"><option value="times"${f.whole_day ? "" : " selected"}>Between two times</option><option value="whole"${f.whole_day ? " selected" : ""}>Entire day (00:00 to 24:00)</option></select></label>
+      <label>From time (IST, HH:MM)<br><input type="time" name="start_time" value="${esc(f.start_time)}" step="60"></label><label>To time (IST, HH:MM)<br><input type="time" name="end_time" value="${esc(f.end_time)}" step="60"></label>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="day_wise"${f.day_wise ? " checked" : ""}> Show each date separately (day by day)</label>
       <label>What to count<br><select name="scope">${opt([["live", "Live streams (viewers)"], ["video", "Videos (views gained)"], ["shorts", "Shorts (views gained)"], ["replay", "Live replays (views gained)"]], f.scope)}</select></label>
       <label>Feed (live only)<br><select name="feed">${opt([["all", "All feeds"], ["primary", "Primary feed"], ["secondary", "Secondary feeds"]], f.feed)}</select></label>
       <label>Genre<br><select name="genre">${opt([["", "All genres"], ...GENRES.map(g => [g, g])], f.genre)}</select></label>
@@ -221,7 +224,14 @@
       <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="by_genre"${f.by_genre ? " checked" : ""}> Also split by genre</label>
       ${filterFields(f)}
       <div class="btnrow"><button class="btn primary" type="submit">Show ranking</button><button class="btn" type="button" id="bpdf">Download PDF</button><button class="btn" type="button" id="bcmp" title="One chart for these days and these hours: all streams and the primary stream side by side">Download comparison image</button></div></form><div id="bmsg" class="msg" hidden></div><div id="bout"></div>`;
-    const read = () => { const form = $("#bf", el), v = formValues(form); v.by_genre = new FormData(form).has("by_genre"); v.known_only = new FormData(form).has("known_only"); keep("builder", v); return v; };
+    const read = () => {
+      const form = $("#bf", el), v = formValues(form), data = new FormData(form);
+      v.by_genre = data.has("by_genre"); v.known_only = data.has("known_only"); v.day_wise = data.has("day_wise") ? 1 : ""; v.whole_day = v.day_part === "whole" ? 1 : ""; delete v.day_part;
+      keep("builder", {...v, whole_day: !!v.whole_day, day_wise: !!v.day_wise}); return v;
+    };
+    const timeState = () => { const f = $("#bf", el).elements, whole = f.day_part.value === "whole"; f.start_time.disabled = whole; f.end_time.disabled = whole; };
+    $("#bf", el).elements.day_part.onchange = timeState; timeState();
+    const spanText = d => d.whole_day ? "Entire day 00:00–24:00" : `${d.start_time}–${d.end_time}`;
     const feedState = () => { $("#bf", el).elements.feed.disabled = $("#bf", el).elements.scope.value !== "live"; };
     $("#bf", el).elements.scope.onchange = feedState; feedState();
     const show = async () => {
@@ -229,10 +239,13 @@
       try {
         const d = await api("/api/v1/market/report", {...v, by_genre: v.by_genre ? 1 : "", known_only: v.known_only ? 1 : ""});
         const live = d.kind === "audience";
-        out.innerHTML = `<section class="card" style="margin-top:14px"><h2>${esc(d.scope_label)}${d.feed ? " · " + esc(d.feed) + " feeds" : ""} · ${String(d.start_hour).padStart(2, "0")}:00–${String(d.end_hour).padStart(2, "0")}:00 IST</h2><p class="muted">${esc(fdate(d.from))} – ${esc(fdate(d.to))} · genre: ${esc(d.genre || "all")}</p>${
+        out.innerHTML = `<section class="card" style="margin-top:14px"><h2>${esc(d.scope_label)}${d.feed ? " · " + esc(d.feed) + " feeds" : ""} · ${esc(spanText(d))} IST</h2><p class="muted">${esc(fdate(d.from))} – ${esc(fdate(d.to))} · genre: ${esc(d.genre || "all")}${d.partial_until_ist ? ` · today is counted up to ${esc(d.partial_until_ist)} IST` : ""}</p>${
           d.rows.length ? table(live ? [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, {h: "Average viewers", n: 1, v: r => whole(r.average)}, {h: "Peak", n: 1, v: r => whole(r.peak)}, {h: "Hours watched", n: 1, v: r => whole(r.watch_hours)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}, {h: "Days seen", n: 1, v: r => r.days_seen}]
             : [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, {h: "Views gained", n: 1, v: r => whole(r.views)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}, {h: "Videos", n: 1, v: r => r.videos}, {h: "New uploads", n: 1, v: r => r.uploads}], d.rows)
           : `<p class="muted">Nothing was measured in these hours with these filters. Nothing is estimated.</p>`}</section>${(d.by_genre || []).map(g => `<section class="card" style="margin-top:14px"><h2>Genre: ${esc(g.genre)}</h2>${table([{h: "#", v: r => r.rank}, {h: "Channel", v: r => r.name}, {h: live ? "Average" : "Views gained", n: 1, v: r => whole(live ? r.average : r.views)}], g.rows.slice(0, 5))}</section>`).join("")}
+          ${(d.by_day || []).map(x => `<section class="card" style="margin-top:14px"><h2>${esc(fdate(x.date))} · ${esc(x.from_time)}–${esc(x.to_time)} IST${x.partial ? " (so far)" : ""}</h2>` + (x.rows.length ? table(live
+            ? [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, {h: "Average viewers", n: 1, v: r => whole(r.average)}, {h: "Peak", n: 1, v: r => whole(r.peak)}, {h: "Hours watched", n: 1, v: r => whole(r.watch_hours)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}]
+            : [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, {h: "Views gained", n: 1, v: r => whole(r.views)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}], x.rows) : `<p class="muted">No channel was measured on this day.</p>`) + `</section>`).join("")}
           ${!live ? `<p class="muted" style="margin-top:8px">Coverage: ${whole(d.coverage.videos_measured_at_both_ends)} of ${whole(d.coverage.videos_matching)} matching videos measured at both ends of the hours.</p>` : ""}${method(d.method)}`;
       } catch (e) { out.innerHTML = fail(e); wireUpgrade(out); }
     };
@@ -242,7 +255,7 @@
       try {
         const base = {...v, scope: "live", by_genre: "", known_only: v.known_only ? 1 : ""};
         const [all, prim] = await Promise.all([api("/api/v1/market/report", {...base, feed: "all"}), api("/api/v1/market/report", {...base, feed: "primary"})]);
-        saveCanvas(await comparisonPng(all, prim, v), `stataxis-comparison-${all.from}-${String(all.start_hour).padStart(2, "0")}-${String(all.end_hour).padStart(2, "0")}${v.language ? "-" + slug(v.language) : ""}.png`);
+        saveCanvas(await comparisonPng(all, prim, v), `stataxis-comparison-${all.from}-${(all.start_time || "").replace(":", "")}-${(all.end_time || "").replace(":", "")}${v.language ? "-" + slug(v.language) : ""}.png`);
         m.className = "msg ok"; m.textContent = "Saved the comparison image · " + window.sxDownloadedAt();
       } catch (e) { m.className = "msg bad"; m.textContent = e.message; }
     };
