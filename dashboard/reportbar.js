@@ -245,18 +245,18 @@
         D.eyebrow(x, `Fig. ${String(n).padStart(2, "0")} — ${label}`, P, y);
         if (pages > 1) { x.textAlign = "right"; x.fillStyle = D.C.blue; x.font = `400 40px ${D.F.head}`; x.fillText(`${n} of ${pages}`, W - P, y); x.textAlign = "left"; }
       }
-      const tl = D.headLines(x, title, W - 2 * P, hs, 3); y += 34 + hs * 0.86;
-      if (draw) D.headline(x, title, P, y, W - 2 * P, hs, 3);
+      const tl = D.headLines(x, title, W - 2 * P, hs, 4); y += 34 + hs * 0.86;
+      if (draw) D.headline(x, title, P, y, W - 2 * P, hs, 4);
       y += (tl - 1) * hs * 0.98 + 30;
-      x.font = `500 24px ${D.F.body}`; const sub = wrap(x, subtitle, W - 2 * P).slice(0, 2);
+      x.font = `500 24px ${D.F.body}`; const sub = wrap(x, subtitle, W - 2 * P).slice(0, 3);
       sub.forEach(t => { if (draw) { x.fillStyle = D.C.mute; x.fillText(t, P, y + 6); } y += 32; });
       y += 18;
       if (first && plain) {
-        x.font = `500 28px ${D.F.body}`; wrap(x, plain, W - 2 * P).slice(0, 4).forEach(t => { if (draw) { x.fillStyle = D.C.text; x.fillText(t, P, y + 24); } y += 40; });
+        x.font = `500 28px ${D.F.body}`; wrap(x, plain, W - 2 * P).slice(0, 6).forEach(t => { if (draw) { x.fillStyle = D.C.text; x.fillText(t, P, y + 24); } y += 40; });
         y += 18;
       }
       if (first && stx) {   /* the STX Index is the headline of every report: a framed callout right under the title */
-        x.font = `600 31px ${D.F.body}`; const lines = wrap(x, stx.replace(/^STX Index:\s*/, ""), W - 2 * P - 56).slice(0, 3), h = 74 + lines.length * 42;
+        x.font = `600 31px ${D.F.body}`; const lines = wrap(x, stx.replace(/^STX Index:\s*/, ""), W - 2 * P - 56).slice(0, 5), h = 74 + lines.length * 42;
         if (draw) {
           x.fillStyle = D.C.panel; x.strokeStyle = D.C.blue; x.lineWidth = 2.5; x.beginPath(); x.roundRect(P, y, W - 2 * P, h, 16); x.fill(); x.stroke();
           x.fillStyle = D.C.blue; x.font = `500 20px ${D.F.mono}`; if ("letterSpacing" in x) x.letterSpacing = "4px"; x.fillText("STX INDEX", P + 28, y + 40); if ("letterSpacing" in x) x.letterSpacing = "0px";
@@ -270,9 +270,9 @@
           const left = P + i * (w + gap);
           if (draw) {
             x.fillStyle = D.C.panel; x.strokeStyle = D.C.line; x.lineWidth = 2; x.beginPath(); x.roundRect(left, y, w, 140, 14); x.fill(); x.stroke();
-            x.fillStyle = D.C.mute; x.font = `600 20px ${D.F.body}`; x.fillText(String(k.l).slice(0, 26), left + 20, y + 34);
-            x.fillStyle = i === 0 ? D.C.blue : D.C.white; x.font = `400 66px ${D.F.head}`; x.fillText(String(k.v).slice(0, 12), left + 20, y + 100);
-            if (k.s && k.s.length <= 36) { x.fillStyle = D.C.mute; x.font = `500 16px ${D.F.body}`; x.fillText(String(k.s).slice(0, Math.floor(w / 9)), left + 20, y + 126); }
+            x.fillStyle = D.C.mute; x.fillText(D.fit(x, k.l, w - 40, 600, 20, D.F.body), left + 20, y + 34);
+            x.fillStyle = i === 0 ? D.C.blue : D.C.white; x.fillText(D.fit(x, k.v, w - 40, 400, 66, D.F.head), left + 20, y + 100);
+            if (k.s) { x.fillStyle = D.C.mute; x.fillText(D.fit(x, k.s, w - 40, 500, 16, D.F.body), left + 20, y + 126); }
           }
         });
         y += 140 + 34;
@@ -280,17 +280,17 @@
       if (chartP) {
         if (draw) { x.fillStyle = D.C.mute; x.font = `500 20px ${D.F.mono}`; if ("letterSpacing" in x) x.letterSpacing = "3px"; x.fillText(String(chart.caption || "").toUpperCase().slice(0, 40), P, y + 20); if ("letterSpacing" in x) x.letterSpacing = "0px"; }
         y += 50;
-        const max = Math.max(...chart.rows.map(r => r.value || 0), 1), left = 430, bar = W - left - P - 200;   /* one scale for the whole series */
+        const max = Math.max(...chart.rows.map(r => r.value || 0), 1), left = 430, bar = W - left - P - 280;   /* one scale for the whole series */
         chartP.rows.forEach((r, i) => {
           const yy = y + i * rowH;
           if (draw) {
             D.number(x, String((n - 1) * ROWS_PER + i + 1).padStart(2, "0"), P, yy + 56, 58);
-            x.fillStyle = D.C.white; x.font = `600 27px ${D.F.body}`; x.fillText(String(r.label).slice(0, 18), P + 98, yy + 50);
-            if (r.value == null) { x.fillStyle = D.C.mute; x.font = `500 22px ${D.F.body}`; x.fillText(String(r.text).slice(0, 30), left, yy + 50); }
+            x.fillStyle = D.C.white; x.fillText(D.fit(x, r.label, left - (P + 98) - 16, 600, 27, D.F.body), P + 98, yy + 50);
+            if (r.value == null) { x.fillStyle = D.C.mute; x.fillText(D.fit(x, r.text, W - P - left, 500, 22, D.F.body), left, yy + 50); }
             else {
               const w = Math.max(5, bar * r.value / max);
               x.fillStyle = i === 0 && first ? D.C.blue : D.C.blueDeep; x.fillRect(left, yy + 20, w, 38);
-              x.fillStyle = D.C.white; x.font = `700 27px ${D.F.body}`; x.fillText(String(r.text).slice(0, 14), left + w + 14, yy + 51);
+              x.fillStyle = D.C.white; x.fillText(D.fit(x, r.text, W - P - (left + w + 14), 700, 27, D.F.body), left + w + 14, yy + 51);
             }
             x.fillStyle = D.C.line; x.fillRect(P, yy + rowH - 6, W - 2 * P, 1);
           }
@@ -303,7 +303,7 @@
       if (last && finds.length) {
         if (draw) { x.fillStyle = D.C.mute; x.font = `500 20px ${D.F.mono}`; if ("letterSpacing" in x) x.letterSpacing = "4px"; x.fillText("WHAT STANDS OUT", P, y + 14); if ("letterSpacing" in x) x.letterSpacing = "0px"; }
         y += 44; x.font = `500 27px ${D.F.body}`;
-        finds.forEach(f => { wrap(x, f, W - 2 * P - 34).slice(0, 2).forEach((t, k) => { if (draw) { if (k === 0) { x.fillStyle = D.C.blue; x.beginPath(); x.arc(P + 8, y + 16, 6, 0, Math.PI * 2); x.fill(); } x.fillStyle = D.C.text; x.fillText(t, P + 34, y + 24); } y += 36; }); y += 8; });
+        finds.forEach(f => { wrap(x, f, W - 2 * P - 34).slice(0, 4).forEach((t, k) => { if (draw) { if (k === 0) { x.fillStyle = D.C.blue; x.beginPath(); x.arc(P + 8, y + 16, 6, 0, Math.PI * 2); x.fill(); } x.fillStyle = D.C.text; x.fillText(t, P + 34, y + 24); } y += 36; }); y += 8; });
         y += 14;
       }
       if (last && vp) {   /* our viewpoint, last: the blue italic line to remember */

@@ -51,14 +51,14 @@
     D.eyebrow(x, "Fig. 00 — " + label, P, 100);
     D.headline(x, title, P, hy, W - 2 * P, hs, 3);
     x.fillStyle = D.C.mute; x.font = `500 26px ${D.F.body}`; x.fillText(subtitle.slice(0, 72), P, y1 + 56);
-    const max = Math.max(...rows.map(r => r.value), 1), left = 440, bar = W - left - P - 210;
+    const max = Math.max(...rows.map(r => r.value), 1), left = 440, bar = W - left - P - 300;
     rows.forEach((r, i) => {
       const y = top + i * rowH;
       D.number(x, String(i + 1).padStart(2, "0"), P, y + 62, 64);
-      x.fillStyle = D.C.white; x.font = `600 28px ${D.F.body}`; x.fillText(String(r.label).slice(0, 17), P + 104, y + 56);
+      x.fillStyle = D.C.white; x.fillText(D.fit(x, r.label, left - P - 104 - 18, 600, 28, D.F.body), P + 104, y + 56);
       const w = Math.max(5, bar * r.value / max);
       x.fillStyle = i === 0 ? D.C.blue : D.C.blueDeep; x.fillRect(left, y + 24, w, 40);
-      x.fillStyle = D.C.white; x.font = `700 28px ${D.F.body}`; x.fillText(r.text || (compact(r.value) + unit), left + w + 14, y + 56);
+      x.fillStyle = D.C.white; x.fillText(D.fit(x, r.text || (compact(r.value) + unit), W - P - (left + w + 14), 700, 28, D.F.body), left + w + 14, y + 56);
       x.fillStyle = D.C.line; x.fillRect(P, y + rowH - 6, W - 2 * P, 1);
     });
     await D.footer(x, W, H, P, [footer.slice(0, 64), "Data via YouTube. Processed and evaluated by StatAxis.", "Downloaded " + window.sxDownloadedAt()]);
@@ -113,12 +113,12 @@
       x.fillStyle = isTotal ? "#071a30" : ri % 2 ? D.C.panel : "rgba(0,0,0,0)"; x.fillRect(P, y, W - 2 * P, rowH);
       if (isTotal) { x.fillStyle = D.C.blue; x.fillRect(P, y, W - 2 * P, 3); }
       r.forEach((cell, i) => {
-        const isStx = /STX/i.test(head[i]), text = String(cell ?? "—").slice(0, i === 1 ? 30 : 14);
+        const isStx = /STX/i.test(head[i]), text = String(cell ?? "—");
         if (isStx && !isTotal) { x.strokeStyle = D.C.blue; x.lineWidth = 2; x.strokeRect(xs[i] + 6, y + 6, widths[i] - 12, rowH - 12); }
         x.textAlign = i === 1 ? "left" : "center"; const px = i === 1 ? xs[i] + 22 : xs[i] + widths[i] / 2;
-        if (i === 0 && !isTotal) { x.fillStyle = D.C.blue; x.font = `400 40px ${D.F.head}`; x.fillText(text.padStart(2, "0"), px, y + 52); }
-        else if (isStx) { x.fillStyle = D.C.blue; x.font = `400 44px ${D.F.head}`; x.fillText(text, px, y + 53); }
-        else { x.fillStyle = isTotal ? D.C.white : D.C.text; x.font = `${isTotal ? 700 : i === 1 ? 600 : 500} 27px ${D.F.body}`; x.fillText(text, px, y + 47); }
+        if (i === 0 && !isTotal) { x.fillStyle = D.C.blue; x.fillText(D.fit(x, text.padStart(2, "0"), widths[i] - 20, 400, 40, D.F.head), px, y + 52); }
+        else if (isStx) { x.fillStyle = D.C.blue; x.fillText(D.fit(x, text, widths[i] - 24, 400, 44, D.F.head), px, y + 53); }
+        else { x.fillStyle = isTotal ? D.C.white : D.C.text; x.fillText(D.fit(x, text, widths[i] - (i === 1 ? 40 : 20), isTotal ? 700 : i === 1 ? 600 : 500, 27, D.F.body), px, y + 47); }
       });
       x.fillStyle = D.C.line; x.fillRect(P, y + rowH - 1, W - 2 * P, 1);
     });
@@ -234,7 +234,7 @@
       x.fillStyle = D.C.blue; x.font = `400 32px ${D.F.head}`; x.textAlign = "center"; x.fillText(pn.label.toUpperCase(), axisX + plotW / 2, baseY + 66); x.textAlign = "left";
       /* the legend, in this panel's order of strength */
       const order = [...names].sort((a, b) => ((pn.by[b] || {}).average || 0) - ((pn.by[a] || {}).average || 0));
-      order.forEach((nm, i) => { const lx = pn.left + 20 + (i % 4) * (panelW / 4), ly = baseY + 106 + Math.floor(i / 4) * 30; x.fillStyle = colour[nm]; x.fillRect(lx, ly - 13, 14, 14); x.fillStyle = D.C.white; x.font = `600 16px ${D.F.body}`; x.fillText(nm.slice(0, 16), lx + 22, ly); });
+      order.forEach((nm, i) => { const lx = pn.left + 20 + (i % 4) * (panelW / 4), ly = baseY + 106 + Math.floor(i / 4) * 30; x.fillStyle = colour[nm]; x.fillRect(lx, ly - 13, 14, 14); x.fillStyle = D.C.white; x.fillText(D.fit(x, nm, panelW / 4 - 34, 600, 16, D.F.body), lx + 22, ly); });
     }
     let y = top + height + 190;
     x.fillStyle = D.C.mute; x.font = `500 20px ${D.F.mono}`; if ("letterSpacing" in x) x.letterSpacing = "4px"; x.fillText("STATAXIS VIEWPOINT", P, y); if ("letterSpacing" in x) x.letterSpacing = "0px"; y += 18;

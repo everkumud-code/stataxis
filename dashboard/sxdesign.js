@@ -20,6 +20,13 @@
     if (line) out.push(line);
     return out;
   };
+  /* text is never cut: the font is made as small as it must be (down to 55%) for the whole text to fit in maxW; the text itself is returned unchanged */
+  function fit(x, text, maxW, weight, px, family) {
+    let size = px; const t = String(text);
+    for (; size > px * 0.55; size -= 1) { x.font = `${weight} ${size}px ${family}`; if (x.measureText(t).width <= maxW) break; }
+    x.font = `${weight} ${size}px ${family}`;
+    return t;
+  }
   /* the black page, with a faint dot grid, a soft blue glow at the top left and a thin arc with one bright dot at the right edge */
   function background(x, W, H) {
     x.fillStyle = C.bg; x.fillRect(0, 0, W, H);
@@ -65,5 +72,5 @@
     for (let r = -10; r <= 10; r++) for (let k = -4; k <= 4; k++) x.drawImage(lg, k * 440 + (r % 2) * 220 - 150, r * 150 - 38, 300, 300 * LOGO_RATIO);
     x.restore();
   }
-  window.SXD = {C, F, SERIES, logo, wrap, background, eyebrow, headline, headLines, number, serif, footer, watermark, LOGO_RATIO};
+  window.SXD = {C, F, SERIES, logo, wrap, fit, background, eyebrow, headline, headLines, number, serif, footer, watermark, LOGO_RATIO};
 })();

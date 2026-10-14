@@ -175,7 +175,8 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
                 if marker in body:
                     body = body.replace(marker, nav, 1)
             content_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
-            _start_response(start_response, "200 OK", [("Content-Type", content_type), ("Content-Length", str(len(body)))])
+            fresh = [("Cache-Control", "no-cache")] if file_path.suffix.lower() in {".js", ".html", ".css", ".svg"} else []   # pages, scripts and styles are checked again every time, so a release is seen at once
+            _start_response(start_response, "200 OK", [("Content-Type", content_type), ("Content-Length", str(len(body)))] + fresh)
             return [body]
 
     _start_response(start_response, "404 Not Found", [("Content-Type", "text/plain; charset=utf-8"), ("Content-Length", "9")])

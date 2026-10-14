@@ -227,3 +227,16 @@ def test_every_picture_and_pdf_uses_the_one_design_of_the_reference():
     assert rp.BLUE.hexval().lower().endswith("0b8ded") and rp.HANDLE.endswith("x.com/stataxis")
     png = rp.logo_png()
     assert png[:8] == b"\x89PNG\r\n\x1a\n" and len(png) > 5_000                                         # the blue-and-gold logo renders
+
+
+def test_text_in_pictures_is_made_to_fit_never_cut_and_pages_are_not_cached():
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    design, market, bar = ((root / "dashboard" / n).read_text(encoding="utf-8") for n in ("sxdesign.js", "market.js", "reportbar.js"))
+    assert "function fit(x, text, maxW, weight, px, family)" in design and "fit," in design
+    for js in (market, bar):
+        assert js.count("D.fit(") >= 5
+    for cut in ("String(r.label).slice(0, 18)", "String(r.label).slice(0, 17)", "String(k.v).slice(0, 12)", "String(r.text).slice(0, 14)", "nm.slice(0, 16)"):
+        assert cut not in market and cut not in bar, cut                        # no label, value or legend is chopped to a fixed length any more
+    web = (root / "web.py").read_text(encoding="utf-8")
+    assert '("Cache-Control", "no-cache")' in web and '".js", ".html", ".css", ".svg"' in web
