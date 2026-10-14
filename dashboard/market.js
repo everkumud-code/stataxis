@@ -133,7 +133,7 @@
   /* ---------- weekly views ---------- */
   add("weekly", "Market tools", "Weekly report", async el => {
     el.innerHTML = head("Weekly report", "Views of every video uploaded in the chosen dates, per channel, with each channel's share of its group. Download a picture card to post.");
-    const out = document.createElement("div"); el.append(out);
+    const out = document.createElement("div");   /* added to the page after the filters, so the filters are above the result */
     const run = async v => {
       out.innerHTML = `<p class="muted">Working it out…</p>`;
       try {
@@ -152,13 +152,13 @@
           saveCanvas(await cardPng(g.label + " YouTube weekly", `Views of videos uploaded ${fdate(d.from)} – ${fdate(d.to)}`, g.channels.slice(0, 10).map(r => ({label: r.name, value: r.views, text: dec(r.views / 1e6, 1) + "M  ·  " + (r.share_percent ?? "—") + "%"})), {footer: `Share of ${g.label}. Views as last measured by STAXIS.`}), `stataxis-weekly-${slug(g.label)}-${d.from}.png`); });
       } catch (e) { out.innerHTML = fail(e); wireUpgrade(out); }
     };
-    run(dateFilters(el, "weekly", "", run));
+    run(dateFilters(el, "weekly", "", run)); el.append(out);
   });
 
   /* ---------- prime time ---------- */
   add("primetime", "Market tools", "Prime time", async el => {
     el.innerHTML = head("Prime time", "Average live viewers for every evening hour, 5 PM to 11 PM Indian time, averaged over the chosen days. Top 5 channels per hour.");
-    const out = document.createElement("div"); el.append(out);
+    const out = document.createElement("div");   /* added to the page after the filters, so the filters are above the result */
     const run = async v => {
       out.innerHTML = `<p class="muted">Working it out (this reads several days of live samples)…</p>`;
       try {
@@ -170,7 +170,7 @@
           saveCanvas(await cardPng("Live viewers " + s.slot.replace("-", " – "), `Average over ${fdate(d.from)} – ${fdate(d.to)}, Indian time`, s.top.map(r => ({label: r.name, value: r.average_concurrent, text: whole(r.average_concurrent)})), {footer: "Average concurrent viewers across the live streams of each channel."}), `stataxis-primetime-${s.start_hour}-${s.end_hour}-${d.from}.png`); });
       } catch (e) { out.innerHTML = fail(e); wireUpgrade(out); }
     };
-    run(dateFilters(el, "primetime", "", run));
+    run(dateFilters(el, "primetime", "", run)); el.append(out);
   });
 
   /* ---------- a ready chart of one date and one time interval: All streams and Primary stream side by side, average and peak, the top eight channels ---------- */

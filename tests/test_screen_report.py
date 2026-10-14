@@ -240,3 +240,13 @@ def test_text_in_pictures_is_made_to_fit_never_cut_and_pages_are_not_cached():
         assert cut not in market and cut not in bar, cut                        # no label, value or legend is chopped to a fixed length any more
     web = (root / "web.py").read_text(encoding="utf-8")
     assert '("Cache-Control", "no-cache")' in web and '".js", ".html", ".css", ".svg"' in web
+
+
+def test_the_date_and_other_filters_sit_above_the_result_on_every_screen():
+    from pathlib import Path
+    market = (Path(__file__).resolve().parent.parent / "dashboard" / "market.js").read_text(encoding="utf-8")
+    for name in ("weekly", "primetime"):
+        block = market[market.index(f'add("{name}"'):]
+        block = block[:block.index("\n  });")]
+        assert f'run(dateFilters(el, "{name}", "", run)); el.append(out);' in block                      # the filters are put on the page first, the result after them
+        assert 'const out = document.createElement("div"); el.append(out);' not in block
