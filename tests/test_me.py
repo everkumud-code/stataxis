@@ -63,7 +63,7 @@ def test_the_first_choice_narrows_the_menu_to_what_is_relevant_and_never_adds_wh
     assert out["nav"] == ["live", "creators", "planner"] and out["start_view"] == "profile"
     chosen_but_not_allowed = me.set_preferences(s, u["free"], {"views": ["planner", "authenticity"]})
     assert chosen_but_not_allowed["nav"] == ["briefing", "overview", "market", "channel", "stx", "notes", "reportmail"]     # nothing allowed was chosen: the person sees what they may use, never an empty menu
-    assert me.set_preferences(s, u["free"], {"persona": None, "views": None})["nav"] == ["briefing", "overview", "market", "channel", "stx", "notes"]
+    assert me.set_preferences(s, u["free"], {"persona": None, "views": None})["nav"] == ["briefing", "overview", "market", "channel", "stx", "notes", "reportmail"]
 
 
 @pytest.mark.parametrize("body", [{"persona": "king"}, {"views": ["nope"]}, {"views": "weekly"}, {"languages": ["Klingon"]}, {"segments": ["xyz"]}, {"start_view": "nowhere"}])
