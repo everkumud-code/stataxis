@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from api import audience as audience_mod
 from api.live_stats import live_window_stats
 from api.market_common import MAX_RANGE_DAYS, clock, ist_minutes, mean, now_utc, parse_clock, parse_day, parse_published, pick_channels, rnd, today_ist, utc
+from api.stx_attach import STX_NOTE, attach as attach_stx, headline as stx_headline, stx_map
 from api.ttl_cache import ttl_cache
 from api.media_intelligence import _scope_matches
 from collector.storage import Observation, Video
@@ -114,6 +115,11 @@ def build_report(session: Session, *, start_date: str, end_date: str, start_hour
         out = _views(session, windows, scope=scope, genre=genre, language=language, segment=segment, by_genre=by_genre, top=top, channel_ids=channel_ids)
         out["method"] = VIEWS_METHOD
         value_key = "views"
+    stx = stx_map(session, now=now)
+    attach_stx(out["rows"], stx)
+    out["stx"] = stx_headline(out["rows"])
+    for g in out.get("by_genre") or []:
+        attach_stx(g["rows"], stx)
     if target and target.get("active"):
         out["rows"] = audience_mod.apply_target(out["rows"], value_key, profiles, target, known_only=known_only)
         out["method"] += " " + TARGET_NOTE
@@ -121,6 +127,9 @@ def build_report(session: Session, *, start_date: str, end_date: str, start_hour
         out["method"] += f" The window of a day that is still running is counted up to {partial_until.astimezone(IST_TZ):%H:%M} IST, when the report was made."
     if day_wise and len(windows) >= 1:
         out["by_day"] = _by_day(session, windows, scope=scope, feed=feed, genre=genre, language=language, segment=segment, top=top, channel_ids=channel_ids, now=now)
+        for d in out["by_day"]:
+            attach_stx(d["rows"], stx)
+    out["method"] += " " + STX_NOTE
     return {**base, **out}
 
 

@@ -91,6 +91,50 @@
     $("#" + id + "-f", el).onsubmit = ev => { ev.preventDefault(); const v = formValues(ev.target); keep(id, v); onGo(v); };
     return f;
   };
+  /* STX Index is the platform's own measure: it sits beside every ranking, and every report opens with a strip that names the leader */
+  const stxBadge = x => x ? `<strong style="color:#e1b94f;font-size:1.15em">${dec(x.score)}</strong>${x.preliminary ? ' <span class="tag" title="Little data: pulled toward 50">P</span>' : ""}` : `<span class="muted">—</span>`;
+  const STXCOL = {h: "STX Index", n: 1, html: 1, v: r => stxBadge(r.stx)};
+  const stxStrip = h => h ? `<div class="card" style="margin:12px 0;border-color:#8b7131;background:linear-gradient(90deg,#16120a,#0b1b2b);display:flex;gap:18px;align-items:center;flex-wrap:wrap"><span class="tag" style="font-size:1.05em;color:#e1b94f;border-color:#e1b94f">STX Index</span>
+      <span>Highest: <strong style="color:#e1b94f;font-size:1.25em">${esc(h.leader)} · ${dec(h.leader_score)}</strong></span><span>Average of the ${whole(h.scored)} scored channels: <strong>${dec(h.average)}</strong></span>
+      <span class="muted">${h.scored < h.of ? `${whole(h.of - h.scored)} without a score yet. ` : ""}STX is StatAxis's own 0–100 score, over the last 7 days.</span></div>` : "";
+  /* a table card in the style analysts post: a title, a coloured header, rank / channel / figure / share / STX, a Total row, the note and the brand */
+  async function tableCardPng(title, subtitle, head, rows, total, {note = "", highlight = -1} = {}) {
+    const W = 1200, rowH = 64, headH = 80, top = 230, H = top + headH + (rows.length + (total ? 1 : 0)) * rowH + 190;
+    const c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d");
+    const font = (w, px) => `${w} ${px}px Manrope, Inter, system-ui, sans-serif`;
+    x.fillStyle = "#f7f9fb"; x.fillRect(0, 0, W, H);
+    const lg = await logo();
+    if (lg) { x.save(); x.globalAlpha = 0.05; x.translate(W / 2, H / 2); x.rotate(-0.55); for (let r = -9; r <= 9; r++) for (let k = -4; k <= 4; k++) x.drawImage(lg, k * 420 + (r % 2) * 210 - 150, r * 150 - 38, 300, 75); x.restore(); }
+    x.fillStyle = "#061322"; x.fillRect(0, 0, W, 120);
+    if (lg) x.drawImage(lg, 36, 22, 300, 75); else { x.fillStyle = "#e1b94f"; x.font = font(800, 34); x.fillText("STATAXIS", 40, 70); }
+    x.textAlign = "right"; x.fillStyle = "#e1b94f"; x.font = font(700, 22); x.fillText("Stat the View. Axis the Viewpoint.", W - 40, 70); x.textAlign = "left";
+    x.fillStyle = "#061322"; x.font = font(800, 42); x.fillText(title.slice(0, 52), 40, 175);
+    x.fillStyle = "#3d5266"; x.font = font(500, 24); x.fillText(subtitle.slice(0, 90), 40, 212);
+    const cols = head.length, wide = [90, 400], rest = (W - 80 - wide[0] - wide[1]) / Math.max(cols - 2, 1), xs = [40, 40 + wide[0]];
+    for (let i = 2; i < cols; i++) xs.push(40 + wide[0] + wide[1] + (i - 2) * rest);
+    const widths = [wide[0], wide[1], ...Array(Math.max(cols - 2, 0)).fill(rest)];
+    x.fillStyle = "#061322"; x.fillRect(40, top, W - 80, headH);
+    head.forEach((h, i) => { const isStx = /STX/i.test(h); if (isStx) { x.fillStyle = "#b8923a"; x.fillRect(xs[i], top, widths[i], headH); } x.fillStyle = isStx ? "#061322" : "#e8f1f8"; x.font = font(800, 25); x.textAlign = i === 1 ? "left" : "center"; x.fillText(h, i === 1 ? xs[i] + 22 : xs[i] + widths[i] / 2, top + 50); });
+    const all = total ? [...rows, total] : rows;
+    all.forEach((r, ri) => {
+      const y = top + headH + ri * rowH, isTotal = total && ri === rows.length;
+      x.fillStyle = isTotal ? "#dfe5ea" : ri % 2 ? "#eef3f7" : "#ffffff"; x.fillRect(40, y, W - 80, rowH);
+      r.forEach((cell, i) => {
+        const isStx = /STX/i.test(head[i]);
+        if (isStx && !isTotal) { x.fillStyle = "#fbf3dc"; x.fillRect(xs[i], y, widths[i], rowH); }
+        x.fillStyle = "#061322"; x.font = font(isTotal || isStx ? 800 : 500, isStx ? 30 : 25); x.textAlign = i === 1 ? "left" : "center";
+        x.fillText(String(cell ?? "—").slice(0, i === 1 ? 30 : 14), i === 1 ? xs[i] + 22 : xs[i] + widths[i] / 2, y + 41);
+      });
+      x.fillStyle = "#c7d0d8"; x.fillRect(40, y + rowH - 1, W - 80, 1);
+    });
+    x.textAlign = "left";
+    const ny = top + headH + all.length * rowH + 40;
+    x.fillStyle = "#061322"; x.font = font(600, 20); (note || "").split("\n").slice(0, 2).forEach((ln, i) => x.fillText(ln.slice(0, 118), 40, ny + i * 28));
+    x.fillStyle = "#b8923a"; x.fillRect(40, H - 84, W - 80, 2);
+    x.fillStyle = "#3d5266"; x.font = font(500, 18); x.fillText("STX Index: StatAxis's own 0–100 score. Data via YouTube. Processed and evaluated by StatAxis. Not TV ratings.   stataxis.org", 40, H - 52);
+    x.textAlign = "right"; x.fillStyle = "#b8923a"; x.font = font(700, 18); x.fillText("Downloaded " + window.sxDownloadedAt(), W - 40, H - 22); x.textAlign = "left";
+    return c;
+  }
   const cardsBtn = (label, attrs) => `<button class="btn" type="button" ${attrs}>${esc(label)}</button>`;
 
   /* ---------- weekly views ---------- */
@@ -102,10 +146,15 @@
       try {
         const d = await api("/api/v1/market/weekly", v);
         if (!d.groups.length) { out.innerHTML = state("Nothing in these dates", "No uploads were measured with these filters. Nothing is estimated."); return; }
-        out.innerHTML = d.groups.map((g, gi) => `<section class="card" style="margin-top:14px"><div class="head"><h2>${esc(g.label)} <span class="muted">· ${esc(whole(g.total_views))} views</span></h2></div>${table([
-          {h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, {h: "Views (million)", n: 1, v: r => dec(r.views / 1e6, 1)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"},
+        out.innerHTML = d.groups.map((g, gi) => `<section class="card" style="margin-top:14px"><div class="head"><h2>${esc(g.label)} <span class="muted">· ${esc(whole(g.total_views))} views</span></h2></div>${stxStrip(g.stx)}${table([
+          {h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, STXCOL, {h: "Views (million)", n: 1, v: r => dec(r.views / 1e6, 1)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"},
           {h: "Videos", n: 1, v: r => r.videos}, {h: "Measured", n: 1, v: r => r.coverage_percent == null ? "—" : r.coverage_percent + "%"}, {h: "Stale", n: 1, v: r => r.stale_videos}], g.channels)}
-          <div class="btnrow" style="margin-top:10px">${cardsBtn("Download picture card (PNG)", `data-png="${gi}"`)}</div></section>`).join("") + method(d.method);
+          <div class="btnrow" style="margin-top:10px">${cardsBtn("Download table card (PNG)", `data-tpng="${gi}"`)}${cardsBtn("Download bar card (PNG)", `data-png="${gi}"`)}</div></section>`).join("") + method(d.method);
+        out.querySelectorAll("[data-tpng]").forEach(b => b.onclick = async () => { const g = d.groups[+b.dataset.tpng], rows = g.channels.slice(0, 15);
+          saveCanvas(await tableCardPng(g.label + " YouTube Weekly Stats", `View count and share for all videos uploaded from ${fdate(d.from)} – ${fdate(d.to)}`, ["Rank", "Channel", "STX Index", "#Views (Million)", "Views Share%"],
+            rows.map(r => [r.rank, r.name, r.stx ? dec(r.stx.score) : "—", dec(r.views / 1e6, 1), (r.share_percent == null ? "—" : Math.round(r.share_percent) + "%")]),
+            ["", "Total", g.stx ? "Avg " + dec(g.stx.average) : "—", dec(rows.reduce((t, r) => t + r.views, 0) / 1e6, 1), "100%"],
+            {note: `Note: Stats as of ${fdate(d.generated_at.slice(0, 10))} for all videos uploaded between ${fdate(d.from)} – ${fdate(d.to)}.\nViews as last measured by StatAxis. STX Index is each channel's current 7-day score.`}), `stataxis-weekly-table-${slug(g.label)}-${d.from}.png`); });
         out.querySelectorAll("[data-png]").forEach(b => b.onclick = async () => { const g = d.groups[+b.dataset.png];
           saveCanvas(await cardPng(g.label + " YouTube weekly", `Views of videos uploaded ${fdate(d.from)} – ${fdate(d.to)}`, g.channels.slice(0, 10).map(r => ({label: r.name, value: r.views, text: dec(r.views / 1e6, 1) + "M  ·  " + (r.share_percent ?? "—") + "%"})), {footer: `Share of ${g.label}. Views as last measured by STAXIS.`}), `stataxis-weekly-${slug(g.label)}-${d.from}.png`); });
       } catch (e) { out.innerHTML = fail(e); wireUpgrade(out); }
@@ -122,7 +171,7 @@
       try {
         const d = await api("/api/v1/market/prime-time", v);
         out.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:14px">${d.slots.map((s, i) => `<section class="card"><h2>${esc(s.slot.replace("-", " – "))}</h2>${
-          s.top.length ? table([{h: "#", v: r => r.rank}, {h: "Channel", v: r => r.name}, {h: "Average", n: 1, v: r => whole(r.average_concurrent)}, {h: "Peak", n: 1, v: r => whole(r.peak_concurrent)}], s.top) : `<p class="muted">Nobody was live in this hour on these days.</p>`}
+          s.top.length ? stxStrip(s.stx) + table([{h: "#", v: r => r.rank}, {h: "Channel", v: r => r.name}, STXCOL, {h: "Average", n: 1, v: r => whole(r.average_concurrent)}, {h: "Peak", n: 1, v: r => whole(r.peak_concurrent)}], s.top) : `<p class="muted">Nobody was live in this hour on these days.</p>`}
           ${s.top.length ? `<div class="btnrow" style="margin-top:8px">${cardsBtn("Picture card (PNG)", `data-png="${i}"`)}</div>` : ""}</section>`).join("")}</div>` + method(d.method);
         out.querySelectorAll("[data-png]").forEach(b => b.onclick = async () => { const s = d.slots[+b.dataset.png];
           saveCanvas(await cardPng("Live viewers " + s.slot.replace("-", " – "), `Average over ${fdate(d.from)} – ${fdate(d.to)}, Indian time`, s.top.map(r => ({label: r.name, value: r.average_concurrent, text: whole(r.average_concurrent)})), {footer: "Average concurrent viewers across the live streams of each channel."}), `stataxis-primetime-${s.start_hour}-${s.end_hour}-${d.from}.png`); });
@@ -239,13 +288,13 @@
       try {
         const d = await api("/api/v1/market/report", {...v, by_genre: v.by_genre ? 1 : "", known_only: v.known_only ? 1 : ""});
         const live = d.kind === "audience";
-        out.innerHTML = `<section class="card" style="margin-top:14px"><h2>${esc(d.scope_label)}${d.feed ? " · " + esc(d.feed) + " feeds" : ""} · ${esc(spanText(d))} IST</h2><p class="muted">${esc(fdate(d.from))} – ${esc(fdate(d.to))} · genre: ${esc(d.genre || "all")}${d.partial_until_ist ? ` · today is counted up to ${esc(d.partial_until_ist)} IST` : ""}</p>${
-          d.rows.length ? table(live ? [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, {h: "Average viewers", n: 1, v: r => whole(r.average)}, {h: "Peak", n: 1, v: r => whole(r.peak)}, {h: "Hours watched", n: 1, v: r => whole(r.watch_hours)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}, {h: "Days seen", n: 1, v: r => r.days_seen}]
-            : [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, {h: "Views gained", n: 1, v: r => whole(r.views)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}, {h: "Videos", n: 1, v: r => r.videos}, {h: "New uploads", n: 1, v: r => r.uploads}], d.rows)
+        out.innerHTML = `<section class="card" style="margin-top:14px"><h2>${esc(d.scope_label)}${d.feed ? " · " + esc(d.feed) + " feeds" : ""} · ${esc(spanText(d))} IST</h2><p class="muted">${esc(fdate(d.from))} – ${esc(fdate(d.to))} · genre: ${esc(d.genre || "all")}${d.partial_until_ist ? ` · today is counted up to ${esc(d.partial_until_ist)} IST` : ""}</p>${stxStrip(d.stx)}${
+          d.rows.length ? table(live ? [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, STXCOL, {h: "Average viewers", n: 1, v: r => whole(r.average)}, {h: "Peak", n: 1, v: r => whole(r.peak)}, {h: "Hours watched", n: 1, v: r => whole(r.watch_hours)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}, {h: "Days seen", n: 1, v: r => r.days_seen}]
+            : [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, STXCOL, {h: "Views gained", n: 1, v: r => whole(r.views)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}, {h: "Videos", n: 1, v: r => r.videos}, {h: "New uploads", n: 1, v: r => r.uploads}], d.rows)
           : `<p class="muted">Nothing was measured in these hours with these filters. Nothing is estimated.</p>`}</section>${(d.by_genre || []).map(g => `<section class="card" style="margin-top:14px"><h2>Genre: ${esc(g.genre)}</h2>${table([{h: "#", v: r => r.rank}, {h: "Channel", v: r => r.name}, {h: live ? "Average" : "Views gained", n: 1, v: r => whole(live ? r.average : r.views)}], g.rows.slice(0, 5))}</section>`).join("")}
           ${(d.by_day || []).map(x => `<section class="card" style="margin-top:14px"><h2>${esc(fdate(x.date))} · ${esc(x.from_time)}–${esc(x.to_time)} IST${x.partial ? " (so far)" : ""}</h2>` + (x.rows.length ? table(live
-            ? [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, {h: "Average viewers", n: 1, v: r => whole(r.average)}, {h: "Peak", n: 1, v: r => whole(r.peak)}, {h: "Hours watched", n: 1, v: r => whole(r.watch_hours)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}]
-            : [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, {h: "Views gained", n: 1, v: r => whole(r.views)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}], x.rows) : `<p class="muted">No channel was measured on this day.</p>`) + `</section>`).join("")}
+            ? [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, STXCOL, {h: "Average viewers", n: 1, v: r => whole(r.average)}, {h: "Peak", n: 1, v: r => whole(r.peak)}, {h: "Hours watched", n: 1, v: r => whole(r.watch_hours)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}]
+            : [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, STXCOL, {h: "Views gained", n: 1, v: r => whole(r.views)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}], x.rows) : `<p class="muted">No channel was measured on this day.</p>`) + `</section>`).join("")}
           ${!live ? `<p class="muted" style="margin-top:8px">Coverage: ${whole(d.coverage.videos_measured_at_both_ends)} of ${whole(d.coverage.videos_matching)} matching videos measured at both ends of the hours.</p>` : ""}${method(d.method)}`;
       } catch (e) { out.innerHTML = fail(e); wireUpgrade(out); }
     };

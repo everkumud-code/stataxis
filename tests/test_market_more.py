@@ -392,3 +392,30 @@ def test_report_builder_takes_times_to_the_minute_the_entire_day_and_a_day_by_da
     s.commit()
     so_far = build_report(s, start_date="2026-10-12", end_date="2026-10-12", whole_day=True, day_wise=True, scope="live", now=today)
     assert so_far["partial_until_ist"] and so_far["by_day"][0]["partial"] is True and so_far["by_day"][0]["to_time"] == "13:30" and so_far["rows"][0]["average"] == 4_000   # the running day is counted up to now
+
+
+def test_every_ranking_carries_the_stx_index_and_a_headline_naming_the_leader():
+    from pathlib import Path
+    from api import stx_attach
+    rows = [{"channel_id": 1, "name": "Alpha", "stx": {"score": 71.2, "confidence": 0.8, "preliminary": False}}, {"channel_id": 2, "name": "Beta", "stx": {"score": 55.0, "confidence": 0.5, "preliminary": True}}, {"channel_id": 3, "name": "Gamma"}]
+    stx_attach.attach(rows, {1: {"score": 71.2}, 2: {"score": 55.0}})
+    assert rows[2]["stx"] is None                                                                            # no score: a dash, never a zero
+    head = stx_attach.headline(rows)
+    assert head["leader"] == "Alpha" and head["leader_score"] == 71.2 and head["average"] == 63.1 and head["scored"] == 2 and head["of"] == 3
+    assert stx_attach.headline([{"name": "x", "stx": None}]) is None
+    s, _ = make_session()
+    a = channel(s, "a", "Alpha")
+    live(s, a, "a-main", datetime(2026, 10, 10).date(), 9, 12, 5_000)
+    s.commit()
+    rep = build_report(s, start_date="2026-10-10", end_date="2026-10-10", start_hour=9, end_hour=12, scope="live", day_wise=True, now=NOW)
+    assert "stx" in rep["rows"][0] and "stx" in rep and "stx" in rep["by_day"][0]["rows"][0] and "STX Index" in rep["method"]
+    from api.report_pdf import report_pdf
+    import fitz
+    rep["rows"][0]["stx"] = {"score": 66.6, "confidence": 0.9, "preliminary": False}
+    rep["stx"] = stx_attach.headline(rep["rows"])
+    text = "".join(p.get_text() for p in fitz.open(stream=report_pdf(rep, protect=False), filetype="pdf"))
+    assert "STX INDEX" in text and "66.6" in text and "Highest: Alpha" in text                                  # the strip at the top and the column
+    market = (Path(__file__).resolve().parent.parent / "dashboard" / "market.js").read_text(encoding="utf-8")
+    bar = (Path(__file__).resolve().parent.parent / "dashboard" / "reportbar.js").read_text(encoding="utf-8")
+    assert market.count("STXCOL") >= 6 and "stxStrip(g.stx)" in market and "stxStrip(d.stx)" in market and "stxStrip(s.stx)" in market and "async function tableCardPng" in market and "data-tpng" in market
+    assert "function stxLine(blocks)" in bar and "[stxLine(result), ...findingsOf(chart)]" in bar                # our finding leads the take-aways and is part of the viewpoint

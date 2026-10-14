@@ -100,8 +100,8 @@
     try {
       await settle(screen, say);
       const s = scopeOf(view, screen, card);
-      const chart = barsOf(s.blocks.filter(b => !b.m)), lead = findingsOf(chart);
-      s.blocks.unshift({t: "h", text: "StatAxis viewpoint"}, {t: "p", text: viewpointOf(chart, view.id)});
+      const chart = barsOf(s.blocks.filter(b => !b.m)), lead = [stxLine(s.blocks.filter(b => !b.m)), ...findingsOf(chart)].filter(Boolean);
+      s.blocks.unshift({t: "h", text: "StatAxis viewpoint"}, {t: "p", text: viewpointOf(chart, view.id, lead[0] && lead[0].startsWith("STX Index") ? lead[0] : "")});
       if (lead.length) s.blocks.unshift({t: "h", text: "What stands out"}, ...lead.map(t => ({t: "p", text: "• " + t})));
       if (s.plain) s.blocks.unshift({t: "p", text: "About this report: " + s.plain});
       const res = await fetch("/api/v1/market/screen-report.pdf", {method: "POST", headers: {"Content-Type": "application/json", Authorization: "Bearer " + token()}, body: JSON.stringify({view: s.id, title: s.title, filters: s.sub, blocks: s.blocks})});
@@ -183,14 +183,28 @@
     creators: "The IFX Score compares creators with each other on what is public; a high score is a strong showing on these measures, nothing more.",
     planner: "Use the figures to compare slots with each other, and confirm any price with the channel's own rate card.",
   };
-  function viewpointOf(chart, viewId) {
+  function viewpointOf(chart, viewId, stx = "") {   /* our finding is part of our viewpoint: the STX line, when the figures carry one, comes first */
     const caution = VIEWPOINT_NOTE[viewId] || "Read the figures with the period in mind: a short window can be moved by a single event, and these are measured on YouTube, not on television.";
     const have = chart ? chart.rows.filter(r => r.value != null && r.value > 0).sort((a, b) => b.value - a.value) : [];
-    if (have.length < 2) return caution;
+    if (have.length < 2) return `${stx} ${caution}`.trim();
     const [top, next] = have, total = have.reduce((t, r) => t + r.value, 0), share = Math.round(100 * top.value / total), ratio = top.value / next.value;
     const lead = ratio >= 2 ? `${top.label} has a runaway lead` : ratio >= 1.2 ? `${top.label} has a clear lead` : `${top.label} and ${next.label} are in a close race`;
     const spread = have.length < 3 ? "" : share >= 50 ? `One channel holds the majority of this audience (${share}%).` : share >= 30 ? "One channel leads, yet the audience is still shared across several." : "The audience is spread widely; no channel dominates.";
-    return `${lead}. ${spread} ${caution}`.replace(/\s+/g, " ").trim();
+    return `${stx} ${lead}. ${spread} ${caution}`.replace(/\s+/g, " ").trim();
+  }
+  /* The STX Index is the platform's own measure and the first thing a reader should see: when a table has an STX column, the report says who is highest and what the average is */
+  function stxLine(blocks) {
+    for (const b of blocks) {
+      if (b.t !== "table" || b.m || !b.rows.length) continue;
+      const c = b.head.findIndex(h => /^STX/i.test(h)); if (c < 0) continue;
+      const isNum = col => b.rows.filter(r => num(r[col]) != null && /\d/.test(r[col])).length >= Math.ceil(b.rows.length * 0.5);
+      let label = -1; for (let k = 0; k < b.head.length; k++) { if (k !== c && !isNum(k)) { label = k; break; } }
+      const have = b.rows.map(r => ({name: label >= 0 ? r[label] : "", v: /\d/.test(r[c]) ? num(r[c]) : null})).filter(x => x.v != null);
+      if (!have.length) continue;
+      const top = have.reduce((m, x) => x.v > m.v ? x : m), avg = have.reduce((t, x) => t + x.v, 0) / have.length;
+      return `STX Index: ${top.name} is highest at ${top.v.toFixed(1)}; the average of the ${have.length} scored channels is ${avg.toFixed(1)}.`;
+    }
+    return "";
   }
   /* "What stands out": a few plain sentences worked out only from the figures shown (who leads, by how much, how the total is shared), so a reader gets a take-away and not just a table */
   function findingsOf(chart) {
@@ -212,10 +226,10 @@
     m.font = `800 46px ${FONT}`; const titleLines = wrap(m, title, W - 2 * P).slice(0, 2);
     m.font = `500 22px ${FONT}`; const subLines = wrap(m, subtitle, W - 2 * P).slice(0, 2);
     m.font = `500 27px ${FONT}`; const plainLines = plain ? wrap(m, plain, W - 2 * P).slice(0, 4) : [];
-    const chart = barsOf(result), finds = findingsOf(chart);
+    const chart = barsOf(result), finds = [stxLine(result), ...findingsOf(chart)].filter(Boolean).slice(0, 4);   /* the STX Index leads every take-away */
     m.font = `500 25px ${FONT}`; const findLines = finds.map(f => wrap(m, f, W - 2 * P - 34).slice(0, 2));
     const findH = finds.length ? 64 + findLines.reduce((t, l) => t + l.length * 33 + 10, 0) : 0;
-    const vp = viewpointOf(chart, viewId); m.font = `500 25px ${FONT}`; const vpLines = vp ? wrap(m, vp, W - 2 * P).slice(0, 6) : [], vpH = vpLines.length ? 70 + vpLines.length * 33 : 0;
+    const vp = viewpointOf(chart, viewId, finds[0] && finds[0].startsWith("STX Index") ? finds[0] : ""); m.font = `500 25px ${FONT}`; const vpLines = vp ? wrap(m, vp, W - 2 * P).slice(0, 6) : [], vpH = vpLines.length ? 70 + vpLines.length * 33 : 0;
     let body = [];   /* text lines when there is no table of numbers: {text, kind} */
     const few = result.filter(b => (b.t === "p" || b.t === "h") && !b.kpi).length <= 5, fs = few ? 36 : 28, lh = few ? 54 : 42;   /* a short note is set larger, like a poster */
     if (!chart) {

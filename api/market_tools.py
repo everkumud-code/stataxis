@@ -6,6 +6,9 @@ Nothing here is invented. Every figure comes from the collected observations, ev
 
 from __future__ import annotations
 
+from api.stx_attach import attach as attach_stx
+from api.stx_attach import headline as stx_headline
+from api.stx_attach import stx_map
 from api.ttl_cache import ttl_cache
 
 import math
@@ -74,6 +77,7 @@ def weekly_views(session: Session, *, start_date: str, end_date: str, segment: s
         row["comments"] += int(obs.comment_count or 0)
         if now - utc(obs.observed_at) > STALE_AFTER:
             row["stale"] += 1
+    stx = stx_map(session, now=now)
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for channel in channels:
         row = per[channel.id]
@@ -94,7 +98,8 @@ def weekly_views(session: Session, *, start_date: str, end_date: str, segment: s
             item["rank"] = rank
             item["share_percent"] = rnd(100 * item["views"] / total, 1) if total else None
         items = audience_mod.apply_target(items, "views", profiles, target, known_only=known_only)
-        out_groups.append({"label": label, "channel_count": len(items), "total_views": total, "channels": items})
+        attach_stx(items, stx)
+        out_groups.append({"label": label, "channel_count": len(items), "total_views": total, "channels": items, "stx": stx_headline(items)})
     out_groups.sort(key=lambda g: g["total_views"], reverse=True)
     return {"from": start_day.isoformat(), "to": end_day.isoformat(), "timezone": "IST", "filters": {"segment": segment, "language": language, "channel_ids": channel_ids or []}, "target": target,
             "method": WEEKLY_METHOD + (TARGET_METHOD if target and target.get("active") else ""), "generated_at": now.isoformat(), "groups": out_groups}
@@ -111,6 +116,7 @@ def prime_time(session: Session, *, start_date: str, end_date: str, language: st
     slots = slots or PRIME_SLOTS
     days = [start_day + timedelta(days=i) for i in range((end_day - start_day).days + 1)]
     out_slots = []
+    stx = stx_map(session, now=now)
     for s_hour, e_hour in slots:
         acc: dict[int, dict[str, Any]] = {}
         for day in days:
@@ -137,7 +143,8 @@ def prime_time(session: Session, *, start_date: str, end_date: str, language: st
         for rank, row in enumerate(rows, start=1):
             row["rank"] = rank
         rows = audience_mod.apply_target(rows, "average_concurrent", profiles, target, known_only=known_only)
-        out_slots.append({"slot": f"{s_hour:02d}:00-{e_hour:02d}:00", "start_hour": s_hour, "end_hour": e_hour, "top": rows[:top], "channels": rows})
+        attach_stx(rows, stx)
+        out_slots.append({"slot": f"{s_hour:02d}:00-{e_hour:02d}:00", "start_hour": s_hour, "end_hour": e_hour, "top": rows[:top], "channels": rows, "stx": stx_headline(rows)})
     return {"from": start_day.isoformat(), "to": end_day.isoformat(), "timezone": "IST", "filters": {"language": language, "segment": segment, "channel_ids": channel_ids or []}, "target": target,
             "method": PRIME_METHOD + (TARGET_METHOD if target and target.get("active") else ""), "slots": out_slots}
 

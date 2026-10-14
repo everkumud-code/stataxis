@@ -166,7 +166,7 @@ def test_a_long_result_is_split_into_numbered_posts_and_every_report_carries_our
     bar = (root / "reportbar.js").read_text(encoding="utf-8")
     assert "ROWS_PER = 8" in bar and "LINES_PER = 12" in bar and "-${n}-of-${pages}" in bar and "`${n} of ${pages}`" in bar        # 1 of 3, 2 of 3, 3 of 3
     assert "b.rows.slice(0, 24)" in bar and "first ? kpis : []" in bar and "last ? findLines : []" in bar                     # the introduction on the first post, our reading on the last
-    assert "function viewpointOf(chart, viewId)" in bar and '"StatAxis viewpoint"' in bar and "STATAXIS VIEWPOINT" in bar            # in the PDF and on the post
+    assert "function viewpointOf(chart, viewId, stx = \"\")" in bar and '"StatAxis viewpoint"' in bar and "STATAXIS VIEWPOINT" in bar            # in the PDF and on the post
     assert "not proof of anything" in bar                                                                                          # the radar's reading describes, it does not accuse
 
 

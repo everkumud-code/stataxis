@@ -236,10 +236,31 @@ def _bars(rows: list[dict[str, Any]], key: str, width: float, label: str) -> Dra
     return d
 
 
+def _stx(x: Any) -> str:
+    return "-" if not x else f"{x['score']:.1f}"
+
+
+def _stx_banner(h: dict[str, Any] | None, width: float) -> Any:
+    """The STX Index strip every report opens with: who leads, the average, how many channels have a score."""
+    if not h:
+        return Spacer(1, 0)
+    big = ParagraphStyle("stxb", fontName="Helvetica-Bold", fontSize=11, leading=14, textColor=NAVY)
+    small = ParagraphStyle("stxs", fontName="Helvetica", fontSize=7.8, leading=10, textColor=GREY)
+    left = _para("<font color='#b8923a'><b>STX INDEX</b></font>", big)
+    mid = _para(f"Highest: <b>{escape(str(h['leader']))} - {h['leader_score']:.1f}</b>  |  Average of {h['scored']} scored channels: <b>{h['average']:.1f}</b>", big)
+    note = _para(escape("STX is StatAxis's own 0-100 score for a channel, over the last 7 days. A dash means not enough data."), small)
+    t = Table([[left, mid], ["", note]], colWidths=[28 * mm, width - 28 * mm])
+    t.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 1.0, GOLD), ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#fbf3dc")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                           ("SPAN", (0, 1), (1, 1)), ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
+    return t
+
+
 def _table(data: list[list[str]], widths: list[float], right_from: int = 2) -> Table:
     data = [[c if i == 0 else _cell(c, "right" if j >= right_from else "left") for j, c in enumerate(row)] for i, row in enumerate(data)]
     t = Table(data, colWidths=widths, repeatRows=1)
+    stx_col = [i for i, h in enumerate(data[0]) if str(h).startswith("STX")]
     t.setStyle(TableStyle([
+        *[("BACKGROUND", (i, 1), (i, -1), colors.HexColor("#fbf3dc")) for i in stx_col], *[("FONT", (i, 1), (i, -1), "Helvetica-Bold", 10) for i in stx_col],
         ("BACKGROUND", (0, 0), (-1, 0), NAVY), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white), ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 8),
         ("FONT", (0, 1), (-1, -1), "Helvetica", 8.5), ("ALIGN", (right_from, 0), (-1, -1), "RIGHT"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BAND]), ("LINEBELOW", (0, 0), (-1, -1), 0.25, LINE),
@@ -288,6 +309,9 @@ def report_pdf(r: dict[str, Any], protect: bool = True) -> bytes:
     story.append(Spacer(1, 8))
     width = A4[0] - 32 * mm
     rows = r["rows"]
+    if r.get("stx"):
+        story.append(_stx_banner(r["stx"], width))
+        story.append(Spacer(1, 8))
     if r.get("kind") == "briefing":
         b = r["briefing"]
         kp = [[_para(f"<font size=15 color='#061322'><b>{escape(str(k['value']))}</b></font><br/><font size=7.5 color='#5b6b7b'>{escape(k['label'])}<br/>{escape(k['detail'])}</font>", body) for k in b["kpis"]]]
@@ -314,24 +338,24 @@ def report_pdf(r: dict[str, Any], protect: bool = True) -> bytes:
     elif r["kind"] == "audience":
         story.append(_bars(rows, "average", width, "Average concurrent viewers (top 10)"))
         story.append(Spacer(1, 8))
-        data = [["#", "Channel", "Average", "Peak", "Share %", "Days seen"]] + [[str(x["rank"]), x["name"][:34], _n(x["average"]), _n(x["peak"]), _n(x["share_percent"]), str(x["days_seen"])] for x in rows]
-        story.append(_table(data, [10 * mm, 70 * mm, 24 * mm, 24 * mm, 20 * mm, 20 * mm]))
+        data = [["#", "Channel", "STX Index", "Average", "Peak", "Share %", "Days seen"]] + [[str(x["rank"]), x["name"][:34], _stx(x.get("stx")), _n(x["average"]), _n(x["peak"]), _n(x["share_percent"]), str(x["days_seen"])] for x in rows]
+        story.append(_table(data, [9 * mm, 58 * mm, 22 * mm, 22 * mm, 22 * mm, 20 * mm, 20 * mm], right_from=2))
     else:
         story.append(_bars(rows, "views", width, "Views gained in the chosen hours (top 10)"))
         story.append(Spacer(1, 8))
-        data = [["#", "Channel", "Views gained", "Share %", "Videos", "New uploads"]] + [[str(x["rank"]), x["name"][:34], _n(x["views"]), _n(x["share_percent"]), _n(x["videos"]), _n(x["uploads"])] for x in rows]
-        story.append(_table(data, [10 * mm, 70 * mm, 28 * mm, 20 * mm, 20 * mm, 20 * mm]))
+        data = [["#", "Channel", "STX Index", "Views gained", "Share %", "Videos", "New uploads"]] + [[str(x["rank"]), x["name"][:34], _stx(x.get("stx")), _n(x["views"]), _n(x["share_percent"]), _n(x["videos"]), _n(x["uploads"])] for x in rows]
+        story.append(_table(data, [9 * mm, 58 * mm, 22 * mm, 26 * mm, 20 * mm, 18 * mm, 21 * mm], right_from=2))
     for d in r.get("by_day") or []:
         label = datetime.fromisoformat(d["date"]).strftime("%A, %d %b %Y").replace(" 0", " ")
         story.append(_para(escape(f"{label}, {d['from_time']}-{d['to_time']} IST" + (" (so far)" if d.get("partial") else "")), h2))
         if not d["rows"]:
             story.append(_para("No channel was measured on this day.", body))
         elif r["kind"] == "audience":
-            data = [["#", "Channel", "Average", "Peak", "Share %"]] + [[str(x["rank"]), x["name"][:34], _n(x["average"]), _n(x["peak"]), _n(x["share_percent"])] for x in d["rows"][:20]]
-            story.append(_table(data, [10 * mm, 80 * mm, 28 * mm, 28 * mm, 24 * mm]))
+            data = [["#", "Channel", "STX Index", "Average", "Peak", "Share %"]] + [[str(x["rank"]), x["name"][:34], _stx(x.get("stx")), _n(x["average"]), _n(x["peak"]), _n(x["share_percent"])] for x in d["rows"][:20]]
+            story.append(_table(data, [10 * mm, 66 * mm, 24 * mm, 26 * mm, 26 * mm, 22 * mm]))
         else:
-            data = [["#", "Channel", "Views gained", "Share %"]] + [[str(x["rank"]), x["name"][:34], _n(x["views"]), _n(x["share_percent"])] for x in d["rows"][:20]]
-            story.append(_table(data, [10 * mm, 90 * mm, 30 * mm, 30 * mm]))
+            data = [["#", "Channel", "STX Index", "Views gained", "Share %"]] + [[str(x["rank"]), x["name"][:34], _stx(x.get("stx")), _n(x["views"]), _n(x["share_percent"])] for x in d["rows"][:20]]
+            story.append(_table(data, [10 * mm, 76 * mm, 26 * mm, 30 * mm, 24 * mm]))
     for g in r.get("by_genre") or []:
         story.append(_para(escape(f"Genre: {g['genre']}"), h2))
         if r["kind"] == "audience":
