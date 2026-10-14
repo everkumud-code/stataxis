@@ -32,7 +32,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from api.live_monitor import LIVE_STREAM_FRESHNESS_SECONDS, language_group
+from api.live_monitor import LIVE_STREAM_FRESHNESS_SECONDS
+from metrics.markets import language_group, language_matches
 from api.ttl_cache import ttl_cache
 from collector.storage import Channel, Observation, Video, effective_channel_language
 from metrics.feeds import LiveStream, min_primary_hours, split_feeds
@@ -87,7 +88,7 @@ def _load_streams(
     channels: dict[int, Channel] = {}
     for row in rows:
         channel = active[row.channel_id]
-        if target and language_group(languages[channel.id]).lower() != target and languages[channel.id].lower() != target:
+        if target and not language_matches(languages[channel.id], target):
             continue
         if segment_key and (channel.segment or "news") != segment_key:
             continue

@@ -21,11 +21,12 @@ AS_OF = datetime(2026, 9, 16, 10, 0, tzinfo=UTC)
 def test_market_labels():
     assert market_label("news", "Hindi") == "Hindi News"
     assert market_label(None, "Tamil") == "Tamil News"
-    assert market_label("business", "English") == "Business News"
-    assert market_label("business", "Hindi") == "Business News"
+    assert market_label("business", "English") == "English Business News"
+    assert market_label("business", "Hindi") == "Hindi Business News" and market_label("business", None) == "Business News"
+    assert market_label("entertainment", "Tamil") == "Tamil Entertainment" and market_label("journalist", "Hindi") == "Hindi Individual Journalists"
     assert market_label("print", "Hindi") == "Print Media"
     assert market_label("party", "Hindi") == market_label("leader", "English") == "Political Parties & Leaders"
-    assert market_label("commentator", "Hindi") == "Political Commentators"
+    assert market_label("commentator", "Hindi") == "Hindi Political Commentary"
     assert market_label("news", "unknown") == "News"
     assert normalize_segment("") == "news" and normalize_segment(" Business ") == "business"
     with pytest.raises(ValueError):
@@ -57,13 +58,13 @@ def test_market_report_share_percent_headline_and_per_market_summary():
     payload = market_report(_seed_report(), as_of=AS_OF, period="1h")
     rows = {row["channel"]: row for row in payload["channels"]}
     assert rows["Alpha"]["share_percent"] == 75.0 and rows["Bravo"]["share_percent"] == 25.0
-    assert rows["Charlie"]["share_percent"] == 50.0 and rows["Delta"]["share_percent"] == 50.0
-    assert rows["Alpha"]["market_label"] == "Hindi News" and rows["Charlie"]["market_label"] == "Business News"
+    assert rows["Charlie"]["share_percent"] == 100.0 and rows["Delta"]["share_percent"] == 100.0       # each alone in its own market: English and Hindi business news are kept apart
+    assert rows["Alpha"]["market_label"] == "Hindi News" and rows["Charlie"]["market_label"] == "English Business News" and rows["Delta"]["market_label"] == "Hindi Business News"
     assert rows["Alpha"]["share_basis"] == "view_delta"
     markets = {market["label"]: market for market in payload["markets"]}
-    assert set(markets) == {"Hindi News", "Business News", "Print Media"}
+    assert set(markets) == {"Hindi News", "English Business News", "Hindi Business News", "Print Media"}
     assert markets["Hindi News"]["headline"] == "Hindi News viewership (1h): Alpha led with 75% share followed by Bravo"
-    assert markets["Business News"]["leaders"][0]["share_percent"] == 50.0
+    assert markets["English Business News"]["leaders"][0]["share_percent"] == 100.0
     # Print has a single channel whose gain is zero: no share can be computed, and nothing is invented.
     assert rows["Echo"]["share_percent"] is None
     assert markets["Print Media"]["headline"] is None
@@ -161,3 +162,32 @@ def test_live_stats_excel_export_has_feed_columns_and_method_sheet():
     assert {"All Avg", "All Peak", "Primary Avg", "Secondary Peak", "Share % (All Avg)"} <= set(header)
     assert workbook["Channels"][2][1].value == "Hindi News"
     assert workbook["Channels"][2][4].value == 1500
+
+
+def test_languages_and_categories_follow_the_owners_list_and_are_never_mixed():
+    from metrics.markets import KNOWN_LANGUAGES, SEGMENTS, language_group, language_matches
+    assert KNOWN_LANGUAGES == ["Hindi", "English", "Bangla", "Tamil", "Telugu", "Kannada", "Bhojpuri", "Hindi (Regional)", "French", "US English", "UK English", "Arabic"]
+    assert [SEGMENTS[k] for k in ("news", "business", "entertainment", "commentator", "journalist")] == ["Main stream", "Business news", "Entertainment", "Political commentary", "Individual journalist"]
+    assert language_group("Hindi (Regional)") == "Hindi (Regional)" and language_group("US English") == "English" and language_group("Tamil") == "Regional" and language_group(None) == "Unknown"
+    assert language_matches("Hindi", "hindi") and not language_matches("Hindi (Regional)", "Hindi") and language_matches("Hindi (Regional)", "Hindi (Regional)")
+    assert language_matches("US English", "English") and language_matches("US English", "US English") and not language_matches("UK English", "US English")
+    assert language_matches("Tamil", "Tamil") and language_matches("Tamil", "Regional") and not language_matches("Tamil", "Telugu") and language_matches("Arabi", "Arabic")
+    assert language_matches("Swahili", "Other") and language_matches("unknown", "Other") and not language_matches("Tamil", "Other") and not language_matches("English", "Other") and language_matches("Anything", "")
+
+
+def test_a_business_news_channel_is_never_counted_with_hindi_news():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from sqlalchemy.pool import StaticPool
+
+    from api.market_common import pick_channels
+    from collector.storage import Base
+    s = Session(create_engine("sqlite://", future=True, poolclass=StaticPool, connect_args={"check_same_thread": False}))
+    Base.metadata.create_all(s.get_bind())
+    for key, name, lang, seg in (("a", "Hindi Daily", "Hindi", "news"), ("b", "Hindi Money", "Hindi", "business"), ("c", "English Money", "English", "business"), ("d", "Bhojpuri Live", "Bhojpuri", "news")):
+        s.add(Channel(youtube_channel_id=key, name=name, language=lang, region="India", segment=seg))
+    s.commit()
+    names = lambda **kw: [c.name for c in pick_channels(s, **kw)[0]]  # noqa: E731
+    assert names(segment="news", language="Hindi") == ["Hindi Daily"]                                           # the report's start: Main stream, Hindi
+    assert names(segment="business", language="Hindi") == ["Hindi Money"] and names(segment="business", language="English") == ["English Money"]
+    assert names(segment="", language="Hindi") == ["Hindi Daily", "Hindi Money"] and names(segment="news", language="Bhojpuri") == ["Bhojpuri Live"]

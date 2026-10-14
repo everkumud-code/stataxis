@@ -79,7 +79,7 @@ def test_weekly_views_groups_follow_the_segment_and_validate_dates():
     biz = channel(s, "z", "Money", segment="business", language="English")
     video(s, biz, "z1", datetime(2026, 10, 7, tzinfo=UTC), 1_000)
     s.commit()
-    assert [g["label"] for g in weekly_views(s, start_date="2026-10-05", end_date="2026-10-11", now=NOW)["groups"]] == ["Business News"]
+    assert [g["label"] for g in weekly_views(s, start_date="2026-10-05", end_date="2026-10-11", now=NOW)["groups"]] == ["English Business News"]
     assert weekly_views(s, start_date="2026-10-05", end_date="2026-10-11", segment="print", now=NOW)["groups"] == []
     with pytest.raises(ValueError):
         weekly_views(s, start_date="2026-10-11", end_date="2026-10-05")

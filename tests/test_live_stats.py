@@ -122,10 +122,10 @@ def test_market_share_headline_and_business_segment_market():
     session.commit()
     payload = live_window_stats(session, start_at=at(0), end_at=at(2))
     labels = {market["label"]: market for market in payload["markets"]}
-    assert set(labels) == {"Hindi News", "Business News"}
-    assert labels["Business News"]["channel_count"] == 2  # English + Hindi business channels share one market
+    assert set(labels) == {"Hindi News", "English Business News", "Hindi Business News"}      # a business channel is never in "Hindi News": category and language are kept apart
+    assert labels["English Business News"]["channel_count"] == 1 and labels["Hindi Business News"]["channel_count"] == 1
     shares = {row["name"]: row["share_percent"] for row in payload["channels"]}
-    assert shares["Alpha"] == 75.0 and shares["Bravo"] == 25.0 and shares["Charlie"] == 50.0
+    assert shares["Alpha"] == 75.0 and shares["Bravo"] == 25.0 and shares["Charlie"] == 100.0 and shares["Delta"] == 100.0
     assert "Alpha led with 75% share followed by Bravo" in labels["Hindi News"]["headline"]
     business_only = live_window_stats(session, start_at=at(0), end_at=at(2), segment="business")
     assert {row["name"] for row in business_only["channels"]} == {"Charlie", "Delta"}

@@ -10,9 +10,9 @@ from typing import Any
 from sqlalchemy import and_, event, func, select
 from sqlalchemy.orm import Session
 
-from api.live_monitor import language_group
+
 from collector.storage import Channel, Observation, Video, effective_channel_language
-from metrics.markets import normalize_segment
+from metrics.markets import language_matches, normalize_segment
 
 IST = timezone(timedelta(hours=5, minutes=30))
 MAX_RANGE_DAYS = 31
@@ -99,7 +99,7 @@ def pick_channels(session: Session, *, segment: str | None, language: str | None
         if segment_key and (channel.segment or "news") != segment_key:
             continue
         lang = effective_channel_language(session, channel)
-        if target and language_group(lang).lower() != target and lang.lower() != target:
+        if target and not language_matches(lang, target):
             continue
         channels.append(channel)
         languages[channel.id] = lang

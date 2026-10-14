@@ -23,6 +23,7 @@ from api.ttl_cache import ttl_cache
 from api.media_intelligence import _scope_matches
 from collector.storage import Observation, Video
 from collector.topics import load_topic_keywords
+from metrics.markets import market_label
 
 IST_TZ = timezone(timedelta(hours=5, minutes=30))
 FEEDS = ("all", "primary", "secondary")
@@ -164,7 +165,7 @@ def _live(session: Session, windows: list, *, feed: str, genre: str | None, lang
         return acc
 
     def rows_of(acc: dict[int, dict[str, Any]]) -> list[dict[str, Any]]:
-        rows = [{"channel_id": cid, "name": a["name"], "language": a["language"], "segment": a["segment"], "average": rnd(mean(a["avg"]), 0), "peak": max(a["peaks"]), "watch_hours": round(sum(a["watch"]), 1), "days_seen": len(a["avg"])}
+        rows = [{"channel_id": cid, "name": a["name"], "language": a["language"], "segment": a["segment"], "average": rnd(mean(a["avg"]), 0), "peak": max(a["peaks"]), "watch_hours": round(sum(a["watch"]), 1), "days_seen": len(a["avg"]), "group": market_label(a["segment"], a["language"])}
                 for cid, a in acc.items() if a["avg"]]
         rows.sort(key=lambda r: r["average"], reverse=True)
         total = sum(r["average"] for r in rows) or 0
@@ -234,7 +235,7 @@ def _views(session: Session, windows: list, *, scope: str, genre: str | None, la
             views = v["views"] if isinstance(v, dict) else v
             if views <= 0:
                 continue
-            out.append({"channel_id": cid, "name": c.name, "language": languages[cid], "segment": c.segment or "news", "views": views,
+            out.append({"channel_id": cid, "name": c.name, "language": languages[cid], "segment": c.segment or "news", "group": market_label(c.segment, languages[cid]), "views": views,
                         "videos": v["videos"] if isinstance(v, dict) else None, "uploads": v["uploads"] if isinstance(v, dict) else None})
         out.sort(key=lambda r: r["views"], reverse=True)
         total = sum(r["views"] for r in out) or 0

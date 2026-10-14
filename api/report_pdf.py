@@ -300,6 +300,10 @@ def _decorate(canvas: Any, document: Any, downloaded: str, data_note: str, who: 
     canvas.restoreState()
 
 
+def _nm(x: dict[str, Any], with_group: bool) -> str:
+    return (x["name"][:34] + (f" ({x['group']})" if with_group and x.get("group") else ""))[:60]
+
+
 def report_pdf(r: dict[str, Any], protect: bool = True) -> bytes:
     buf = BytesIO()
     downloaded = ist_stamp()
@@ -320,6 +324,7 @@ def report_pdf(r: dict[str, Any], protect: bool = True) -> bytes:
     story.append(Spacer(1, 8))
     width = A4[0] - 32 * mm
     rows = r["rows"]
+    groups = not (r.get("filters") or {}).get("segment")   # with every category chosen, a channel is shown with its group (language and category)
     if r.get("stx"):
         story.append(_stx_banner(r["stx"], width))
         story.append(Spacer(1, 8))
@@ -349,12 +354,12 @@ def report_pdf(r: dict[str, Any], protect: bool = True) -> bytes:
     elif r["kind"] == "audience":
         story.append(_bars(rows, "average", width, "Average concurrent viewers (top 10)"))
         story.append(Spacer(1, 8))
-        data = [["#", "Channel", "STX Index", "Average", "Peak", "Share %", "Days seen"]] + [[str(x["rank"]), x["name"][:34], _stx(x.get("stx")), _n(x["average"]), _n(x["peak"]), _n(x["share_percent"]), str(x["days_seen"])] for x in rows]
+        data = [["#", "Channel", "STX Index", "Average", "Peak", "Share %", "Days seen"]] + [[str(x["rank"]), _nm(x, groups), _stx(x.get("stx")), _n(x["average"]), _n(x["peak"]), _n(x["share_percent"]), str(x["days_seen"])] for x in rows]
         story.append(_table(data, [9 * mm, 58 * mm, 22 * mm, 22 * mm, 22 * mm, 20 * mm, 20 * mm], right_from=2))
     else:
         story.append(_bars(rows, "views", width, "Views gained in the chosen hours (top 10)"))
         story.append(Spacer(1, 8))
-        data = [["#", "Channel", "STX Index", "Views gained", "Share %", "Videos", "New uploads"]] + [[str(x["rank"]), x["name"][:34], _stx(x.get("stx")), _n(x["views"]), _n(x["share_percent"]), _n(x["videos"]), _n(x["uploads"])] for x in rows]
+        data = [["#", "Channel", "STX Index", "Views gained", "Share %", "Videos", "New uploads"]] + [[str(x["rank"]), _nm(x, groups), _stx(x.get("stx")), _n(x["views"]), _n(x["share_percent"]), _n(x["videos"]), _n(x["uploads"])] for x in rows]
         story.append(_table(data, [9 * mm, 58 * mm, 22 * mm, 26 * mm, 20 * mm, 18 * mm, 21 * mm], right_from=2))
     for d in r.get("by_day") or []:
         label = datetime.fromisoformat(d["date"]).strftime("%A, %d %b %Y").replace(" 0", " ")
@@ -362,18 +367,18 @@ def report_pdf(r: dict[str, Any], protect: bool = True) -> bytes:
         if not d["rows"]:
             story.append(_para("No channel was measured on this day.", body))
         elif r["kind"] == "audience":
-            data = [["#", "Channel", "STX Index", "Average", "Peak", "Share %"]] + [[str(x["rank"]), x["name"][:34], _stx(x.get("stx")), _n(x["average"]), _n(x["peak"]), _n(x["share_percent"])] for x in d["rows"][:20]]
+            data = [["#", "Channel", "STX Index", "Average", "Peak", "Share %"]] + [[str(x["rank"]), _nm(x, groups), _stx(x.get("stx")), _n(x["average"]), _n(x["peak"]), _n(x["share_percent"])] for x in d["rows"][:20]]
             story.append(_table(data, [10 * mm, 66 * mm, 24 * mm, 26 * mm, 26 * mm, 22 * mm]))
         else:
-            data = [["#", "Channel", "STX Index", "Views gained", "Share %"]] + [[str(x["rank"]), x["name"][:34], _stx(x.get("stx")), _n(x["views"]), _n(x["share_percent"])] for x in d["rows"][:20]]
+            data = [["#", "Channel", "STX Index", "Views gained", "Share %"]] + [[str(x["rank"]), _nm(x, groups), _stx(x.get("stx")), _n(x["views"]), _n(x["share_percent"])] for x in d["rows"][:20]]
             story.append(_table(data, [10 * mm, 76 * mm, 26 * mm, 30 * mm, 24 * mm]))
     for g in r.get("by_genre") or []:
         story.append(_para(escape(f"Genre: {g['genre']}"), h2))
         if r["kind"] == "audience":
-            data = [["#", "Channel", "Average", "Peak"]] + [[str(x["rank"]), x["name"][:34], _n(x["average"]), _n(x["peak"])] for x in g["rows"][:5]]
+            data = [["#", "Channel", "Average", "Peak"]] + [[str(x["rank"]), _nm(x, groups), _n(x["average"]), _n(x["peak"])] for x in g["rows"][:5]]
             story.append(_table(data, [10 * mm, 90 * mm, 30 * mm, 30 * mm]))
         else:
-            data = [["#", "Channel", "Views gained", "Share %"]] + [[str(x["rank"]), x["name"][:34], _n(x["views"]), _n(x["share_percent"])] for x in g["rows"][:5]]
+            data = [["#", "Channel", "Views gained", "Share %"]] + [[str(x["rank"]), _nm(x, groups), _n(x["views"]), _n(x["share_percent"])] for x in g["rows"][:5]]
             story.append(_table(data, [10 * mm, 90 * mm, 30 * mm, 30 * mm]))
     story.append(_para("How these numbers were worked out", h2))
     story.append(_para(escape(r["method"]), body))

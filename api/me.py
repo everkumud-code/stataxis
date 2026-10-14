@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from api import feature_access
 from collector.storage import User, UserPref
-from metrics.markets import SEGMENTS
+from metrics.markets import KNOWN_LANGUAGES, SEGMENTS
 
 # every screen of the workspace that a person may use: (id, label, the feature that gates it)
 VIEWS: list[tuple[str, str, str]] = [
@@ -38,7 +38,7 @@ PERSONAS: dict[str, tuple[str, list[str]]] = {
     "influencer": ("Influencer or journalist", ["briefing", "creators", "stx", "content", "trends", "audience", "authenticity"]),
     "audience": ("Audience member", ["briefing", "overview", "market", "live", "stx"]),
 }
-LANGUAGES = ["Hindi", "English", "Regional"]
+LANGUAGES = [*KNOWN_LANGUAGES, "Regional", "Other"]
 SEGMENT_CHOICES = [(k, v) for k, v in SEGMENTS.items()]
 
 

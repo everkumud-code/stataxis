@@ -3,10 +3,12 @@
    so it can use that script's helpers ($, esc, api, post, table, head, state, add, token, isAdmin ...). */
 "use strict";
 (() => {
-  const SEGMENTS = [["", "All groups"], ["news", "News"], ["business", "Business news"], ["print", "Print media"], ["party", "Political parties"], ["leader", "Political leaders"],
-    ["commentator", "Political commentators"], ["creator", "Creators & influencers"], ["journalist", "Independent journalists"], ["brand", "Brands & entertainment"]];
+  /* the owner's classification: a category (Main stream, Business news, Entertainment, Political commentary, Individual journalist) and a language, never mixed */
+  const SEGMENTS = [["", "All categories"], ["news", "Main stream"], ["business", "Business news"], ["entertainment", "Entertainment"], ["commentator", "Political commentary"], ["journalist", "Individual journalist"],
+    ["print", "Print media"], ["party", "Political parties"], ["leader", "Political leaders"], ["creator", "Creators & influencers"], ["brand", "Brands & entertainment"]];
   const GENRES = ["Politics", "Sports", "Entertainment", "Business", "Current Affairs", "Other"];
-  const LANGS = [["", "All languages"], ["Hindi", "Hindi"], ["English", "English"], ["Regional", "Regional"]];
+  const LANGS = [["", "All languages"], ["Hindi", "Hindi"], ["English", "English"], ["Bangla", "Bangla"], ["Tamil", "Tamil"], ["Telugu", "Telugu"], ["Kannada", "Kannada"], ["Bhojpuri", "Bhojpuri"], ["Hindi (Regional)", "Hindi (Regional)"],
+    ["French", "French"], ["US English", "US English"], ["UK English", "UK English"], ["Arabic", "Arabic"], ["Other", "Other (more)"]];
   const opt = (list, cur) => list.map(([v, l]) => `<option value="${esc(v)}"${String(cur ?? "") === v ? " selected" : ""}>${esc(l)}</option>`).join("");
   const istDay = off => new Date(Date.now() + off * 864e5).toLocaleDateString("en-CA", {timeZone: "Asia/Kolkata"});
   const qs = o => Object.entries(o).filter(([, v]) => v !== "" && v != null && v !== false).map(([k, v]) => encodeURIComponent(k) + "=" + encodeURIComponent(v === true ? "1" : v)).join("&");
@@ -76,7 +78,7 @@
     } catch (e) { if (msgEl) { msgEl.className = "msg bad"; msgEl.textContent = e.message; } }
   }
   const dateFilters = (el, id, extra, onGo) => {
-    const f = SP[id] || {from: istDay(-7), to: istDay(-1), segment: "", language: ""};
+    const f = SP[id] || {from: istDay(-7), to: istDay(-1), segment: id === "primetime" ? "news" : "", language: ""};
     el.insertAdjacentHTML("beforeend", `<form class="card" id="${id}-f" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin:12px 0">
       <label>Category<br><select name="segment">${opt(SEGMENTS, f.segment)}</select></label><label>Language<br><select name="language">${opt(LANGS, f.language)}</select></label>
       <label>From<br><input type="date" name="from" value="${esc(f.from)}"></label><label>To<br><input type="date" name="to" value="${esc(f.to)}"></label>${extra || ""}
@@ -87,6 +89,7 @@
   /* STX Index is the platform's own measure: it sits beside every ranking, and every report opens with a strip that names the leader */
   const stxBadge = x => x ? `<strong style="color:#e1b94f;font-size:1.15em">${dec(x.score)}</strong>${x.preliminary ? ' <span class="tag" title="Little data: pulled toward 50">P</span>' : ""}` : `<span class="muted">—</span>`;
   const STXCOL = {h: "STX Index", n: 1, html: 1, v: r => stxBadge(r.stx)};
+  const groupCol = d => (d.filters && d.filters.segment) ? [] : [{h: "Group", v: r => r.group || "—"}];   /* with every category chosen, each row says which group (language and category) it belongs to */
   const stxStrip = h => h ? `<div class="card" style="margin:12px 0;border-color:#8b7131;background:linear-gradient(90deg,#16120a,#0b1b2b);display:flex;gap:18px;align-items:center;flex-wrap:wrap"><span class="tag" style="font-size:1.05em;color:#e1b94f;border-color:#e1b94f">STX Index</span>
       <span>Highest: <strong style="color:#e1b94f;font-size:1.25em">${esc(h.leader)} · ${dec(h.leader_score)}</strong></span><span>Average of the ${whole(h.scored)} scored channels: <strong>${dec(h.average)}</strong></span>
       <span class="muted">${h.scored < h.of ? `${whole(h.of - h.scored)} without a score yet. ` : ""}STX is StatAxis's own 0–100 score, over the last 7 days.</span></div>` : "";
@@ -245,7 +248,7 @@
 
   /* ---------- report builder ---------- */
   add("builder", "Market tools", "Report builder", async el => {
-    const f = SP.builder || {from: istDay(-7), to: istDay(-1), start_time: "09:00", end_time: "12:00", whole_day: false, day_wise: false, scope: "live", feed: "all", genre: "", segment: "", language: "", by_genre: false};
+    const f = SP.builder || {from: istDay(-7), to: istDay(-1), start_time: "09:00", end_time: "12:00", whole_day: false, day_wise: false, scope: "live", feed: "all", genre: "", segment: "news", language: "", by_genre: false};
     f.start_time = f.start_time || (f.start_hour != null ? String(f.start_hour).padStart(2, "0") + ":00" : "09:00"); f.end_time = f.end_time || (f.end_hour != null && f.end_hour < 24 ? String(f.end_hour).padStart(2, "0") + ":00" : "12:00");
     f.from = f.from || istDay(-7); f.to = f.to || istDay(-1);
     const hours = sel => Array.from({length: 25}, (_, h) => [String(h), String(h).padStart(2, "0") + ":00"]).map(([v, l]) => `<option value="${v}"${String(sel) === v ? " selected" : ""}>${l}</option>`).join("");
@@ -277,12 +280,12 @@
         const d = await api("/api/v1/market/report", {...v, by_genre: v.by_genre ? 1 : "", known_only: v.known_only ? 1 : ""});
         const live = d.kind === "audience";
         out.innerHTML = `<section class="card" style="margin-top:14px"><h2>${esc(d.scope_label)}${d.feed ? " · " + esc(d.feed) + " feeds" : ""} · ${esc(spanText(d))} IST</h2><p class="muted">${esc(fdate(d.from))} – ${esc(fdate(d.to))} · genre: ${esc(d.genre || "all")}${d.partial_until_ist ? ` · today is counted up to ${esc(d.partial_until_ist)} IST` : ""}</p>${stxStrip(d.stx)}${
-          d.rows.length ? table(live ? [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, STXCOL, {h: "Average viewers", n: 1, v: r => whole(r.average)}, {h: "Peak", n: 1, v: r => whole(r.peak)}, {h: "Hours watched", n: 1, v: r => whole(r.watch_hours)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}, {h: "Days seen", n: 1, v: r => r.days_seen}]
-            : [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, STXCOL, {h: "Views gained", n: 1, v: r => whole(r.views)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}, {h: "Videos", n: 1, v: r => r.videos}, {h: "New uploads", n: 1, v: r => r.uploads}], d.rows)
+          d.rows.length ? table(live ? [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, STXCOL, ...groupCol(d), {h: "Average viewers", n: 1, v: r => whole(r.average)}, {h: "Peak", n: 1, v: r => whole(r.peak)}, {h: "Hours watched", n: 1, v: r => whole(r.watch_hours)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}, {h: "Days seen", n: 1, v: r => r.days_seen}]
+            : [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, STXCOL, ...groupCol(d), {h: "Views gained", n: 1, v: r => whole(r.views)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}, {h: "Videos", n: 1, v: r => r.videos}, {h: "New uploads", n: 1, v: r => r.uploads}], d.rows)
           : `<p class="muted">Nothing was measured in these hours with these filters. Nothing is estimated.</p>`}</section>${(d.by_genre || []).map(g => `<section class="card" style="margin-top:14px"><h2>Genre: ${esc(g.genre)}</h2>${table([{h: "#", v: r => r.rank}, {h: "Channel", v: r => r.name}, {h: live ? "Average" : "Views gained", n: 1, v: r => whole(live ? r.average : r.views)}], g.rows.slice(0, 5))}</section>`).join("")}
           ${(d.by_day || []).map(x => `<section class="card" style="margin-top:14px"><h2>${esc(fdate(x.date))} · ${esc(x.from_time)}–${esc(x.to_time)} IST${x.partial ? " (so far)" : ""}</h2>` + (x.rows.length ? table(live
-            ? [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, STXCOL, {h: "Average viewers", n: 1, v: r => whole(r.average)}, {h: "Peak", n: 1, v: r => whole(r.peak)}, {h: "Hours watched", n: 1, v: r => whole(r.watch_hours)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}]
-            : [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, STXCOL, {h: "Views gained", n: 1, v: r => whole(r.views)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}], x.rows) : `<p class="muted">No channel was measured on this day.</p>`) + `</section>`).join("")}
+            ? [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, STXCOL, ...groupCol(d), {h: "Average viewers", n: 1, v: r => whole(r.average)}, {h: "Peak", n: 1, v: r => whole(r.peak)}, {h: "Hours watched", n: 1, v: r => whole(r.watch_hours)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}]
+            : [{h: "#", v: r => r.rank}, {h: "Channel", html: 1, v: r => `<strong>${esc(r.name)}</strong>`}, STXCOL, ...groupCol(d), {h: "Views gained", n: 1, v: r => whole(r.views)}, {h: "Share", n: 1, v: r => r.share_percent == null ? "—" : r.share_percent + "%"}], x.rows) : `<p class="muted">No channel was measured on this day.</p>`) + `</section>`).join("")}
           ${!live ? `<p class="muted" style="margin-top:8px">Coverage: ${whole(d.coverage.videos_measured_at_both_ends)} of ${whole(d.coverage.videos_matching)} matching videos measured at both ends of the hours.</p>` : ""}${method(d.method)}`;
       } catch (e) { out.innerHTML = fail(e); wireUpgrade(out); }
     };
@@ -580,7 +583,7 @@
 
   /* ---------- live event compare: up to 30 channels, live ---------- */
   add("liveevent", "Market tools", "Live event compare", async el => {
-    const f = SP.live || {terms: "", segment: "", language: "", minutes: "60", stx_period: "7d", feed: "all", auto: true};
+    const f = SP.live || {terms: "", segment: "news", language: "", minutes: "60", stx_period: "7d", feed: "all", auto: true};
     el.innerHTML = head("Live event compare", "Up to 30 channels covering the same live event, side by side: the audience each has now, how it moved, the peak, the STX index and the tone of what each is showing. The screen refreshes by itself.") +
       `<form class="card" id="lf" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><label style="flex:1 1 100%">Name of this live event (you can change it any time)<br><input type="text" name="name" id="lname" maxlength="80" value="${esc(f.name || "")}" placeholder="e.g. Budget 2026, live coverage" style="width:min(520px,100%);font-size:18px"></label><label>Event words<br><input type="text" name="terms" value="${esc(f.terms)}" placeholder="e.g. budget, election result" style="min-width:230px"></label>
       <label>Category<br><select name="segment">${opt(SEGMENTS, f.segment)}</select></label><label>Language<br><select name="language">${opt(LANGS, f.language)}</select></label>

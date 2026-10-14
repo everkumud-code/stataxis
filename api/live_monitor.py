@@ -16,6 +16,7 @@ from collector.storage import Channel, Observation, Video, effective_channel_lan
 from collector.youtube.client import YouTubeClient
 from collector.youtube.manual_live import ManualLiveTarget, fetch_manual_live
 from metrics.feeds import LiveStream, split_feeds
+from metrics.markets import language_group, language_matches
 
 # A concurrent stream still counts as live if it was observed within this many seconds of
 # its channel's newest live observation (covers the live poll interval plus jitter).
@@ -70,7 +71,7 @@ def live_audience_window(session: Session, *, start_at: datetime, end_at: dateti
     effective = {channel.id: effective_channel_language(session, channel) for _, channel, _ in full_rows}
     if language:
         target = language.strip().lower()
-        full_rows = [row for row in full_rows if language_group(effective[row[1].id]).lower() == target or effective[row[1].id].lower() == target]
+        full_rows = [row for row in full_rows if language_matches(effective[row[1].id], target)]
     videos_by_id = {video.id: video for _, _, video in full_rows}
     rows = [(observation, channel) for observation, channel, _ in full_rows]
 
@@ -208,17 +209,6 @@ def live_audience_window(session: Session, *, start_at: datetime, end_at: dateti
             for observation, channel in channel_latest.values()
         ],
     }
-
-
-def language_group(language: str | None) -> str:
-    value = (language or "").strip().lower()
-    if not value or value == "unknown":
-        return "Unknown"
-    if value.startswith("hi") or value in {"hindi", "hin"}:
-        return "Hindi"
-    if value.startswith("en") or value in {"english", "eng"}:
-        return "English"
-    return "Regional"
 
 
 def _utc(value: datetime) -> datetime:

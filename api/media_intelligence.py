@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, aliased
 
 from collector.storage import Channel, Observation, Video, effective_channel_language
 from metrics.market_stx import build_market_stx
-from metrics.markets import market_label, normalize_segment
+from metrics.markets import language_matches, market_label, normalize_segment
 
 PERIOD_DAYS = {
     "1h": 1 / 24,
@@ -192,7 +192,7 @@ def _eligible_channels(session: Session, *, language: str | None, region: str | 
     result = []
     for channel in channels:
         channel_language = effective_channel_language(session, channel)
-        if language and channel_language.lower() != language.lower(): continue
+        if language and not language_matches(channel_language, language): continue
         if region and (channel.region or "unknown").lower() != region.lower(): continue
         if market and market.lower() not in {_market_name(channel).lower(), _channel_market_label(channel).lower()}: continue
         if segment_key and (channel.segment or "news") != segment_key: continue
