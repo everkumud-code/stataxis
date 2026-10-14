@@ -247,7 +247,7 @@ def _stx(x: Any) -> str:
     return "-" if not x else f"{x['score']:.1f}"
 
 
-def _stx_banner(h: dict[str, Any] | None, width: float) -> Any:
+def _stx_banner(h: dict[str, Any] | None, width: float, period: str = "the last 7 days") -> Any:
     """The STX Index strip every report opens with: who leads, the average, how many channels have a score."""
     if not h:
         return Spacer(1, 0)
@@ -255,7 +255,7 @@ def _stx_banner(h: dict[str, Any] | None, width: float) -> Any:
     small = ParagraphStyle("stxs", fontName="Helvetica", fontSize=7.8, leading=10, textColor=MUTE)
     left = _para("<font color='#0b8ded'><b>STX INDEX</b></font>", big)
     mid = _para(f"Highest: <b>{escape(str(h['leader']))} - {h['leader_score']:.1f}</b>  |  Average of {h['scored']} scored channels: <b>{h['average']:.1f}</b>", big)
-    note = _para(escape("STX is StatAxis's own 0-100 score for a channel, over the last 7 days. A dash means not enough data."), small)
+    note = _para(escape(f"STX is StatAxis's own 0-100 score for a channel, over {period}. A dash means not enough data."), small)
     t = Table([[left, mid], [note, ""]], colWidths=[28 * mm, width - 28 * mm])
     t.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 1.2, BLUE), ("BACKGROUND", (0, 0), (-1, -1), PANEL), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                            ("SPAN", (0, 1), (1, 1)), ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
