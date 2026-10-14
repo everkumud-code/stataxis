@@ -277,10 +277,10 @@ def test_a_menu_name_is_never_cut_and_the_menu_width_can_be_moved_left_and_right
         assert part in html, part                                                                                  # drag, arrow keys, remembered width, double-click reset
 
 
-def test_the_overview_is_a_dashboard_each_person_can_arrange():
+def test_the_overview_is_a_dashboard_of_six_sections_each_person_arranges_and_the_second_is_the_stx_index():
     from pathlib import Path
     html = (Path(__file__).resolve().parent.parent / "dashboard" / "workspace.html").read_text(encoding="utf-8")
-    for widget in ("kpis:", "stxleaders:", "topviews:", "topaudience:", "snapshot:", "pipeline:", "decisions:"):
+    for widget in ("stx:", "numbers:", "views:", "audience:", "movers:", "live:", "spikes:", "forecasts:", "weekly:", "alerts:"):
         assert widget in html, widget
-    assert "Customize this dashboard" in html and 'localStorage.getItem("sx_dashboard")' in html and "data-up" in html and "data-down" in html and "Back to the original" in html
-    assert '"/api/v1/market/live-event"' not in html or True
+    assert "/api/v1/me/dashboard" in html and 'data-slot="${i}"' in html and "layout.fixed.slot" in html and "Back to the original dashboard" in html and "The second section is always the STX Index." in html
+    assert "localStorage" not in html[html.index('add("overview"'):html.index("const readyReason")]               # the layout belongs to the login, not to one browser

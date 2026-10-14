@@ -701,11 +701,13 @@
   /* ---------- admin: channel groups ---------- */
   add("adm-groups", "Admin", "Channel groups", async el => {
     if (!isAdmin) { el.innerHTML = adminOnly("Channel groups"); return; }
-    el.innerHTML = head("Channel groups", "Put each channel in a group so reports compare like with like: news, business, print, parties, leaders, commentators, creators or independent journalists.") + `<div id="gmsg" class="msg" hidden></div><div id="gout"><p class="muted">Loading…</p></div>`;
+    el.innerHTML = head("Channel groups", "Give each channel its category (Main stream, Business news, Entertainment, Political commentary, Individual journalist ...) and its language, so reports compare like with like. A business channel is never counted with Hindi news.") + `<div id="gmsg" class="msg" hidden></div><div id="gout"><p class="muted">Loading…</p></div>`;
     await reloadChannels();
-    const seg = SEGMENTS.filter(([v]) => v);
-    $("#gout", el).innerHTML = `<section class="card">${table([{h: "Channel", html: 1, v: c => `<strong>${esc(c.name)}</strong>`}, {h: "Language", v: c => c.language || "—"},
-      {h: "Group", html: 1, v: c => `<select data-grp="${esc(c.id)}">${seg.map(([v, l]) => `<option value="${esc(v)}"${(c.segment || "news") === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>`}], channels, "No channels yet.")}</section>`;
+    const seg = SEGMENTS.filter(([v]) => v), langs = LANGS.filter(([v]) => v).map(([v]) => v);
+    $("#gout", el).innerHTML = `<section class="card">${table([{h: "Channel", html: 1, v: c => `<strong>${esc(c.name)}</strong>`},
+      {h: "Language", html: 1, v: c => `<select data-lang="${esc(c.id)}">${[...(langs.includes(c.language) || !c.language ? [] : [c.language]), ...langs].map(l => `<option value="${esc(l)}"${l === c.language ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>`},
+      {h: "Category", html: 1, v: c => `<select data-grp="${esc(c.id)}">${seg.map(([v, l]) => `<option value="${esc(v)}"${(c.segment || "news") === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>`}], channels, "No channels yet.")}</section>`;
+    $("#gout", el).querySelectorAll("[data-lang]").forEach(s => s.onchange = async () => { const m = $("#gmsg", el); try { await post("/api/v1/admin/channels/language", {channel_id: +s.dataset.lang, language: s.value}); m.hidden = false; m.className = "msg ok"; m.textContent = "Language saved."; } catch (e) { m.hidden = false; m.className = "msg bad"; m.textContent = e.message; } });
     $("#gout", el).querySelectorAll("[data-grp]").forEach(s => s.onchange = async () => { const m = $("#gmsg", el); try { await post("/api/v1/admin/channels/segment", {channel_id: +s.dataset.grp, segment: s.value}); m.hidden = false; m.className = "msg ok"; m.textContent = "Group saved."; } catch (e) { m.hidden = false; m.className = "msg bad"; m.textContent = e.message; } });
   }, {admin: 1});
 

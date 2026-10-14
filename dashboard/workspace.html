@@ -577,70 +577,56 @@ add("dashboard", "Intelligence", "Channel dashboard", async el => {
 });
 
 add("overview", "Intelligence", "Overview", async el => {
-  el.innerHTML = head("Market overview", "The state of the market you follow, from the first observation to the latest.") + filterBar({channel: false}) + `<div id="ov"><p class="muted">Loading…</p></div>`;
-  const [m, r, w] = await Promise.allSettled([marketReport(), readiness(), api("/api/v1/insights/what-changed", {hours: 24})]);
-  const box = $("#ov", el);
-  if (m.status !== "fulfilled") { box.innerHTML = errCard(m.reason); return; }
-  const rep = m.value, rows = marketRows(rep), scored = rows.filter(x => x.stx && x.stx.score != null);
-  if (!rows.length) { box.innerHTML = channels.length ? state("No observations in this window", "Try a longer period or clear the language filter. If the window is right, the collector may not have run yet — see Operations.") : noChannels(); return; }
-  const videos = rows.reduce((s, x) => s + (x.videos_observed || 0), 0);
-  const avgStx = scored.length ? scored.reduce((s, x) => s + stxShown(x.stx), 0) / scored.length : null;
-  const avgConf = scored.length ? scored.reduce((s, x) => s + x.stx.confidence, 0) / scored.length : null;
-  const rd = r.status === "fulfilled" ? r.value : null;
-  const ageP = rd && rd.collection.latest_run ? Math.max(0, 100 - rd.collection.latest_run.age_minutes / rd.collection.stale_after_minutes * 100) : null;
-  const mover = rows.filter(x => x.rank_change).sort((a, b) => Math.abs(b.rank_change) - Math.abs(a.rank_change))[0];
-  const wc = w.status === "fulfilled" ? w.value : null;
-  /* The dashboard is the person's own: which blocks show, and in what order, is their choice. It is remembered in this browser (never needed for anything else) and a reset puts the original back. */
-  const top = (list, key, n = 5) => list.filter(x => x[key] != null && x[key] > 0).sort((p, q) => q[key] - p[key]).slice(0, n);
-  const leaderList = (items, text) => items.length ? `<ul class="list">${items.map((x, i) => `<li><span><b style="color:var(--blue);margin-right:8px">${String(i + 1).padStart(2, "0")}</b>${esc(x.channel)}</span><b>${text(x)}</b></li>`).join("")}</ul>` : `<p class="muted">Nothing measured in this window yet.</p>`;
-  const WIDGETS = {
-    kpis: ["Key numbers", () => `<div style="grid-column:1/-1"><div class="grid kpis">
-      ${kpi("Views gained", compact(rep.market.view_delta_total), "In the selected window")}
-      ${kpi("Average concurrent viewers", compact(rep.market.average_concurrent_total), "Sum across channels")}
-      ${kpi("Channels", whole(rep.market.channel_count), whole(scored.length) + " with usable history")}
-      ${kpi("Videos observed", compact(videos), "Stored observations")}
-      ${kpi("Average STX", avgStx == null ? "—" : dec(avgStx), avgConf == null ? "No scored channels yet" : "Confidence-adjusted · avg confidence " + pct(avgConf), "gold")}</div></div>`],
-    stxleaders: ["STX Index leaders", () => `<section class="card"><h2>STX Index leaders</h2>${leaderList(scored.map(x => ({channel: x.channel, v: stxShown(x.stx)})).sort((p, q) => q.v - p.v).slice(0, 5), x => dec(x.v))}</section>`],
-    topviews: ["Top channels by views gained", () => `<section class="card"><h2>Top channels by views gained</h2>${leaderList(top(rows, "view_delta"), x => compact(x.view_delta))}</section>`],
-    topaudience: ["Top channels by average audience", () => `<section class="card"><h2>Top channels by average audience</h2>${leaderList(top(rows, "average_concurrent"), x => compact(x.average_concurrent))}</section>`],
-    snapshot: ["Market snapshot", () => `<section class="card"><h2>Market snapshot</h2>
-        ${bar("Channels with usable history", rows.length ? scored.length / rows.length * 100 : null)}
-        ${bar("Snapshot coverage", rd ? rd.intelligence.coverage * 100 : null)}
-        ${bar("Collection freshness", ageP)}
-        <p class="muted">${rd && rd.collection.latest_run ? "Last collection run " + when(rd.collection.latest_run.finished_at || rd.collection.latest_run.started_at) + "." : "The collector has not run yet."}</p></section>`],
-    pipeline: ["Pipeline status", () => `<section class="card"><h2>Pipeline status</h2>${rd ? `<ul class="list">
-        <li><span>Collection</span>${badge(rd.collection.fresh, "Fresh", "Stale", "Unknown")}</li>
-        <li><span>Data integrity</span>${badge(rd.integrity.ok, "No issues", rd.integrity.issue_count + " issue(s)")}</li>
-        <li><span>Intelligence</span>${badge(rd.ready, "Ready", "Not ready")}</li></ul>
-        <p class="muted">${esc(readyReason(rd.reason))}</p>` : errCard(r.reason)}</section>`],
-    decisions: ["Decision surfaces", () => `<section class="card"><h2>Decision surfaces</h2>
-        <div class="decide"><b>Who is moving?</b>${mover ? `${esc(mover.channel)} ${mover.rank_change > 0 ? "climbed " : "fell "}${Math.abs(mover.rank_change)} place(s).` : "No rank movement recorded in this window."}</div>
-        <div class="decide"><b>What is moving?</b>${wc && wc.changes.length ? `${esc(wc.changes[0].title)} (${signed(wc.changes[0].view_delta)} views).` : "No video moved measurably in the last 24 hours."}</div>
-        <div class="decide"><b>What changed?</b>${wc ? esc(wc.headline) : "Change data is unavailable right now."}</div></section>`],
+  el.innerHTML = head("My dashboard", "Six sections, each showing the data you chose, side by side. The second section is always the STX Index. Your layout is saved with your login, so it is the same on every device.") + `<div id="dash"><p class="muted">Loading…</p></div>`;
+  const box = $("#dash", el);
+  let layout;
+  try { layout = await api("/api/v1/me/dashboard"); } catch (e) { box.innerHTML = errCard(e); return; }
+  const isoDay = n => new Date(Date.now() + 19800000 - n * 86400000).toISOString().slice(0, 10);
+  const nameOf = (list, id, key = "label") => (list.find(x => x.id === id) || {})[key] || id;
+  const rep = (period, sl) => api("/api/v1/markets/report", {period, language: sl.language, segment: sl.segment, stream_scope: "all", limit: 200});
+  const list = (items, text, empty = "Nothing measured for this choice yet.") => items.length ? `<ul class="list">${items.map((x, i) => `<li><span><b style="color:var(--blue);margin-right:8px">${String(i + 1).padStart(2, "0")}</b>${esc(x.name)}</span><b>${text(x)}</b></li>`).join("")}</ul>` : `<p class="muted">${esc(empty)}</p>`;
+  const top = (rows, key, n = 6) => rows.filter(r => r[key] != null && r[key] > 0).sort((p, q) => q[key] - p[key]).slice(0, n);
+  const RUN = {   /* what each kind of data fetches and shows; every section asks for its own, so one slow or refused section never blocks the others */
+    stx: async sl => { const r = await rep("7d", sl), rows = (r.channels || []).filter(x => x.stx && x.stx.score != null).map(x => ({name: x.channel, v: stxShown(x.stx), c: x.stx.confidence, p: prelim(x.stx)})).sort((p, q) => q.v - p.v).slice(0, 8);
+      return list(rows, x => `<span style="color:var(--blue);font-size:1.15em">${dec(x.v)}</span> <span class="muted">${pct(x.c)}</span>${x.p ? ' <span class="tag" title="Little data: pulled toward 50">P</span>' : ""}`, "No channel has an STX Index for this choice yet.") + `<p class="muted" style="margin-top:8px">STX is StatAxis's own 0–100 score, over 7 days, with its confidence beside it.</p>`; },
+    numbers: async sl => { const r = await rep("7d", sl), rows = r.channels || [], sc = rows.filter(x => x.stx && x.stx.score != null);
+      return `<div class="grid kpis" style="grid-template-columns:repeat(2,1fr)">${kpi("Views gained", compact(r.market.view_delta_total), "7 days")}${kpi("Average audience", compact(r.market.average_concurrent_total), "sum of channels")}${kpi("Channels", whole(r.market.channel_count), whole(sc.length) + " with an STX")}${kpi("Average STX", sc.length ? dec(sc.reduce((t, x) => t + stxShown(x.stx), 0) / sc.length) : "—", "confidence-adjusted", "gold")}</div>`; },
+    views: async sl => list(top((await rep("7d", sl)).channels || [], "view_delta").map(x => ({name: x.channel, v: x.view_delta})), x => compact(x.v)),
+    audience: async sl => list(top((await rep("today", sl)).channels || [], "average_concurrent").map(x => ({name: x.channel, v: x.average_concurrent})), x => compact(x.v)),
+    movers: async sl => { const rows = ((await rep("7d", sl)).channels || []).filter(x => x.rank_change).sort((p, q) => Math.abs(q.rank_change) - Math.abs(p.rank_change)).slice(0, 6);
+      return list(rows.map(x => ({name: x.channel, v: x.rank_change})), x => x.v > 0 ? `<span class="green">▲ ${x.v}</span>` : `<span class="red">▼ ${-x.v}</span>`, "No rank movement in this window."); },
+    live: async sl => { const d = await api("/api/v1/market/live-event", {minutes: 30, feed: "all", stx_period: "7d", language: sl.language, segment: sl.segment}); return d.channels.length ? `<p class="muted">${whole(d.summary.total_live_now)} viewers live across ${d.summary.channels_live} channels</p>` + list(d.channels.slice(0, 6).map(x => ({name: x.name, v: x.live_now})), x => whole(x.v)) : `<p class="muted">${esc(d.note || "Nobody is live for this choice right now.")}</p>`; },
+    spikes: async sl => { const d = await api("/api/v1/lab/spikes", {hours: 6, language: sl.language, segment: sl.segment}); return d.spikes.length ? `<ul class="list">${d.spikes.slice(0, 4).map(x => `<li><span>${esc(x.text)}</span></li>`).join("")}</ul>` : `<p class="muted">No channel rose suddenly in the last 6 hours.</p>`; },
+    forecasts: async () => { const d = await api("/api/v1/lab/forecasts"); return list((d.upcoming || []).slice(0, 6).map(x => ({name: x.channel, v: x.predicted})), x => whole(x.v), "No forecast written yet for the coming slot.") + `<p class="muted" style="margin-top:8px">Expected average audience, ${esc(d.slot || "")} IST.</p>`; },
+    weekly: async sl => { const d = await api("/api/v1/market/weekly", {from: isoDay(7), to: isoDay(1), language: sl.language, segment: sl.segment}), g = (d.groups || [])[0];
+      return g ? `<p class="muted">${esc(g.label)}</p>` + list(g.channels.slice(0, 6).map(x => ({name: x.name, v: x.views})), x => dec(x.v / 1e6, 1) + "M") : `<p class="muted">No uploads were measured for this choice.</p>`; },
+    alerts: async () => { const d = await post("/api/v1/lab/alerts/list", {}); return d.events.length ? `<ul class="list">${d.events.slice(0, 4).map(e => `<li><span>${e.seen ? "" : '<span class="tag green">new</span> '}${esc(e.message)}</span></li>`).join("")}</ul>` : `<p class="muted">None of your alerts has fired yet.</p>`; },
   };
-  const IDS = Object.keys(WIDGETS);
-  const loadPrefs = () => { try { const p = JSON.parse(localStorage.getItem("sx_dashboard") || "{}"); return {order: [...(p.order || []).filter(id => IDS.includes(id)), ...IDS.filter(id => !(p.order || []).includes(id))], hidden: (p.hidden || []).filter(id => IDS.includes(id))}; } catch { return {order: IDS.slice(), hidden: []}; } };
-  const savePrefs = pr => { try { localStorage.setItem("sx_dashboard", JSON.stringify(pr)); } catch { /* not remembered */ } };
-  let prefs = loadPrefs();
-  const paint = (withPanel = false) => {
-    const shown = prefs.order.filter(id => !prefs.hidden.includes(id));   /* the key numbers take the whole row, wherever they are in the order */
-    box.innerHTML = `<div class="btnrow" style="margin-bottom:10px"><button class="btn" type="button" id="dashcustom" aria-expanded="false">Customize this dashboard</button></div><div id="dashpanel" class="card" hidden style="margin-bottom:14px"></div>`
-      + (shown.length ? `<div class="grid cols">${shown.map(id => WIDGETS[id][1]()).join("")}</div>` : state("Nothing is switched on", "Open “Customize this dashboard” and tick what you want to see."))
-      + evidence(provText(rep.provenance.observation_count, rep.start_at, rep.end_at));
-    const panel = $("#dashpanel", box), btn = $("#dashcustom", box);
-    const drawPanel = () => {
-      panel.innerHTML = `<h2>Customize this dashboard</h2><p class="muted">Tick what you want to see and move blocks up or down. This is kept in this browser.</p><ul class="list">${prefs.order.map((id, i) => `<li><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-w="${id}"${prefs.hidden.includes(id) ? "" : " checked"}> ${esc(WIDGETS[id][0])}</label>
-        <span class="btnrow"><button class="btn" type="button" data-up="${i}" aria-label="Move up"${i ? "" : " disabled"}>▲</button><button class="btn" type="button" data-down="${i}" aria-label="Move down"${i < prefs.order.length - 1 ? "" : " disabled"}>▼</button></span></li>`).join("")}</ul>
-        <div class="btnrow" style="margin-top:12px"><button class="btn" type="button" id="dashreset">Back to the original</button><button class="btn primary" type="button" id="dashdone">Done</button></div>`;
-      panel.querySelectorAll("[data-w]").forEach(c => c.onchange = () => { prefs.hidden = c.checked ? prefs.hidden.filter(x => x !== c.dataset.w) : [...prefs.hidden, c.dataset.w]; savePrefs(prefs); paint(true); });
-      const move = (i, d) => { const o = prefs.order.slice(); [o[i], o[i + d]] = [o[i + d], o[i]]; prefs.order = o; savePrefs(prefs); paint(true); };
-      panel.querySelectorAll("[data-up]").forEach(b => b.onclick = () => move(+b.dataset.up, -1));
-      panel.querySelectorAll("[data-down]").forEach(b => b.onclick = () => move(+b.dataset.down, 1));
-      $("#dashreset", panel).onclick = () => { prefs = {order: IDS.slice(), hidden: []}; savePrefs(prefs); paint(true); };
-      $("#dashdone", panel).onclick = () => { panel.hidden = true; btn.setAttribute("aria-expanded", "false"); };
-    };
-    if (withPanel) { panel.hidden = false; btn.setAttribute("aria-expanded", "true"); drawPanel(); }
-    btn.onclick = () => { if (panel.hidden) { panel.hidden = false; btn.setAttribute("aria-expanded", "true"); drawPanel(); } else { panel.hidden = true; btn.setAttribute("aria-expanded", "false"); } };
+  const filterText = sl => [sl.language || "All languages", nameOf(layout.segments, sl.segment, "label") && sl.segment ? nameOf(layout.segments, sl.segment) : "All categories"].join(" · ");
+  const msg = (t, ok) => { const m = $("#dmsg", box); m.hidden = !t; m.className = "msg " + (ok ? "ok" : "bad"); m.textContent = t || ""; };
+  const fill = async i => {
+    const sl = layout.slots[i], body = $(`#dbody${i}`, box); body.innerHTML = `<p class="muted">Loading…</p>`;
+    try { body.innerHTML = await RUN[sl.widget](sl); } catch (e) { body.innerHTML = /package|allowed|403|plan/i.test(e.message || "") ? `<p class="muted">This data is not part of your package. Choose another kind of data for this section.</p>` : `<p class="muted">Could not load this section: ${esc(e.message || "try again")}.</p>`; }
+  };
+  const opts = (items, cur, firstLabel) => (firstLabel ? `<option value="">${esc(firstLabel)}</option>` : "") + items.map(x => `<option value="${esc(x.id)}"${x.id === cur ? " selected" : ""}>${esc(x.label)}</option>`).join("");
+  const paint = () => {
+    box.innerHTML = `<div id="dmsg" class="msg" hidden></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px">${layout.slots.map((sl, i) => {
+      const fixed = i === layout.fixed.slot;
+      return `<section class="card" data-slot="${i}"><div style="display:flex;gap:8px;align-items:baseline;justify-content:space-between"><h2 style="margin:0"><span style="color:var(--blue);margin-right:8px">${i + 1}</span>${esc(nameOf(layout.widgets, sl.widget))}${fixed ? ' <span class="tag" title="This section is always the STX Index">fixed</span>' : ""}</h2><button class="btn" type="button" data-edit="${i}">Edit</button></div>
+        <p class="muted" style="margin:2px 0 10px">${esc(filterText(sl))}</p><div id="dbody${i}"></div>
+        <form class="dedit" data-form="${i}" hidden style="margin-top:12px;display:none;grid-template-columns:1fr 1fr;gap:10px;align-items:end"><label style="grid-column:1/-1">Data to show<br><select name="widget"${fixed ? " disabled" : ""}>${opts(layout.widgets, sl.widget)}</select>${fixed ? '<span class="muted">The second section is always the STX Index.</span>' : ""}</label>
+          <label>Language<br><select name="language">${opts(layout.languages.map(l => ({id: l, label: l})), sl.language, "All languages")}</select></label><label>Category<br><select name="segment">${opts(layout.segments, sl.segment, "All categories")}</select></label>
+          <div class="btnrow" style="grid-column:1/-1"><button class="btn primary" type="submit">Save this section</button><button class="btn" type="button" data-cancel="${i}">Cancel</button></div></form></section>`; }).join("")}</div>
+      <div class="btnrow" style="margin-top:14px"><button class="btn" type="button" id="dreset">Back to the original dashboard</button></div>`;
+    layout.slots.forEach((_, i) => fill(i));
+    box.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => { const f = $(`[data-form="${b.dataset.edit}"]`, box); const open = f.style.display === "none"; f.style.display = open ? "grid" : "none"; });
+    box.querySelectorAll("[data-cancel]").forEach(b => b.onclick = () => { $(`[data-form="${b.dataset.cancel}"]`, box).style.display = "none"; });
+    box.querySelectorAll("[data-form]").forEach(f => f.onsubmit = async ev => {
+      ev.preventDefault(); const i = +f.dataset.form, slots = layout.slots.map(x => ({...x}));
+      slots[i] = {widget: i === layout.fixed.slot ? layout.fixed.widget : f.elements.widget.value, language: f.elements.language.value, segment: f.elements.segment.value};
+      try { layout = await post("/api/v1/me/dashboard", {slots}); paint(); msg("Saved with your login.", true); } catch (e) { msg(e.message); }
+    });
+    $("#dreset", box).onclick = async () => { if (!confirm("Put the dashboard back to the original six sections?")) return; try { layout = await post("/api/v1/me/dashboard", {reset: true}); paint(); msg("Back to the original.", true); } catch (e) { msg(e.message); } };
   };
   paint();
 });
