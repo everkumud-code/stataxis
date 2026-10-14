@@ -1,7 +1,7 @@
 """The collector's small scheduled jobs, run in their own thread beside the live poll and the collection pass:
 
   every minute   check people's alerts against the live audiences (api/alerts.py)
-  every 10 min   close collection runs a restart cut short; write the day's note from 09:00 IST (and the week's on Monday); write the 19:00-22:00 forecasts from 06:00 IST until the slot
+  every 10 min   send the report e-mails that are due (api/report_subscriptions.py); close collection runs a restart cut short; write the day's note from 09:00 IST (and the week's on Monday); write the 19:00-22:00 forecasts from 06:00 IST until the slot
                  starts; score the forecasts of a slot once it is over
 Each job has its own database session and its own error handling, so a failing job never stops the others or the collection.
 """
@@ -50,8 +50,11 @@ def periodic_jobs(engine: Any, now: datetime) -> None:
     from api.notes import due_notes, generate_note
     from collector.run import close_interrupted_runs
 
+    from api.report_subscriptions import send_due
+
     local = now + IST
     _guarded(engine, "close_interrupted_runs", close_interrupted_runs)
+    _guarded(engine, "report_emails", lambda s: send_due(s, now=now))
     _guarded(engine, "old_snapshots_removed", lambda s: _remove_old_snapshots(s, now))
     for kind, day in due_notes(now):
         _guarded(engine, f"note_{kind}", lambda s, k=kind, d=day: int(generate_note(s, k, d, now=now)))

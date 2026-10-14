@@ -27,7 +27,7 @@ VIEWS: list[tuple[str, str, str]] = [
     ("builder", "Report builder", "report_builder"), ("creators", "IFX Score", "creators"), ("planner", "Media planner", "planner"), ("authenticity", "Authenticity radar", "authenticity"),
     ("audience", "Audience (geography and age)", "audience"), ("liveevent", "Live event compare", "live_compare"),
     ("operations", "Operations", "operations"), ("integrity", "Data integrity", "integrity"),
-    ("spikes", "Spikes and movement", "spikes"), ("forecasts", "Forecasts", "forecasts"), ("notes", "Notes", "notes"), ("alerts", "Alerts", "alerts"), ("completeness", "Data completeness", "integrity"),
+    ("spikes", "Spikes and movement", "spikes"), ("forecasts", "Forecasts", "forecasts"), ("notes", "Notes", "notes"), ("alerts", "Alerts", "alerts"), ("completeness", "Data completeness", "integrity"), ("reportmail", "Report e-mails", "report_email"),
 ]
 VIEW_FEATURE = {vid: feature for vid, _label, feature in VIEWS}
 ALWAYS = ("mychannels", "profile")   # every login has these two

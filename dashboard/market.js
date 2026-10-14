@@ -800,6 +800,67 @@
     try { draw(await post("/api/v1/lab/alerts/list", {})); } catch (e) { $("#alout", el).innerHTML = fail(e); wireUpgrade($("#alout", el)); }
   });
 
+  /* ---------- report e-mails: a person chooses how often, the layout and the parts ---------- */
+  add("reportmail", "Market tools", "Report e-mails", async el => {
+    el.innerHTML = head("Report e-mails", "Choose how often, in which layout and with which parts, and StatAxis e-mails the report to you. The STX Index is always first.") + `<div id="rmout"><p class="muted">Loading…</p></div>`;
+    const out = $("#rmout", el), hours = Array.from({length: 24}, (_, h) => [String(h), String(h).padStart(2, "0") + ":00"]);
+    const say = (t, ok) => { const m = $("#rmmsg", el); if (!m) return; m.hidden = !t; m.className = "msg " + (ok ? "ok" : "bad"); m.textContent = t || ""; };
+    const draw = d => {
+      const o = d.options, defaults = layout => o.sections.filter(x => layout === "booklet" || x.default_one_pager).map(x => x.id);
+      out.innerHTML = (d.mail_ready ? "" : `<p class="msg">E-mail sending is being set up by StatAxis. You can choose your reports now; they start as soon as it is ready.</p>`) +
+        `<form class="card" id="rmf" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end;margin:12px 0"><input type="hidden" name="id">
+          <label>How often<br><select name="interval">${opt(o.intervals.map(x => [x.id, x.label]), "weekly")}</select></label>
+          <label>Layout<br><select name="layout">${opt(o.layouts.map(x => [x.id, x.label]), "one_pager")}</select></label>
+          <label>Language<br><select name="language">${opt(LANGS, "")}</select></label><label>Group<br><select name="segment">${opt(SEGMENTS, "")}</select></label>
+          <label>Send at (IST)<br><select name="send_hour">${opt(hours, "8")}</select></label>
+          <div style="grid-column:1/-1"><div class="muted">Parts of the report (the STX Index and the key numbers are always in it)</div>${o.sections.map(x => `<label style="display:inline-flex;gap:6px;align-items:center;margin:6px 16px 0 0"><input type="checkbox" name="sections" value="${esc(x.id)}"> ${esc(x.label)}</label>`).join("")}</div>
+          <div class="btnrow" style="grid-column:1/-1"><button class="btn primary" type="submit" id="rmsave">Save this report</button><button class="btn" type="button" id="rmnew" hidden>Cancel editing</button></div></form>
+        <div id="rmmsg" class="msg" hidden></div>
+        <section class="card"><h2>Your reports go to ${esc(d.email)}</h2>${d.subscriptions.length ? table([
+          {h: "Report", html: 1, v: r => `<strong>${esc(r.interval_label)}</strong><br><span class="muted">${esc(r.layout_label)}</span>`}, {h: "Parts", v: r => r.sections.map(id => (o.sections.find(x => x.id === id) || {label: id}).label.replace(/ \(.*\)/, "")).join(", ")},
+          {h: "For", v: r => [r.language, r.segment].filter(Boolean).join(" · ") || "everything"}, {h: "Sent at", n: 1, v: r => String(r.send_hour).padStart(2, "0") + ":00 IST"},
+          {h: "Status", html: 1, v: r => (r.active ? '<span class="tag green">on</span>' : '<span class="tag">off</span>') + (r.last ? `<br><span class="muted">${esc(({sent: "Last sent", failed: "Failed", waiting_history: "Waiting for enough data"})[r.last.status] || r.last.status)}${r.last.period ? ": " + esc(r.last.period) : ""}</span>` : '<br><span class="muted">Nothing sent yet</span>')},
+          {h: "", html: 1, v: r => `<div class="btnrow"><button class="btn" type="button" data-send="${esc(r.id)}">Send me one now</button><button class="btn" type="button" data-edit="${esc(r.id)}">Edit</button><button class="btn" type="button" data-tg="${esc(r.id)}" data-to="${r.active ? 0 : 1}">${r.active ? "Switch off" : "Switch on"}</button><button class="btn" type="button" data-del="${esc(r.id)}">Delete</button></div>`}], d.subscriptions) : `<p class="muted">You have not chosen a report yet. Pick one above.</p>`}
+          <p class="muted" style="margin-top:10px">${esc(o.note)} Every e-mail has an unsubscribe link. A report is sent when its period has ended and StatAxis has measured enough of it.</p></section>`;
+      const f = $("#rmf", el), setSections = ids => f.querySelectorAll('[name="sections"]').forEach(c => { c.checked = ids.includes(c.value); });
+      setSections(defaults("one_pager"));
+      f.elements.layout.onchange = () => setSections(defaults(f.elements.layout.value));
+      f.onsubmit = async ev => {
+        ev.preventDefault(); const v = formValues(f), sections = [...f.querySelectorAll('[name="sections"]:checked')].map(c => c.value);
+        try { draw(await post("/api/v1/lab/report-subscriptions/save", {id: v.id ? +v.id : null, interval: v.interval, layout: v.layout, sections, language: v.language, segment: v.segment, send_hour: +v.send_hour})); say("Saved.", true); } catch (e) { say(e.message); }
+      };
+      out.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => {
+        const r = d.subscriptions.find(x => String(x.id) === b.dataset.edit); f.elements.id.value = r.id; f.elements.interval.value = r.interval; f.elements.layout.value = r.layout; f.elements.language.value = r.language || ""; f.elements.segment.value = r.segment || ""; f.elements.send_hour.value = String(r.send_hour);
+        setSections(r.sections); $("#rmsave", el).textContent = "Save changes"; $("#rmnew", el).hidden = false; f.scrollIntoView({block: "center"});
+      });
+      $("#rmnew", el).onclick = () => draw(d);
+      out.querySelectorAll("[data-tg]").forEach(b => b.onclick = async () => { try { draw(await post("/api/v1/lab/report-subscriptions/toggle", {id: +b.dataset.tg, active: b.dataset.to === "1"})); } catch (e) { say(e.message); } });
+      out.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { if (!confirm("Delete this report?")) return; try { draw(await post("/api/v1/lab/report-subscriptions/delete", {id: +b.dataset.del})); } catch (e) { say(e.message); } });
+      out.querySelectorAll("[data-send]").forEach(b => b.onclick = async () => { b.disabled = true; say("Making and sending the report…", true); try { const r = await post("/api/v1/lab/report-subscriptions/send-now", {id: +b.dataset.send}); say(`Sent the ${r.period} report to ${r.sent_to}.`, true); } catch (e) { say(e.message); } b.disabled = false; });
+    };
+    try { draw(await api("/api/v1/lab/report-subscriptions")); } catch (e) { out.innerHTML = fail(e); wireUpgrade(out); }
+  });
+
+  /* ---------- admin: the mail service the report e-mails go through ---------- */
+  add("adm-email", "Admin", "Email delivery", async el => {
+    if (!isAdmin) { el.innerHTML = adminOnly("Email delivery"); return; }
+    el.innerHTML = head("Email delivery", "Report e-mails are sent through Resend. Add the API key here; it is kept on the server and never shown again in full.") + `<div id="emout"><p class="muted">Loading…</p></div>`;
+    const out = $("#emout", el), say = (t, ok) => { const m = $("#emmsg", el); m.hidden = !t; m.className = "msg " + (ok ? "ok" : "bad"); m.textContent = t || ""; };
+    const draw = d => {
+      out.innerHTML = `<section class="card" style="margin-top:12px"><h2>${d.configured ? "Ready to send" : "Not set up yet"} ${d.configured ? '<span class="tag green">on</span>' : '<span class="tag">off</span>'}</h2>
+        <dl class="kv"><dt>API key</dt><dd>${d.configured ? esc(d.key_hint) + " (from the " + esc(d.source) + ")" : "none"}</dd><dt>Sent from</dt><dd>${esc(d.from)}</dd><dt>Site address in e-mails</dt><dd>${esc(d.base_url)}</dd></dl></section>
+        <form class="card" id="emf" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;align-items:end;margin:12px 0">
+          <label>Resend API key (starts with re_)<br><input type="password" name="key" autocomplete="off" placeholder="${d.configured ? "leave empty to keep the current key" : "re_…"}"></label>
+          <label>From address<br><input type="text" name="from" value="${esc(d.from)}"></label><label>Site address<br><input type="text" name="base_url" value="${esc(d.base_url)}"></label>
+          <div class="btnrow"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="emtest">Send a test e-mail to me</button></div></form><div id="emmsg" class="msg" hidden></div>
+        <section class="card"><h2>How to set it up</h2><ol class="muted"><li>Make an account at resend.com (the free plan allows 3,000 e-mails a month, at most 100 a day).</li><li>Under Domains, add stataxis.org and put the records it shows into the domain's DNS. Wait until it says Verified.</li>
+          <li>Under API Keys, make a key and paste it above. Use a From address on that domain, such as StatAxis &lt;reports@stataxis.org&gt;.</li><li>Press "Send a test e-mail to me". Reports start going out at once for everyone who chose them.</li></ol></section>`;
+      $("#emf", el).onsubmit = async ev => { ev.preventDefault(); const v = formValues(ev.target); try { draw(await post("/api/v1/admin/email/save", {key: v.key, from: v.from, base_url: v.base_url})); say("Saved.", true); } catch (e) { say(e.message); } };
+      $("#emtest", el).onclick = async () => { say("Sending a test e-mail…", true); try { const r = await post("/api/v1/admin/email/test", {}); say(`Sent to ${r.sent_to}. Check the inbox (and spam).`, true); } catch (e) { say(e.message); } };
+    };
+    try { draw(await api("/api/v1/admin/email")); } catch (e) { out.innerHTML = fail(e); }
+  });
+
   /* ---------- how complete the record is ---------- */
   add("completeness", "Market tools", "Data completeness", async el => {
     const f = SP.completeness || {days: "3", only: ""};

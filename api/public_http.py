@@ -51,9 +51,36 @@ def packages(session: Any) -> dict[str, Any]:
             "order": feature_access.PLAN_ORDER, "commercial_packages": [{"name": p["name"], "criteria": p["criteria"], "amount": p["amount"], "currency": p["currency"]} for p in priced.values()]}
 
 
+def _unsubscribe(session_factory: Callable[[], Any], environ: dict[str, Any], start_response: Callable[..., Any]):
+    """One click in the report e-mail (or the page it opens): the subscription behind the token is switched off. Rate limited by address; the answer never says whether a token existed."""
+    import json as _json_mod
+    from urllib.parse import parse_qs
+
+    from api import report_subscriptions
+    retry = limiter.check(f"unsub:{client_ip(environ)}", 20, 60)
+    if retry:
+        return _json(start_response, 429, {"error": "too many requests"}, retry)
+    token = parse_qs(environ.get("QUERY_STRING", "")).get("token", [""])[0]
+    if not token:   # the page sends JSON; a mail program's one-click POST carries the token in the address only
+        try:
+            length = int(environ.get("CONTENT_LENGTH") or "0")
+            raw = environ["wsgi.input"].read(min(max(length, 0), 4096)).decode("utf-8") if length > 0 else ""
+            token = str(_json_mod.loads(raw).get("token") or "") if raw.lstrip().startswith("{") else parse_qs(raw).get("token", [""])[0]
+        except (ValueError, KeyError, AttributeError):
+            token = ""
+    session = session_factory()
+    try:
+        report_subscriptions.unsubscribe(session, str(token))
+    finally:
+        session.close()
+    return _json(start_response, 200, {"ok": True})
+
+
 def public_application(session_factory: Callable[[], Any]):
     def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         path, method = environ.get("PATH_INFO", ""), environ.get("REQUEST_METHOD", "GET")
+        if method == "POST" and path == "/api/v1/public/reports/unsubscribe":
+            return _unsubscribe(session_factory, environ, start_response)
         if method != "GET":
             return _json(start_response, 405, {"error": "method not allowed"})
         if path not in {"/api/v1/public/pulse", "/api/v1/public/packages", "/api/v1/public/status", "/api/v1/public/methodology"}:

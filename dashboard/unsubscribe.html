@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Unsubscribe — StatAxis</title><link rel="icon" href="assets/stataxis-favicon.svg">
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#010509;color:#ccd5dd;font-family:"Inter Tight","Segoe UI",system-ui,sans-serif}
+.box{max-width:480px;margin:24px;padding:32px;border:1px solid #255073;border-radius:16px;background:#050d17}
+h1{font:400 40px Impact,"Arial Narrow",sans-serif;text-transform:uppercase;color:#fdfdfd;margin:6px 0 10px}.eb{font:12px monospace;letter-spacing:3px;color:#9ba0a6}.eb b{color:#0b8ded}
+p{line-height:1.55}a{color:#0b8ded}button{margin-top:10px;padding:11px 22px;border:0;border-radius:10px;background:#0b8ded;color:#fff;font:inherit;font-weight:700;cursor:pointer}em{font:italic 20px Georgia,serif;color:#0b8ded}</style>
+</head>
+<body><div class="box"><div class="eb"><b>●</b> STATAXIS · REPORT E-MAILS</div><h1>Unsubscribe</h1>
+<p id="msg">Stop this report e-mail? You can switch it on again any time under <b>Report e-mails</b> in your StatAxis workspace.</p>
+<button id="go" type="button">Yes, unsubscribe</button> <p><em>Stat the View. Axis the Viewpoint.</em> · <a href="/">stataxis.org</a> · <a href="https://x.com/stataxis">x.com/stataxis</a></p></div>
+<script>
+const token = new URLSearchParams(location.search).get("token") || "";
+document.getElementById("go").onclick = async () => {
+  const m = document.getElementById("msg"), b = document.getElementById("go");
+  if (!token) { m.textContent = "This link is not complete. Please use the link in the e-mail, or switch the report off under Report e-mails in your workspace."; return; }
+  b.disabled = true;
+  try {
+    const r = await fetch("/api/v1/public/reports/unsubscribe", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({token})});
+    if (!r.ok) throw new Error("failed");
+    m.textContent = "Done. You will not get this report e-mail any more."; b.remove();
+  } catch { m.textContent = "That did not work. Please try again in a minute."; b.disabled = false; }
+};
+</script></body></html>

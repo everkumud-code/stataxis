@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any, Callable
 from urllib.parse import parse_qs
 
-from api import alerts, feature_access, forecasts, notes, spikes
+from api import alerts, feature_access, forecasts, notes, report_subscriptions, spikes
 from api.auth_service import authenticate
 from api.completeness import channel_day_completeness
 from api.errors import AuthenticationError, AuthorizationError
@@ -26,6 +26,11 @@ ROUTE_FEATURE = {
     ("POST", "/api/v1/lab/alerts/toggle"): "alerts",
     ("POST", "/api/v1/lab/alerts/seen"): "alerts",
     ("GET", "/api/v1/lab/completeness"): "integrity",
+    ("GET", "/api/v1/lab/report-subscriptions"): "report_email",
+    ("POST", "/api/v1/lab/report-subscriptions/save"): "report_email",
+    ("POST", "/api/v1/lab/report-subscriptions/toggle"): "report_email",
+    ("POST", "/api/v1/lab/report-subscriptions/delete"): "report_email",
+    ("POST", "/api/v1/lab/report-subscriptions/send-now"): "report_email",
 }
 
 
@@ -57,9 +62,20 @@ def lab_application(session_factory: Callable[[], Any]):
                     return _json(start_response, 200, forecasts.forecast_overview(session))
                 if path == "/api/v1/lab/notes":
                     return _json(start_response, 200, {"notes": notes.list_notes(session, limit=_int(q.get("limit"), "limit", 30))})
+                if path == "/api/v1/lab/report-subscriptions":
+                    return _json(start_response, 200, report_subscriptions.list_subscriptions(session, user))
                 if path == "/api/v1/lab/completeness":
                     return _json(start_response, 200, channel_day_completeness(session, days=_int(q.get("days"), "days", 3)))
                 body = _read_json(environ)
+                if path == "/api/v1/lab/report-subscriptions/save":
+                    return _json(start_response, 200, report_subscriptions.save_subscription(session, user, sub_id=body.get("id"), interval=body.get("interval"), layout=body.get("layout"), sections=body.get("sections"),
+                                                                                          language=body.get("language"), segment=body.get("segment"), send_hour=body.get("send_hour")))
+                if path == "/api/v1/lab/report-subscriptions/toggle":
+                    return _json(start_response, 200, report_subscriptions.set_active(session, user, body.get("id"), bool(body.get("active"))))
+                if path == "/api/v1/lab/report-subscriptions/delete":
+                    return _json(start_response, 200, report_subscriptions.delete_subscription(session, user, body.get("id")))
+                if path == "/api/v1/lab/report-subscriptions/send-now":
+                    return _json(start_response, 200, report_subscriptions.send_now(session, user, body.get("id")))
                 if path == "/api/v1/lab/alerts/list":
                     return _json(start_response, 200, alerts.list_alerts(session, user.id))
                 if path == "/api/v1/lab/alerts/create":

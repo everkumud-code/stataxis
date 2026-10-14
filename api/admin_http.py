@@ -6,7 +6,7 @@ from typing import Any, Callable
 from api.admin import add_channel, add_video, deactivate_channel, list_all_channels, remove_video, rename_channel, set_channel_active, set_channel_language, set_channel_segment
 from api.auth_service import authenticate
 from api import audience as audience_mod
-from api import feature_access, my_channels, user_admin
+from api import feature_access, mailer, my_channels, user_admin
 from api.package_config import list_package_slots, update_package_slot
 from collector.storage import User
 
@@ -25,6 +25,12 @@ def admin_application(session_factory: Callable[[], Any]):
                     return _json(start_response, 200, {"packages": list_package_slots(session)})
                 finally:
                     session.close()
+            if path == "/api/v1/admin/email" and method == "GET":
+                session = session_factory()
+                try:
+                    return _json(start_response, 200, mailer.public_status(session))
+                finally:
+                    session.close()
             if method != "POST":
                 return _json(start_response, 405, {"error": "method not allowed"})
             length = int(environ.get("CONTENT_LENGTH") or "0")
@@ -35,6 +41,17 @@ def admin_application(session_factory: Callable[[], Any]):
                 raise ValueError("JSON body must be an object")
             session = session_factory()
             try:
+                if path == "/api/v1/admin/email/save":
+                    mailer.save_settings(session, identity.email, key=body.get("key") if body.get("key") else None, sender=body.get("from") if "from" in body else None, base_url=body.get("base_url") if "base_url" in body else None)
+                    return _json(start_response, 200, mailer.public_status(session))
+                if path == "/api/v1/admin/email/test":
+                    user = session.get(User, identity.user_id)
+                    try:
+                        message_id = mailer.send_email(session, to=user.email, subject="StatAxis: test e-mail", text="This is a test e-mail from StatAxis. If you can read it, report e-mails will reach you.",
+                                                       html="<div style='background:#010509;color:#ccd5dd;padding:24px;font-family:Arial'><b style='color:#0b8ded'>StatAxis</b><p>This is a test e-mail. If you can read it, report e-mails will reach you.</p></div>")
+                    except mailer.MailError as exc:
+                        raise ValueError(str(exc)) from exc
+                    return _json(start_response, 200, {"sent_to": user.email, "message_id": message_id})
                 if path == "/api/v1/admin/packages/configure":
                     slot = int(body.get("slot"))
                     return _json(start_response, 200, {"package": update_package_slot(session, slot, body)})

@@ -42,12 +42,14 @@ FEATURES: dict[str, tuple[str, str]] = {
     "authenticity": ("Authenticity radar (unusual viewership)", SXPlan.PRO.value),
     "audience": ("Audience geography and age", SXPlan.ANALYST.value),
     "data_export": ("Excel data exports (machine-readable)", SXPlan.ANALYST.value),
+    "report_email": ("Report e-mails: daily to yearly reports sent to you", SXPlan.FREE.value),
 }
 DESCRIPTIONS = {
     "spikes": "Sudden rises in a channel's live audience with the stream that carried them, and who gained while who lost in the same minutes.",
     "forecasts": "What StatAxis expected each channel's prime-time audience to be, written down before the slot and scored afterwards, with the hit rate.",
     "notes": "A dated note on what the data said, written each day and each week by the findings engine.",
     "alerts": "Alerts on a channel's live audience (a level, a rise or a fall), shown inside StatAxis.",
+    "report_email": "Choose how often (daily to yearly), the layout (one-pager or booklet) and the parts, and the report is e-mailed to you on time, with the STX Index first.",
     "operations": "How collection is running: channels tracked, last pass, readiness.",
     "integrity": "Checks on the stored data: gaps and inconsistencies, with the evidence.",
     "overview": "The state of the market today: who leads, what changed, and where to look next.",
