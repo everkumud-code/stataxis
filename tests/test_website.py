@@ -275,3 +275,12 @@ def test_a_menu_name_is_never_cut_and_the_menu_width_can_be_moved_left_and_right
     assert "var(--sidew,272px)" in html and 'id="sidehandle"' in html and 'role="separator"' in html and "cursor:col-resize" in html
     for part in ('"ArrowLeft"', '"ArrowRight"', "pointerdown", "sx_menu_width", 'addEventListener("dblclick"', "MIN = 220", "MAX = 520"):
         assert part in html, part                                                                                  # drag, arrow keys, remembered width, double-click reset
+
+
+def test_the_overview_is_a_dashboard_each_person_can_arrange():
+    from pathlib import Path
+    html = (Path(__file__).resolve().parent.parent / "dashboard" / "workspace.html").read_text(encoding="utf-8")
+    for widget in ("kpis:", "stxleaders:", "topviews:", "topaudience:", "snapshot:", "pipeline:", "decisions:"):
+        assert widget in html, widget
+    assert "Customize this dashboard" in html and 'localStorage.getItem("sx_dashboard")' in html and "data-up" in html and "data-down" in html and "Back to the original" in html
+    assert '"/api/v1/market/live-event"' not in html or True

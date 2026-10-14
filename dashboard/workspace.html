@@ -590,28 +590,59 @@ add("overview", "Intelligence", "Overview", async el => {
   const ageP = rd && rd.collection.latest_run ? Math.max(0, 100 - rd.collection.latest_run.age_minutes / rd.collection.stale_after_minutes * 100) : null;
   const mover = rows.filter(x => x.rank_change).sort((a, b) => Math.abs(b.rank_change) - Math.abs(a.rank_change))[0];
   const wc = w.status === "fulfilled" ? w.value : null;
-  box.innerHTML = `<div class="grid kpis">
+  /* The dashboard is the person's own: which blocks show, and in what order, is their choice. It is remembered in this browser (never needed for anything else) and a reset puts the original back. */
+  const top = (list, key, n = 5) => list.filter(x => x[key] != null && x[key] > 0).sort((p, q) => q[key] - p[key]).slice(0, n);
+  const leaderList = (items, text) => items.length ? `<ul class="list">${items.map((x, i) => `<li><span><b style="color:var(--blue);margin-right:8px">${String(i + 1).padStart(2, "0")}</b>${esc(x.channel)}</span><b>${text(x)}</b></li>`).join("")}</ul>` : `<p class="muted">Nothing measured in this window yet.</p>`;
+  const WIDGETS = {
+    kpis: ["Key numbers", () => `<div style="grid-column:1/-1"><div class="grid kpis">
       ${kpi("Views gained", compact(rep.market.view_delta_total), "In the selected window")}
       ${kpi("Average concurrent viewers", compact(rep.market.average_concurrent_total), "Sum across channels")}
       ${kpi("Channels", whole(rep.market.channel_count), whole(scored.length) + " with usable history")}
       ${kpi("Videos observed", compact(videos), "Stored observations")}
-      ${kpi("Average STX", avgStx == null ? "—" : dec(avgStx), avgConf == null ? "No scored channels yet" : "Confidence-adjusted · avg confidence " + pct(avgConf), "gold")}</div>
-    <div class="grid cols">
-      <section class="card"><h2>Market snapshot</h2>
+      ${kpi("Average STX", avgStx == null ? "—" : dec(avgStx), avgConf == null ? "No scored channels yet" : "Confidence-adjusted · avg confidence " + pct(avgConf), "gold")}</div></div>`],
+    stxleaders: ["STX Index leaders", () => `<section class="card"><h2>STX Index leaders</h2>${leaderList(scored.map(x => ({channel: x.channel, v: stxShown(x.stx)})).sort((p, q) => q.v - p.v).slice(0, 5), x => dec(x.v))}</section>`],
+    topviews: ["Top channels by views gained", () => `<section class="card"><h2>Top channels by views gained</h2>${leaderList(top(rows, "view_delta"), x => compact(x.view_delta))}</section>`],
+    topaudience: ["Top channels by average audience", () => `<section class="card"><h2>Top channels by average audience</h2>${leaderList(top(rows, "average_concurrent"), x => compact(x.average_concurrent))}</section>`],
+    snapshot: ["Market snapshot", () => `<section class="card"><h2>Market snapshot</h2>
         ${bar("Channels with usable history", rows.length ? scored.length / rows.length * 100 : null)}
         ${bar("Snapshot coverage", rd ? rd.intelligence.coverage * 100 : null)}
         ${bar("Collection freshness", ageP)}
-        <p class="muted">${rd && rd.collection.latest_run ? "Last collection run " + when(rd.collection.latest_run.finished_at || rd.collection.latest_run.started_at) + "." : "The collector has not run yet."}</p></section>
-      <section class="card"><h2>Pipeline status</h2>${rd ? `<ul class="list">
+        <p class="muted">${rd && rd.collection.latest_run ? "Last collection run " + when(rd.collection.latest_run.finished_at || rd.collection.latest_run.started_at) + "." : "The collector has not run yet."}</p></section>`],
+    pipeline: ["Pipeline status", () => `<section class="card"><h2>Pipeline status</h2>${rd ? `<ul class="list">
         <li><span>Collection</span>${badge(rd.collection.fresh, "Fresh", "Stale", "Unknown")}</li>
         <li><span>Data integrity</span>${badge(rd.integrity.ok, "No issues", rd.integrity.issue_count + " issue(s)")}</li>
         <li><span>Intelligence</span>${badge(rd.ready, "Ready", "Not ready")}</li></ul>
-        <p class="muted">${esc(readyReason(rd.reason))}</p>` : errCard(r.reason)}</section>
-      <section class="card"><h2>Decision surfaces</h2>
+        <p class="muted">${esc(readyReason(rd.reason))}</p>` : errCard(r.reason)}</section>`],
+    decisions: ["Decision surfaces", () => `<section class="card"><h2>Decision surfaces</h2>
         <div class="decide"><b>Who is moving?</b>${mover ? `${esc(mover.channel)} ${mover.rank_change > 0 ? "climbed " : "fell "}${Math.abs(mover.rank_change)} place(s).` : "No rank movement recorded in this window."}</div>
         <div class="decide"><b>What is moving?</b>${wc && wc.changes.length ? `${esc(wc.changes[0].title)} (${signed(wc.changes[0].view_delta)} views).` : "No video moved measurably in the last 24 hours."}</div>
-        <div class="decide"><b>What changed?</b>${wc ? esc(wc.headline) : "Change data is unavailable right now."}</div></section></div>
-    ${evidence(provText(rep.provenance.observation_count, rep.start_at, rep.end_at))}`;
+        <div class="decide"><b>What changed?</b>${wc ? esc(wc.headline) : "Change data is unavailable right now."}</div></section>`],
+  };
+  const IDS = Object.keys(WIDGETS);
+  const loadPrefs = () => { try { const p = JSON.parse(localStorage.getItem("sx_dashboard") || "{}"); return {order: [...(p.order || []).filter(id => IDS.includes(id)), ...IDS.filter(id => !(p.order || []).includes(id))], hidden: (p.hidden || []).filter(id => IDS.includes(id))}; } catch { return {order: IDS.slice(), hidden: []}; } };
+  const savePrefs = pr => { try { localStorage.setItem("sx_dashboard", JSON.stringify(pr)); } catch { /* not remembered */ } };
+  let prefs = loadPrefs();
+  const paint = (withPanel = false) => {
+    const shown = prefs.order.filter(id => !prefs.hidden.includes(id));   /* the key numbers take the whole row, wherever they are in the order */
+    box.innerHTML = `<div class="btnrow" style="margin-bottom:10px"><button class="btn" type="button" id="dashcustom" aria-expanded="false">Customize this dashboard</button></div><div id="dashpanel" class="card" hidden style="margin-bottom:14px"></div>`
+      + (shown.length ? `<div class="grid cols">${shown.map(id => WIDGETS[id][1]()).join("")}</div>` : state("Nothing is switched on", "Open “Customize this dashboard” and tick what you want to see."))
+      + evidence(provText(rep.provenance.observation_count, rep.start_at, rep.end_at));
+    const panel = $("#dashpanel", box), btn = $("#dashcustom", box);
+    const drawPanel = () => {
+      panel.innerHTML = `<h2>Customize this dashboard</h2><p class="muted">Tick what you want to see and move blocks up or down. This is kept in this browser.</p><ul class="list">${prefs.order.map((id, i) => `<li><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-w="${id}"${prefs.hidden.includes(id) ? "" : " checked"}> ${esc(WIDGETS[id][0])}</label>
+        <span class="btnrow"><button class="btn" type="button" data-up="${i}" aria-label="Move up"${i ? "" : " disabled"}>▲</button><button class="btn" type="button" data-down="${i}" aria-label="Move down"${i < prefs.order.length - 1 ? "" : " disabled"}>▼</button></span></li>`).join("")}</ul>
+        <div class="btnrow" style="margin-top:12px"><button class="btn" type="button" id="dashreset">Back to the original</button><button class="btn primary" type="button" id="dashdone">Done</button></div>`;
+      panel.querySelectorAll("[data-w]").forEach(c => c.onchange = () => { prefs.hidden = c.checked ? prefs.hidden.filter(x => x !== c.dataset.w) : [...prefs.hidden, c.dataset.w]; savePrefs(prefs); paint(true); });
+      const move = (i, d) => { const o = prefs.order.slice(); [o[i], o[i + d]] = [o[i + d], o[i]]; prefs.order = o; savePrefs(prefs); paint(true); };
+      panel.querySelectorAll("[data-up]").forEach(b => b.onclick = () => move(+b.dataset.up, -1));
+      panel.querySelectorAll("[data-down]").forEach(b => b.onclick = () => move(+b.dataset.down, 1));
+      $("#dashreset", panel).onclick = () => { prefs = {order: IDS.slice(), hidden: []}; savePrefs(prefs); paint(true); };
+      $("#dashdone", panel).onclick = () => { panel.hidden = true; btn.setAttribute("aria-expanded", "false"); };
+    };
+    if (withPanel) { panel.hidden = false; btn.setAttribute("aria-expanded", "true"); drawPanel(); }
+    btn.onclick = () => { if (panel.hidden) { panel.hidden = false; btn.setAttribute("aria-expanded", "true"); drawPanel(); } else { panel.hidden = true; btn.setAttribute("aria-expanded", "false"); } };
+  };
+  paint();
 });
 
 const readyReason = r => ({ready: "Collection is fresh and intelligence covers the latest run.", collection_not_fresh: "The latest collection run is older than the freshness limit.",

@@ -250,3 +250,9 @@ def test_the_date_and_other_filters_sit_above_the_result_on_every_screen():
         block = block[:block.index("\n  });")]
         assert f'run(dateFilters(el, "{name}", "", run)); el.append(out);' in block                      # the filters are put on the page first, the result after them
         assert 'const out = document.createElement("div"); el.append(out);' not in block
+
+
+def test_live_event_compare_lets_the_reader_pick_the_feed():
+    from pathlib import Path
+    market = (Path(__file__).resolve().parent.parent / "dashboard" / "market.js").read_text(encoding="utf-8")
+    assert '<label>Feed<br><select name="feed">' in market and '"Primary stream"' in market and '"Secondary streams"' in market and "feed: v.feed" in market

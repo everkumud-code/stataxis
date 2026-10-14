@@ -1,6 +1,8 @@
 """Live event compare: up to 30 channels covering the same live event, side by side on one live screen, with the audience each has right now, how it moved, its peak,
 the STX index and the tone of what each is broadcasting.
 
+Which streams are counted is the reader's choice: all of a channel's live streams, only its primary stream (the long-running main stream, found as in the Report builder), or only its secondary streams.
+
 Which channels are "covering the event": the reader either picks the channels, or gives words that describe the event (for example "budget") and STAXIS takes every channel that is live now
 with a stream whose title contains one of them. Nothing is guessed: a channel that is not live is listed as not live.
 
@@ -23,8 +25,10 @@ from api.live_stats import FRESHNESS_SECONDS, _load_streams
 from api.market_common import now_utc, pick_channels, rnd, utc
 from api.media_intelligence import market_report
 from collector.storage import Video
+from metrics.feeds import LiveStream, split_feeds
 
 MAX_CHANNELS = 30
+FEEDS = {"all": "All live streams", "primary": "Primary stream only", "secondary": "Secondary streams only"}
 METHOD = (
     "Every minute, each channel's live viewers are the latest sample of each of its live streams (a sample older than 3 minutes is not used) added together. 'Now' is the latest minute, "
     "'change' compares it with five minutes earlier, 'peak' and 'average' are over the chosen window (the average only over minutes the channel was live). "
@@ -45,7 +49,9 @@ def _series(samples: list[tuple[datetime, int]], grid: list[datetime]) -> list[i
 
 @ttl_cache(scale=0.2)   # a live screen: a few seconds is enough
 def live_event_compare(session: Session, *, terms: list[str] | None = None, channel_ids: list[int] | None = None, minutes: int = 60, segment: str | None = None, language: str | None = None,
-                       stx_period: str = "7d", now: datetime | None = None) -> dict[str, Any]:
+                       stx_period: str = "7d", feed: str = "all", now: datetime | None = None) -> dict[str, Any]:
+    if feed not in FEEDS:
+        raise ValueError("feed must be all, primary or secondary")
     if not 10 <= int(minutes) <= 180:
         raise ValueError("minutes must be between 10 and 180")
     minutes = int(minutes)
@@ -69,7 +75,9 @@ def live_event_compare(session: Session, *, terms: list[str] | None = None, chan
         c = by_id.get(cid)
         if c is None:
             continue
-        live_ss = {vid: s for vid, s in ss.items() if s.samples and (now - s.samples[-1][0]).total_seconds() <= FRESHNESS_SECONDS}
+        live_all = {vid: s for vid, s in ss.items() if s.samples and (now - s.samples[-1][0]).total_seconds() <= FRESHNESS_SECONDS}
+        primary_id = split_feeds([LiveStream(vid, s.samples[-1][1], titles.get(vid, ("", None))[1]) for vid, s in live_all.items()], now=now).primary_video_id
+        live_ss = live_all if feed == "all" else {vid: s for vid, s in live_all.items() if (vid == primary_id) == (feed == "primary")}   # the channel's long-running main stream, or every other stream it has live
         matched = {vid: s for vid, s in live_ss.items() if not terms or any(t in titles.get(vid, ("", None))[0].casefold() for t in terms)}
         counted = matched if (terms and not explicit) else live_ss if explicit or not terms else matched
         if terms and not explicit and not matched:
@@ -115,9 +123,9 @@ def live_event_compare(session: Session, *, terms: list[str] | None = None, chan
         mix[r["tone"]["label"]] += 1
     weighted = sum(r["tone"]["score"] * r["live_now"] for r in rows) / total_now if total_now else None
     stx_rows = [r for r in rows if r["stx"]]
-    return {"as_of": now.isoformat(), "window_minutes": minutes, "stx_period": stx_period, "filters": {"terms": terms, "channel_ids": channel_ids or [], "segment": segment, "language": language},
+    return {"as_of": now.isoformat(), "window_minutes": minutes, "stx_period": stx_period, "feed": feed, "feed_label": FEEDS[feed], "filters": {"terms": terms, "channel_ids": channel_ids or [], "segment": segment, "language": language},
             "method": METHOD, "summary": {"channels_live": len(rows), "total_live_now": total_now, "leader": rows[0]["name"] if rows else None, "leader_share_percent": rows[0]["share_percent"] if rows else None,
                                          "median_live_now": median([r["live_now"] for r in rows]) if rows else None, "tone_mix": mix, "audience_weighted_tone": rnd(weighted, 2),
                                          "best_stx": max(stx_rows, key=lambda r: r["stx"]["score"])["name"] if stx_rows else None},
             "channels": rows, "not_live": not_live,
-            "note": None if rows else ("No channel is live now with a stream matching these words." if terms and not explicit else "None of these channels is live right now.")}
+            "note": None if rows else ("No channel is live now with a stream matching these words." if terms and not explicit else "None of these channels is live right now." if feed == "all" else f"None of these channels has a {feed} stream live right now.")}

@@ -172,7 +172,7 @@ def market_application(session_factory: Callable[[], Any]):
                     return _json(start_response, 200, audience_mod.overview(session))
                 if (method, path) == ("GET", "/api/v1/market/live-event"):
                     return _json(start_response, 200, live_event_compare(session, terms=[t for t in (q.get("terms") or "").split(",") if t.strip()], channel_ids=cids, minutes=_int(q.get("minutes"), "minutes", 60),
-                                                                          segment=segment, language=language, stx_period=q.get("stx_period") or "7d"))
+                                                                          segment=segment, language=language, stx_period=q.get("stx_period") or "7d", feed=q.get("feed") or "all"))
                 if (method, path) == ("GET", "/api/v1/market/authenticity"):
                     return _json(start_response, 200, authenticity.scan(session, days=_int(q.get("days"), "days", 7), segment=segment, language=language, channel_ids=cids))
                 if (method, path) == ("GET", "/api/v1/market/quota"):

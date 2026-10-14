@@ -249,3 +249,22 @@ def test_http_filters_briefing_live_event_and_upgrade_requests():
     with Session(engine) as check:
         user = check.get(User, 2)
         assert user.requested_plan == "sx_pro" and user.plan == "sx_idea"                      # asking does not grant
+
+
+def test_live_event_compare_counts_all_streams_only_the_primary_or_only_the_secondary():
+    s, _ = make()
+    a, b = chan(s, "a", "Alpha"), chan(s, "b", "Beta")
+    steady = lambda level: [(m, level) for m in range(30, -1, -1)]  # noqa: E731
+    stream(s, a, "a-main", "Alpha 24x7 live news", steady(10_000), started=NOW - timedelta(days=90))     # the long-running main stream: the primary feed
+    stream(s, a, "a-event", "Budget special", steady(3_000))                                              # an event stream beside it: secondary
+    stream(s, b, "b-event", "Budget special", steady(7_000))                                              # Beta has only an event stream live: no primary
+    s.commit()
+    both = {r["name"]: r for r in live_event_compare(s, channel_ids=[a.id, b.id], feed="all", now=NOW)["channels"]}
+    assert both["Alpha"]["live_now"] == 13_000 and both["Alpha"]["streams"] == 2 and both["Beta"]["live_now"] == 7_000
+    prim = live_event_compare(s, channel_ids=[a.id, b.id], feed="primary", now=NOW)
+    assert [(r["name"], r["live_now"], r["streams"]) for r in prim["channels"]] == [("Alpha", 10_000, 1)] and prim["feed"] == "primary" and prim["feed_label"] == "Primary stream only"
+    sec = {r["name"]: r["live_now"] for r in live_event_compare(s, channel_ids=[a.id, b.id], feed="secondary", now=NOW)["channels"]}
+    assert sec == {"Beta": 7_000, "Alpha": 3_000} and "Beta" not in [r["name"] for r in prim["channels"]]
+    assert live_event_compare(s, channel_ids=[b.id], feed="primary", now=NOW)["note"] == "None of these channels has a primary stream live right now."
+    with pytest.raises(ValueError):
+        live_event_compare(s, channel_ids=[a.id], feed="tv", now=NOW)

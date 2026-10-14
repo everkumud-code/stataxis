@@ -580,10 +580,11 @@
 
   /* ---------- live event compare: up to 30 channels, live ---------- */
   add("liveevent", "Market tools", "Live event compare", async el => {
-    const f = SP.live || {terms: "", segment: "", language: "", minutes: "60", stx_period: "7d", auto: true};
+    const f = SP.live || {terms: "", segment: "", language: "", minutes: "60", stx_period: "7d", feed: "all", auto: true};
     el.innerHTML = head("Live event compare", "Up to 30 channels covering the same live event, side by side: the audience each has now, how it moved, the peak, the STX index and the tone of what each is showing. The screen refreshes by itself.") +
       `<form class="card" id="lf" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><label style="flex:1 1 100%">Name of this live event (you can change it any time)<br><input type="text" name="name" id="lname" maxlength="80" value="${esc(f.name || "")}" placeholder="e.g. Budget 2026, live coverage" style="width:min(520px,100%);font-size:18px"></label><label>Event words<br><input type="text" name="terms" value="${esc(f.terms)}" placeholder="e.g. budget, election result" style="min-width:230px"></label>
       <label>Category<br><select name="segment">${opt(SEGMENTS, f.segment)}</select></label><label>Language<br><select name="language">${opt(LANGS, f.language)}</select></label>
+      <label>Feed<br><select name="feed">${opt([["all", "Live (all streams)"], ["primary", "Primary stream"], ["secondary", "Secondary streams"]], f.feed || "all")}</select></label>
       <label>Window<br><select name="minutes">${opt([["30", "Last 30 min"], ["60", "Last hour"], ["120", "Last 2 hours"], ["180", "Last 3 hours"]], f.minutes)}</select></label>
       <label>STX period<br><select name="stx_period">${opt([["today", "Today"], ["7d", "7 days"], ["month", "Month"]], f.stx_period)}</select></label>
       ${filterFields(f, {place: false, age: false, known: false})}<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="auto"${f.auto ? " checked" : ""}> Refresh every 15 s</label><button class="btn primary" type="submit">Compare now</button></form>
@@ -591,6 +592,7 @@
     let timer = null, last = null;
     const eventName = () => (($("#lname", el) || {}).value || "").trim() || String(f.terms || "").split(",")[0].trim().replace(/^./, c => c.toUpperCase()) || "Live event";
     $("#lname", el).addEventListener("input", () => { f.name = $("#lname", el).value; keep("live", f); const t = $("#ltitle", el); if (t) t.textContent = eventName(); });
+    const feedWord = () => ({all: "all streams", primary: "primary stream", secondary: "secondary streams"})[f.feed || "all"];
     const read = () => { const form = $("#lf", el), v = formValues(form); v.auto = new FormData(form).has("auto"); Object.assign(f, v); keep("live", f); return v; };
     const toneCls = {positive: "green", negative: "red", "mixed/neutral": ""};
     const draw = d => {
@@ -611,11 +613,11 @@
           {h: "Tone", html: 1, v: r => `<span class="tag ${toneCls[r.tone.label] || ""}" title="Score ${r.tone.score}; ${Math.round(r.tone.words_recognised * 100)}% of the title's words were recognised">${esc(r.tone.label)}</span>`}], d.channels, undefined, {group: r => r.language})}</section>
         ${d.not_live.length ? `<p class="muted" style="margin-top:8px">Not live right now: ${esc(d.not_live.join(", "))}</p>` : ""}
         <div class="btnrow" style="margin-top:12px"><button class="btn" type="button" id="lpng">Download picture card (PNG)</button></div>${method(d.method)}`;
-      $("#lpng", el).onclick = async () => saveCanvas(await cardPng(eventName() + " · viewers now", `${new Date(d.as_of).toLocaleTimeString("en-IN", {hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata"})} IST · ${s.channels_live} channels live`,
+      $("#lpng", el).onclick = async () => saveCanvas(await cardPng(eventName() + " · viewers now", `${new Date(d.as_of).toLocaleTimeString("en-IN", {hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata"})} IST · ${s.channels_live} channels live · ${feedWord()}`,
         d.channels.slice(0, 10).map(r => ({label: r.name, value: r.live_now, text: whole(r.live_now) + "  ·  STX " + (r.stx ? dec(r.stx.score) : "—")})), {footer: "Average live viewers across each channel's live streams. Tone is read from stream titles."}), `stataxis-live-${eventName().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "event"}-${Date.now()}.png`);
     };
     const run = async () => {
-      const v = read(), qv = {terms: v.terms, segment: v.segment, language: v.language, minutes: v.minutes, stx_period: v.stx_period, channels: v.channels};
+      const v = read(), qv = {terms: v.terms, segment: v.segment, language: v.language, minutes: v.minutes, stx_period: v.stx_period, feed: v.feed || "all", channels: v.channels};
       $("#lstat", el).textContent = "Updating…";
       try { draw(await api("/api/v1/market/live-event", qv)); $("#lstat", el).textContent = "Updated " + new Date().toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"}) + " IST" + (v.auto ? " · refreshing every 15 seconds" : " · automatic refresh is off"); }
       catch (e) { $("#lout", el).innerHTML = fail(e); wireUpgrade($("#lout", el)); $("#lstat", el).textContent = ""; }
