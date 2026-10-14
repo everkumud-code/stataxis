@@ -265,3 +265,13 @@ def test_every_time_on_screen_is_indian_time() -> None:
             for call in _re.findall(r"toLocale(?:Time|Date)?String\(([^;]*)", line):
                 if '"en-IN"' in call and ("hour" in call or "day" in call or "dateStyle" in call or "TimeString" in line or "DateString" in line):
                     assert "Asia/Kolkata" in line or "IST_ZONE" in line, (name, line.strip()[:120])
+
+
+def test_a_menu_name_is_never_cut_and_the_menu_width_can_be_moved_left_and_right():
+    from pathlib import Path
+    html = (Path(__file__).resolve().parent.parent / "dashboard" / "workspace.html").read_text(encoding="utf-8")
+    gt = re.search(r"\.gt\{([^}]*)\}", html).group(1)
+    assert "text-overflow" not in gt and "nowrap" not in gt and "overflow-wrap:anywhere" in gt                      # a group name wraps onto a second line instead of ending in dots
+    assert "var(--sidew,272px)" in html and 'id="sidehandle"' in html and 'role="separator"' in html and "cursor:col-resize" in html
+    for part in ('"ArrowLeft"', '"ArrowRight"', "pointerdown", "sx_menu_width", 'addEventListener("dblclick"', "MIN = 220", "MAX = 520"):
+        assert part in html, part                                                                                  # drag, arrow keys, remembered width, double-click reset

@@ -28,76 +28,36 @@ from reportlab.lib.units import mm
 from reportlab.platypus import KeepTogether, PageBreak, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from api.report_pdf import BLUE, BLUE_LIGHT, HANDLE, LINE, MUTE, PANEL, TEXT, WHITE, _decorate, _para, _stx_banner, _table
+from api.report_content import compose
 from api.stamps import ist_stamp
 
-INTERVALS = {
-    "daily": {"label": "Daily report", "days": 1, "unit": "day", "period": "13 Oct 2026", "chart": ("Audience through the day", "average viewers, all channels", [f"{h:02d}h" for h in range(0, 24, 2)])},
-    "weekly": {"label": "Weekly report", "days": 7, "unit": "week", "period": "7 – 13 Oct 2026", "chart": ("Views day by day", "million views of new videos", ["7 Oct", "8", "9", "10", "11", "12", "13"])},
-    "fortnightly": {"label": "Fortnightly report", "days": 14, "unit": "fortnight", "period": "30 Sep – 13 Oct 2026", "chart": ("Views day by day", "million views of new videos", [str(d) for d in range(30, 31)] + [str(d) for d in range(1, 14)])},
-    "monthly": {"label": "Monthly report", "days": 30, "unit": "month", "period": "September 2026", "chart": ("Views week by week", "million views of new videos", ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"])},
-    "quarterly": {"label": "Quarterly report", "days": 91, "unit": "quarter", "period": "Jul – Sep 2026 (Q3)", "chart": ("Views month by month", "million views of new videos", ["Jul", "Aug", "Sep"])},
-    "half-yearly": {"label": "Half-yearly report", "days": 183, "unit": "half-year", "period": "Apr – Sep 2026 (H1, FY 2026-27)", "chart": ("Views month by month", "million views of new videos", ["Apr", "May", "Jun", "Jul", "Aug", "Sep"])},
-    "yearly": {"label": "Yearly report", "days": 365, "unit": "year", "period": "Apr 2025 – Mar 2026 (FY 2025-26)", "chart": ("Views month by month", "million views of new videos", ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"])},
+SAMPLE = {   # the period shown on a sample, and the labels of its chart
+    "daily": ("13 Oct 2026", 1, ("Audience through the day", "average viewers, all channels", [f"{h:02d}h" for h in range(0, 24, 2)])),
+    "weekly": ("7 – 13 Oct 2026", 7, ("Views day by day", "million views of new videos", ["7 Oct", "8", "9", "10", "11", "12", "13"])),
+    "fortnightly": ("1 – 14 Oct 2026", 14, ("Views day by day", "million views of new videos", ["1 Oct"] + [str(d) for d in range(2, 15)])),
+    "monthly": ("September 2026", 30, ("Views week by week", "million views of new videos", ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"])),
+    "quarterly": ("Jul – Sep 2026 (Q2, FY 2026-27)", 92, ("Views month by month", "million views of new videos", ["Jul", "Aug", "Sep"])),
+    "half-yearly": ("Apr – Sep 2026 (H1, FY 2026-27)", 183, ("Views month by month", "million views of new videos", ["Apr", "May", "Jun", "Jul", "Aug", "Sep"])),
+    "yearly": ("FY 2025-26 (Apr 2025 – Mar 2026)", 365, ("Views month by month", "million views of new videos", ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"])),
 }
 CHANNELS = [("Sample News A", 162.9, 72.4), ("Sample News B", 152.3, 68.1), ("Sample News C", 151.5, 61.0), ("Sample News D", 108.0, 58.2), ("Sample News E", 101.0, 55.0),
             ("Sample News F", 73.8, 49.5), ("Sample News G", 40.1, 44.3), ("Sample News H", 22.3, 41.0)]   # fictional: weekly million views and an STX Index each
+ALL_SECTIONS = ("highlights", "findings", "data", "observations", "viewpoint")
+ONE_PAGER_SECTIONS = ("highlights", "data", "viewpoint")   # what fits on one page by default; a client may swap in findings or observations
 
 
 def sample_content(interval: str) -> dict[str, Any]:
     """Illustrative content for one interval: fictional channels, invented figures, deterministic, and marked as a sample on every page."""
-    spec = INTERVALS[interval]
+    period, days, (chart_title, chart_unit, labels) = SAMPLE[interval]
     rnd = random.Random(interval)
-    days = spec["days"]
-    rows = []
-    for name, weekly, stx in CHANNELS:
-        views = weekly * days / 7 * rnd.uniform(0.92, 1.08)
-        rows.append({"name": name, "views": views, "stx": round(max(30.0, min(90.0, stx + rnd.uniform(-3.5, 3.5))), 1)})
-    rows.sort(key=lambda r: r["views"], reverse=True)
+    rows = [{"name": name, "views": weekly * days / 7 * rnd.uniform(0.92, 1.08), "stx": round(max(30.0, min(90.0, stx + rnd.uniform(-3.5, 3.5))), 1)} for name, weekly, stx in CHANNELS]
     total = sum(r["views"] for r in rows)
-    for i, r in enumerate(rows, start=1):
-        r["rank"], r["share"] = i, round(100 * r["views"] / total, 1)
-    best = max(rows, key=lambda r: r["stx"])
-    top, second, third = rows[0], rows[1], rows[2]
-    stx = {"leader": best["name"], "leader_score": best["stx"], "average": round(sum(r["stx"] for r in rows) / len(rows), 1), "scored": len(rows), "of": len(rows)}
-    labels = spec["chart"][2]
     weights = [rnd.uniform(0.7, 1.3) for _ in labels]
-    scale = (total / sum(weights)) if interval != "daily" else 1
-    points = [(lab, round(w * scale, 1)) for lab, w in zip(labels, weights)] if interval != "daily" else [(lab, int(rnd.uniform(6_000, 52_000))) for lab in labels]
-    unit = spec["unit"]
-    top3 = round(sum(r["share"] for r in rows[:3]), 1)
-    mover = rows[rnd.randint(3, 6)]
-    peak_audience = int(rnd.uniform(48_000, 61_000))
-    content: dict[str, Any] = {
-        "interval": interval, "title": f"Hindi news · {spec['label']}", "period": spec["period"], "kicker": spec["label"].upper(), "sample": True, "stx": stx,
-        "kpis": [{"label": "Total views", "value": f"{total:,.1f}M", "detail": "videos uploaded in the period"}, {"label": "Highest STX Index", "value": f"{best['stx']:.1f}", "detail": best["name"]},
-                 {"label": "Peak audience", "value": f"{peak_audience:,}", "detail": "concurrent viewers, all streams"}, {"label": "Channels measured", "value": str(len(rows)), "detail": "all with an STX Index"}],
-        "ranking": rows,
-        "trend": {"title": spec["chart"][0], "unit": spec["chart"][1], "points": points},
-        "highlights": [f"{best['name']} has the highest STX Index: {best['stx']:.1f}.", f"{top['name']} leads on views with {top['views']:,.1f}M ({top['share']}% of the total).",
-                       f"{mover['name']} moved up {(places := rnd.randint(1, 3))} place{'s' if places > 1 else ''} against the previous {unit}.",
-                       f"The top three channels hold {top3}% of all views."],
-        "findings": [
-            {"headline": f"{top['name']} leads on views, {best['name']} leads on STX" if top["name"] != best["name"] else f"{top['name']} leads on both views and STX",
-             "detail": f"{top['name']} collected {top['views']:,.1f}M views, {top['views'] / second['views']:.2f} times {second['name']}. The STX Index, which also weighs audience, momentum and consistency, is highest for {best['name']} at {best['stx']:.1f}.",
-             "so_what": "Views show who was watched; STX shows who is strongest overall. Read the two together before choosing where to place a campaign."},
-            {"headline": f"The top three hold {top3}% of all views", "detail": f"{top['name']}, {second['name']} and {third['name']} together hold {top3}% of the {total:,.1f}M views; the other {len(rows) - 3} share the rest.",
-             "so_what": "A crowded top means rankings can change with one big story; a wide gap means the lead is safer."},
-            {"headline": f"{mover['name']} is the mover of the {unit}", "detail": f"{mover['name']} now stands at number {mover['rank']} with an STX Index of {mover['stx']:.1f}, up on the previous {unit}.",
-             "so_what": "A channel that climbs on STX before it climbs on views is often the one to watch next."},
-            {"headline": f"The gap between {top['name']} and {second['name']} is {top['views'] - second['views']:,.1f}M views", "detail": f"That is {100 * (top['views'] - second['views']) / second['views']:.1f}% more than the runner-up. The channels at the bottom, {rows[-2]['name']} and {rows[-1]['name']}, hold {rows[-2]['share'] + rows[-1]['share']:.1f}% between them.",
-             "so_what": "A wide gap at the top is a safer lead; a narrow one can change in a single news cycle."},
-            {"headline": f"STX is spread from {min(r['stx'] for r in rows):.1f} to {max(r['stx'] for r in rows):.1f}", "detail": f"The average STX Index of the {len(rows)} channels is {stx['average']:.1f}. {best['name']} is {best['stx'] - stx['average']:.1f} points above the average.",
-             "so_what": "STX separates channels that look alike on views: use it to choose between two channels that draw similar audiences."},
-        ],
-        "observations": [f"Views are measured on YouTube for the videos uploaded in this {unit}, as last measured; STX is each channel's score over the same period.",
-                         f"This {unit} covers {days} day{'s' if days != 1 else ''}; a short window can be moved by a single event.",
-                         "Channels with little data carry a lower confidence and are pulled toward 50 so they cannot look more certain than they are.",
-                         "The ranking is by views; the STX column beside it ranks the same channels by overall strength, so the two orders can differ."],
-        "viewpoint": (f"STX Index: {best['name']} is highest at {best['stx']:.1f}; the average of the {len(rows)} scored channels is {stx['average']:.1f}. "
-                      f"{top['name']} and {second['name']} lead on views, and the audience is {'spread widely' if top['share'] < 30 else 'concentrated in a few channels'}. "
-                      "Read the figures with the period in mind: they are measured on YouTube, not on television."),
-    }
-    return content
+    points = [(lab, round(w * total / sum(weights), 1)) for lab, w in zip(labels, weights)] if interval != "daily" else [(lab, float(int(rnd.uniform(6_000, 52_000)))) for lab in labels]
+    ranked = sorted(rows, key=lambda r: r["views"], reverse=True)
+    mover = {**(m := ranked[rnd.randint(3, 6)]), "places": rnd.randint(1, 3), "rank": ranked.index(m) + 1}
+    return compose(interval, "Hindi news", period, rows, points, (chart_title, chart_unit), days=days, sample=True, mover=mover,
+                   third_kpi={"label": "Peak audience", "value": f"{int(rnd.uniform(48_000, 61_000)):,}", "detail": "concurrent viewers, all streams"})
 
 
 # ------------------------------------------------------------------------------------------------ pieces
@@ -131,7 +91,7 @@ def _kpi_row(c: dict[str, Any], st: dict[str, ParagraphStyle], width: float) -> 
 
 
 def _ranking(c: dict[str, Any], width: float, rows: int | None = None) -> Table:
-    data = [["#", "Channel", "STX Index", "Views (M)", "Share %"]] + [[f"{r['rank']:02d}", r["name"], f"{r['stx']:.1f}", f"{r['views']:,.1f}", f"{r['share']:.1f}"] for r in c["ranking"][:rows]]
+    data = [["#", "Channel", "STX Index", "Views (M)", "Share %"]] + [[f"{r['rank']:02d}", r["name"], "-" if r.get("stx") is None else f"{r['stx']:.1f}", f"{r['views']:,.1f}", f"{r['share']:.1f}"] for r in c["ranking"][:rows]]
     return _table(data, [12 * mm, width - 12 * mm - 3 * 26 * mm, 26 * mm, 26 * mm, 26 * mm], right_from=2)
 
 
@@ -185,41 +145,69 @@ def _page_fn(c: dict[str, Any], downloaded: str, who: str):
 
 
 # ------------------------------------------------------------------------------------------------ the one-pager
-def one_pager(c: dict[str, Any], prepared_for: str | None = None) -> bytes:
-    """Everything that matters on one page: STX first, the numbers, the ranking, the trend, what stands out and our viewpoint."""
+def one_pager(c: dict[str, Any], prepared_for: str | None = None, sections: tuple[str, ...] | list[str] | None = None) -> bytes:
+    """Everything that matters on one page: STX first, the numbers, the ranking, the trend, what stands out and our viewpoint. ``sections`` narrows it (STX and the numbers are always there)."""
+    want = set(sections or ONE_PAGER_SECTIONS)
     st, width, buf, downloaded = _styles(), A4[0] - 32 * mm, BytesIO(), ist_stamp()
     story: list[Any] = _kicker(c, st)
-    story += [_stx_banner(c["stx"], width, "this period"), Spacer(1, 7), _kpi_row(c, st, width), Spacer(1, 6), _ranking(c, width, rows=8), Spacer(1, 4), _chart(c, width, 62)]
-    story += [_para("WHAT STANDS OUT", st["h2"])] + _bullets(c["highlights"], st)
-    story += [_para("STATAXIS VIEWPOINT", st["h2"]), _para(escape(c["viewpoint"]), st["serif"])]
+    story += [_stx_banner(c["stx"], width, "this period"), Spacer(1, 7), _kpi_row(c, st, width), Spacer(1, 6)]
+    if "data" in want:
+        story += [_ranking(c, width, rows=8), Spacer(1, 4), _chart(c, width, 62)]
+    if "highlights" in want:
+        story += [_para("WHAT STANDS OUT", st["h2"])] + _bullets(c["highlights"], st)
+    if "findings" in want:
+        story += [_para("FINDINGS", st["h2"])] + [_para(f"<b>{escape(f['headline'])}.</b> {escape(f['detail'])}", st["body"]) for f in c["findings"][:3]]
+    if "observations" in want:
+        story += [_para("OBSERVATIONS", st["h2"])] + _bullets(c["observations"][:3], st)
+    if "viewpoint" in want:
+        story += [_para("STATAXIS VIEWPOINT", st["h2"]), _para(escape(c["viewpoint"]), st["serif"])]
     page = _page_fn(c, downloaded, f" for {prepared_for}" if prepared_for else "")
     _doc(buf, c["title"], 27 * mm).build(story, onFirstPage=page, onLaterPages=page)
     return buf.getvalue()
 
 
 # ------------------------------------------------------------------------------------------------ the booklet
-def booklet(c: dict[str, Any], prepared_for: str | None = None) -> bytes:
-    """A cover, an at-a-glance page, the STX ranking and trend, every finding in detail, the full data, and our observations, method and viewpoint."""
+def booklet(c: dict[str, Any], prepared_for: str | None = None, sections: tuple[str, ...] | list[str] | None = None) -> bytes:
+    """A cover, an at-a-glance page, the STX ranking and trend, every finding in detail, the full data, and our observations, method and viewpoint. ``sections`` narrows it (STX, the numbers and the method are always there)."""
+    want = set(sections or ALL_SECTIONS)
     st, width, buf, downloaded = _styles(), A4[0] - 32 * mm, BytesIO(), ist_stamp()
     cover_title = ParagraphStyle("cover", fontName="Helvetica-Bold", fontSize=40, leading=42, textColor=WHITE)
+    inside = ["At a glance: the numbers" + (", what stands out" if "highlights" in want else "") + (", our viewpoint" if "viewpoint" in want else ""), "The STX Index, channel by channel" + (", and the trend" if "data" in want else "")]
+    if "findings" in want:
+        inside.append("Detailed findings, one by one")
+    if "data" in want:
+        inside.append("The data: every figure, period by period")
+    inside.append(("Observations, " if "observations" in want else "") + "method" + (" and our closing viewpoint" if "viewpoint" in want else ""))
     story: list[Any] = [Spacer(1, 38 * mm), _para(f"<font color='#0b8ded'>&#8226;</font>  FIG. 00 - {escape(c['kicker'])}" + ("  |  SAMPLE" if c.get("sample") else ""), st["kicker"]), Spacer(1, 8),
                         _para(escape(c["title"].upper()), cover_title), Spacer(1, 8), _para(escape(c["period"]), ParagraphStyle("cp", parent=st["period"], fontSize=15, leading=19)), Spacer(1, 16),
                         _para("Detailed findings, data, observations and the StatAxis viewpoint." + (f" Prepared for {escape(prepared_for)}." if prepared_for else ""), st["body"]), Spacer(1, 22),
-                        _stx_banner(c["stx"], width, "this period"), Spacer(1, 22), _para("INSIDE", st["h2"])] + _bullets(["At a glance: the numbers, what stands out, our viewpoint", "The STX Index, channel by channel, and the trend", "Detailed findings, one by one",
-                                                                                                               "The data: every figure, period by period", "Observations, method and our closing viewpoint"], st) + [PageBreak()]
-    story += [_para("AT A GLANCE", st["h2"]), _kpi_row(c, st, width), Spacer(1, 8), _para("WHAT STANDS OUT", st["h2"])] + _bullets(c["highlights"], st) + [Spacer(1, 6), _para("STATAXIS VIEWPOINT", st["h2"]), _para(escape(c["viewpoint"]), st["serif"]), PageBreak()]
-    story += [_para("THE STX INDEX, CHANNEL BY CHANNEL", st["h2"]), _para("STX is StatAxis's own 0-100 score for a channel: audience, momentum, consistency and more, in one number, with a confidence beside it.", st["small"]), Spacer(1, 5),
-              _ranking(c, width), Spacer(1, 10), _chart(c, width, 110), PageBreak()]
-    story += [_para("DETAILED FINDINGS", st["h2"])] + [KeepTogether(_finding(i, f, st, width)) for i, f in enumerate(c["findings"], start=1)] + [PageBreak()]
-    pts = c["trend"]["points"]
-    story += [_para("THE DATA, PERIOD BY PERIOD", st["h2"]), _para(escape(c["trend"]["title"] + ": " + c["trend"]["unit"]), st["small"]), Spacer(1, 5),
-              _table([["Period", "Value", "Against the average"]] + [[str(lab), f"{v:,.1f}" if v < 1000 else f"{v:,.0f}", f"{100 * (v / (sum(x for _l, x in pts) / len(pts)) - 1):+.0f}%"] for lab, v in pts], [60 * mm, 40 * mm, 40 * mm], right_from=1),
-              Spacer(1, 12), _para("EVERY CHANNEL", st["h2"]), _ranking(c, width), PageBreak()]
-    story += [_para("OBSERVATIONS", st["h2"])] + _bullets(c["observations"], st) + [Spacer(1, 10), _para("HOW THESE NUMBERS WERE WORKED OUT", st["h2"]),
+                        _stx_banner(c["stx"], width, "this period"), Spacer(1, 22), _para("INSIDE", st["h2"])] + _bullets(inside, st) + [PageBreak()]
+    story += [_para("AT A GLANCE", st["h2"]), _kpi_row(c, st, width), Spacer(1, 8)]
+    if "highlights" in want:
+        story += [_para("WHAT STANDS OUT", st["h2"])] + _bullets(c["highlights"], st)
+    if "viewpoint" in want:
+        story += [Spacer(1, 6), _para("STATAXIS VIEWPOINT", st["h2"]), _para(escape(c["viewpoint"]), st["serif"])]
+    story += [PageBreak(), _para("THE STX INDEX, CHANNEL BY CHANNEL", st["h2"]), _para("STX is StatAxis's own 0-100 score for a channel: audience, momentum, consistency and more, in one number, with a confidence beside it.", st["small"]), Spacer(1, 5),
+              _ranking(c, width)]
+    if "data" in want:
+        story += [Spacer(1, 10), _chart(c, width, 110)]
+    story += [PageBreak()]
+    if "findings" in want:
+        story += [_para("DETAILED FINDINGS", st["h2"])] + [KeepTogether(_finding(i, f, st, width)) for i, f in enumerate(c["findings"], start=1)] + [PageBreak()]
+    if "data" in want:
+        pts = c["trend"]["points"]
+        mean = (sum(x for _l, x in pts) / len(pts)) or 1
+        story += [_para("THE DATA, PERIOD BY PERIOD", st["h2"]), _para(escape(c["trend"]["title"] + ": " + c["trend"]["unit"]), st["small"]), Spacer(1, 5),
+                  _table([["Period", "Value", "Against the average"]] + [[str(lab), f"{v:,.1f}" if v < 1000 else f"{v:,.0f}", f"{100 * (v / mean - 1):+.0f}%"] for lab, v in pts], [60 * mm, 40 * mm, 40 * mm], right_from=1),
+                  Spacer(1, 12), _para("EVERY CHANNEL", st["h2"]), _ranking(c, width), PageBreak()]
+    if "observations" in want:
+        story += [_para("OBSERVATIONS", st["h2"])] + _bullets(c["observations"], st) + [Spacer(1, 10)]
+    story += [_para("HOW THESE NUMBERS WERE WORKED OUT", st["h2"]),
               _para("Views are what YouTube reports for videos uploaded in the period, as last measured by StatAxis. The STX Index is StatAxis's own score and is pulled toward 50 when data is thin. "
-                    "Nothing is estimated; a dash means not enough data. Measured from public YouTube data: this is not TV ratings and not a statement about who watched.", st["body"]),
-              Spacer(1, 14), _para("STATAXIS VIEWPOINT", st["h2"]), _para(escape(c["viewpoint"]), st["serif"]), Spacer(1, 12), _para(f"stataxis.org  |  x.com/stataxis  |  {escape(HANDLE.split('|')[0].strip())}", st["small"])]
+                    "Nothing is estimated; a dash means not enough data. Measured from public YouTube data: this is not TV ratings and not a statement about who watched.", st["body"])]
+    if "viewpoint" in want:
+        story += [Spacer(1, 14), _para("STATAXIS VIEWPOINT", st["h2"]), _para(escape(c["viewpoint"]), st["serif"])]
+    story += [Spacer(1, 12), _para(f"stataxis.org  |  x.com/stataxis  |  {escape(HANDLE.split('|')[0].strip())}", st["small"])]
     page = _page_fn(c, downloaded, f" for {prepared_for}" if prepared_for else "")
     _doc(buf, c["title"]).build(story, onFirstPage=page, onLaterPages=page)
     return buf.getvalue()
-

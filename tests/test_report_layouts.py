@@ -4,7 +4,8 @@ import pytest
 pytest.importorskip("reportlab")
 fitz = pytest.importorskip("fitz")
 
-from api.report_layouts import INTERVALS, booklet, one_pager, sample_content  # noqa: E402
+from api.report_content import INTERVALS  # noqa: E402
+from api.report_layouts import booklet, one_pager, sample_content  # noqa: E402
 
 
 def text_of(pdf: bytes) -> str:

@@ -235,6 +235,37 @@ class AlertEvent(Base):
     seen: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class ReportSubscription(Base):
+    """A person's choice to receive a periodic report by e-mail (api/report_subscriptions.py): how often, which layout, which parts, which language and group, and when in the day (Indian time)."""
+    __tablename__ = "stx_report_subscriptions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("stx_users.id"), index=True)
+    interval: Mapped[str] = mapped_column(String(16))
+    layout: Mapped[str] = mapped_column(String(16), default="one_pager")
+    sections_json: Mapped[str] = mapped_column(Text, default="[]")
+    language: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    segment: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    send_hour: Mapped[int] = mapped_column(Integer, default=8)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    unsubscribe_token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class ReportDelivery(Base):
+    """One report for one subscription and one period: sent, failed, or waiting for enough history. The unique key means a period is never sent twice."""
+    __tablename__ = "stx_report_deliveries"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subscription_id: Mapped[int] = mapped_column(ForeignKey("stx_report_subscriptions.id"), index=True)
+    period_key: Mapped[str] = mapped_column(String(64))
+    period_label: Mapped[str] = mapped_column(String(80), default="")
+    trigger: Mapped[str] = mapped_column(String(12), default="scheduled")
+    status: Mapped[str] = mapped_column(String(24))
+    detail: Mapped[str] = mapped_column(Text, default="")
+    message_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
+    __table_args__ = (UniqueConstraint("subscription_id", "period_key", "trigger", name="uq_stx_report_delivery_period"),)
+
+
 class Prediction(Base):
     """What StatAxis expected a channel's prime-time audience to be, written down before the slot, and later scored against what was measured (api/forecasts.py)."""
     __tablename__ = "stx_predictions"
