@@ -6,6 +6,7 @@ import base64
 import binascii
 import re
 import secrets
+from pathlib import Path
 from datetime import datetime
 from functools import lru_cache
 from html import unescape
@@ -23,19 +24,24 @@ from reportlab.platypus import Flowable, Image, Paragraph, SimpleDocTemplate, Sp
 
 from api.stamps import file_stamp, ist_stamp
 
-NAVY = colors.HexColor("#061322")
-BLUE = colors.HexColor("#159de8")
-GOLD = colors.HexColor("#b8923a")
-GREY = colors.HexColor("#5b6b7b")
-LINE = colors.HexColor("#d5dde5")
-BAND = colors.HexColor("#eef3f7")
+# The StatAxis design (design/reference.png): a near-black page, white headlines, electric blue for numbers and accents, grey-white text, and the blue-and-gold logo.
+BG = colors.HexColor("#010509")
+PANEL = colors.HexColor("#050d17")
+WHITE = colors.HexColor("#fdfdfd")
+TEXT = colors.HexColor("#ccd5dd")
+MUTE = colors.HexColor("#9ba0a6")
+BLUE = colors.HexColor("#0b8ded")
+BLUE_LIGHT = colors.HexColor("#5fb4ff")
+DEEP = colors.HexColor("#0b52b1")
+LINE = colors.HexColor("#255073")
+STXBG = colors.HexColor("#071a30")
 YOUTUBE_NOTE = "Data via YouTube. Processed and evaluated by StatAxis."
+HANDLE = "stataxis.org  |  x.com/stataxis"
 
 
 # ---------------------------------------------------------------------------------------------- brand: the logo, drawn on every page as a watermark
-_MARK = ('<circle cx="68" cy="58" r="48" fill="none" stroke="{ring}" stroke-width="18"/><path d="M38 74l27-27 17 15 35-35" fill="none" stroke="{ink}" stroke-width="12" stroke-linecap="square"/>'
-         '<path d="M103 26h20v20" fill="none" stroke="{ink}" stroke-width="12"/><line x1="139" y1="10" x2="139" y2="112" stroke="{gold}" stroke-width="2"/>')
-_WORD = '<text x="164" y="66" font-family="Helvetica,Arial,sans-serif" font-size="52" font-weight="700" letter-spacing="3" fill="{ink}">STATAXIS</text>'
+LOGO_SVG = Path(__file__).resolve().parent.parent / "dashboard" / "assets" / "stataxis-logo-dark.svg"
+LOGO_RATIO = 200 / 760
 _LOGO_CACHE: dict[str, bytes] = {}
 
 
@@ -48,15 +54,16 @@ def _mupdf() -> Any:
         return fitz
 
 
-def logo_png(ring: str = "#5f7f9c", ink: str = "#061322", gold: str = "#b8923a", words: bool = True, scale: float = 3.0) -> bytes:
-    """The StatAxis mark (and name) as a transparent PNG in the given colours; drawn from the same shapes as the site logo."""
-    key = f"{ring}{ink}{gold}{words}{scale}"
+def logo_png(*_ignored: Any, scale: float = 3.0, **_ignored_kw: Any) -> bytes:
+    """The blue-and-gold StatAxis logo as a transparent PNG, drawn from the same SVG the workspace uses for its pictures."""
+    key = f"{scale}"
     if key not in _LOGO_CACHE:
         fitz = _mupdf()  # PyMuPDF renders the SVG to pixels
-        width = 520 if words else 150
-        svg = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} 124" width="{width}" height="124">' + _MARK.format(ring=ring, ink=ink, gold=gold) + (_WORD.format(ink=ink) if words else "") + "</svg>"
+        svg = LOGO_SVG.read_text(encoding="utf-8")   # MuPDF draws flat colours more reliably than gradients, so the gradients are replaced by the colour they average to
+        for ref, flat in (("url(#ring)", "#1470d8"), ("url(#word)", "#1a85ec"), ("url(#arrow)", "#edc461")):
+            svg = svg.replace(ref, flat)
         doc = fitz.open(stream=svg.encode("utf-8"), filetype="svg")
-        _LOGO_CACHE[key] = doc[0].get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=True).tobytes("png")
+        _LOGO_CACHE[key] = doc[0].get_pixmap(matrix=fitz.Matrix(scale * 760 / doc[0].rect.width, scale * 760 / doc[0].rect.width), alpha=True).tobytes("png")
     return _LOGO_CACHE[key]
 
 
@@ -67,7 +74,7 @@ def _watermark(canvas: Any, size: tuple[float, float] = A4) -> None:
     canvas.setFillAlpha(0.075)
     canvas.translate(size[0] / 2, size[1] / 2)
     canvas.rotate(32)
-    w, h = 70 * mm, 70 * mm * 124 / 520
+    w, h = 70 * mm, 70 * mm * LOGO_RATIO
     for row in range(-6, 7):
         for col in range(-5, 6):
             x = col * 105 * mm + (row % 2) * 52 * mm - w / 2
@@ -174,7 +181,7 @@ def _cell(text: str, align: str = "left") -> Any:
     """A table cell: the plain string when Helvetica can write it (the table's own font is used), otherwise a shaped picture."""
     if _plain_ok(text):
         return text
-    return Shaped(escape(text), ParagraphStyle("cell", fontName="Helvetica", fontSize=8.5, leading=10.5, textColor=NAVY, alignment=2 if align == "right" else 0))
+    return Shaped(escape(text), ParagraphStyle("cell", fontName="Helvetica", fontSize=8.5, leading=10.5, textColor=TEXT, alignment=2 if align == "right" else 0))
 
 
 def _put(canvas: Any, x: float, y: float, text: str, font: str, size: float, color: Any, right: bool = False) -> None:
@@ -226,13 +233,13 @@ def _bars(rows: list[dict[str, Any]], key: str, width: float, label: str) -> Dra
     row_h, left = 15, 120
     d = Drawing(width, 18 + row_h * len(rows))
     top = max((r[key] for r in rows), default=0) or 1
-    d.add(String(0, 6 + row_h * len(rows), label, fontName="Helvetica-Bold", fontSize=8, fillColor=GREY))
+    d.add(String(0, 6 + row_h * len(rows), label, fontName="Helvetica-Bold", fontSize=8, fillColor=MUTE))
     for i, r in enumerate(rows):
         y = row_h * (len(rows) - 1 - i)
         w = (width - left - 60) * r[key] / top
-        d.add(String(0, y + 4, str(r["name"])[:24].encode("cp1252", "replace").decode("cp1252"), fontName="Helvetica", fontSize=8, fillColor=NAVY))
-        d.add(Rect(left, y + 1, max(w, 1), 10, fillColor=BLUE if i else GOLD, strokeColor=None))
-        d.add(String(left + w + 4, y + 3, _n(r[key]), fontName="Helvetica-Bold", fontSize=8, fillColor=NAVY))
+        d.add(String(0, y + 4, str(r["name"])[:24].encode("cp1252", "replace").decode("cp1252"), fontName="Helvetica", fontSize=8, fillColor=TEXT))
+        d.add(Rect(left, y + 1, max(w, 1), 10, fillColor=BLUE if i else BLUE_LIGHT, strokeColor=None))
+        d.add(String(left + w + 4, y + 3, _n(r[key]), fontName="Helvetica-Bold", fontSize=8, fillColor=WHITE))
     return d
 
 
@@ -244,13 +251,13 @@ def _stx_banner(h: dict[str, Any] | None, width: float) -> Any:
     """The STX Index strip every report opens with: who leads, the average, how many channels have a score."""
     if not h:
         return Spacer(1, 0)
-    big = ParagraphStyle("stxb", fontName="Helvetica-Bold", fontSize=11, leading=14, textColor=NAVY)
-    small = ParagraphStyle("stxs", fontName="Helvetica", fontSize=7.8, leading=10, textColor=GREY)
-    left = _para("<font color='#b8923a'><b>STX INDEX</b></font>", big)
+    big = ParagraphStyle("stxb", fontName="Helvetica-Bold", fontSize=11, leading=14, textColor=WHITE)
+    small = ParagraphStyle("stxs", fontName="Helvetica", fontSize=7.8, leading=10, textColor=MUTE)
+    left = _para("<font color='#0b8ded'><b>STX INDEX</b></font>", big)
     mid = _para(f"Highest: <b>{escape(str(h['leader']))} - {h['leader_score']:.1f}</b>  |  Average of {h['scored']} scored channels: <b>{h['average']:.1f}</b>", big)
     note = _para(escape("STX is StatAxis's own 0-100 score for a channel, over the last 7 days. A dash means not enough data."), small)
-    t = Table([[left, mid], ["", note]], colWidths=[28 * mm, width - 28 * mm])
-    t.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 1.0, GOLD), ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#fbf3dc")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    t = Table([[left, mid], [note, ""]], colWidths=[28 * mm, width - 28 * mm])
+    t.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 1.2, BLUE), ("BACKGROUND", (0, 0), (-1, -1), PANEL), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                            ("SPAN", (0, 1), (1, 1)), ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
     return t
 
@@ -260,31 +267,35 @@ def _table(data: list[list[str]], widths: list[float], right_from: int = 2) -> T
     t = Table(data, colWidths=widths, repeatRows=1)
     stx_col = [i for i, h in enumerate(data[0]) if str(h).startswith("STX")]
     t.setStyle(TableStyle([
-        *[("BACKGROUND", (i, 1), (i, -1), colors.HexColor("#fbf3dc")) for i in stx_col], *[("FONT", (i, 1), (i, -1), "Helvetica-Bold", 10) for i in stx_col],
-        ("BACKGROUND", (0, 0), (-1, 0), NAVY), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white), ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 8),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [BG, PANEL]), ("TEXTCOLOR", (0, 1), (-1, -1), TEXT),
+        *[("BACKGROUND", (i, 1), (i, -1), STXBG) for i in stx_col], *[("FONT", (i, 1), (i, -1), "Helvetica-Bold", 10) for i in stx_col], *[("TEXTCOLOR", (i, 1), (i, -1), BLUE) for i in stx_col],
+        ("BACKGROUND", (0, 0), (-1, 0), DEEP), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white), ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 8),
         ("FONT", (0, 1), (-1, -1), "Helvetica", 8.5), ("ALIGN", (right_from, 0), (-1, -1), "RIGHT"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BAND]), ("LINEBELOW", (0, 0), (-1, -1), 0.25, LINE),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.25, LINE),
         ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
     return t
 
 
 def _decorate(canvas: Any, document: Any, downloaded: str, data_note: str, who: str) -> None:
-    """The look every page of every report shares: watermark, the navy band with the mark, and a footer that says when it was downloaded."""
+    """The look every page of every report shares: the near-black page with the faint logo, the logo at the top, and a footer with the download time, the site and the X handle."""
     pw, ph = document.pagesize
+    canvas.saveState()
+    canvas.setFillColor(BG)
+    canvas.rect(0, 0, pw, ph, stroke=0, fill=1)
+    canvas.restoreState()
     _watermark(canvas, (pw, ph))
     canvas.saveState()
-    canvas.setFillColor(NAVY)
-    canvas.rect(0, ph - 16 * mm, pw, 16 * mm, stroke=0, fill=1)
-    canvas.drawImage(ImageReader(BytesIO(logo_png(ring="#e8f0f8", ink="#e8f0f8", gold="#e1b94f", words=False, scale=2))), 16 * mm, ph - 14 * mm, 12 * mm, 12 * 124 / 150 * mm, mask="auto")
-    _put(canvas, 31 * mm, ph - 10.5 * mm, "STATAXIS", "Helvetica-Bold", 13, GOLD)
-    _put(canvas, pw - 16 * mm, ph - 7.5 * mm, "Stat the View. Axis the Viewpoint.", "Helvetica", 8, colors.white, right=True)
-    _put(canvas, pw - 16 * mm, ph - 12 * mm, f"Downloaded {downloaded}", "Helvetica-Bold", 8, colors.HexColor("#e1b94f"), right=True)
-    _put(canvas, 16 * mm, 9 * mm, f"Downloaded {downloaded}{who}" + (f"  |  {data_note}" if data_note else "") + "  |  STATAXIS", "Helvetica", 7.5, GREY)
-    _put(canvas, 16 * mm, 5.5 * mm, YOUTUBE_NOTE, "Helvetica", 6.8, GREY)
-    _put(canvas, pw - 16 * mm, 9 * mm, f"Page {document.page}", "Helvetica", 7.5, GREY, right=True)
-    canvas.setStrokeColor(GOLD)
+    lw = 52 * mm
+    canvas.drawImage(ImageReader(BytesIO(logo_png(scale=2))), 16 * mm, ph - 6 * mm - lw * LOGO_RATIO, lw, lw * LOGO_RATIO, mask="auto")
+    _put(canvas, pw - 16 * mm, ph - 11 * mm, "STAT THE VIEW. AXIS THE VIEWPOINT.", "Courier", 7.5, MUTE, right=True)
+    _put(canvas, pw - 16 * mm, ph - 16 * mm, f"Downloaded {downloaded}", "Helvetica-Bold", 8, BLUE, right=True)
+    canvas.setStrokeColor(LINE)
     canvas.setLineWidth(0.6)
+    canvas.line(16 * mm, ph - 20 * mm, pw - 16 * mm, ph - 20 * mm)
+    _put(canvas, 16 * mm, 9 * mm, f"Downloaded {downloaded}{who}" + (f"  |  {data_note}" if data_note else ""), "Helvetica", 7.5, MUTE)
+    _put(canvas, 16 * mm, 5.5 * mm, YOUTUBE_NOTE + "  |  " + HANDLE, "Helvetica", 6.8, MUTE)
+    _put(canvas, pw - 16 * mm, 9 * mm, f"Page {document.page}", "Helvetica", 7.5, BLUE, right=True)
     canvas.line(16 * mm, 13 * mm, pw - 16 * mm, 13 * mm)
     canvas.restoreState()
 
@@ -292,20 +303,20 @@ def _decorate(canvas: Any, document: Any, downloaded: str, data_note: str, who: 
 def report_pdf(r: dict[str, Any], protect: bool = True) -> bytes:
     buf = BytesIO()
     downloaded = ist_stamp()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=16 * mm, rightMargin=16 * mm, topMargin=26 * mm, bottomMargin=18 * mm, title=report_title(r), author="STAXIS")
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=16 * mm, rightMargin=16 * mm, topMargin=28 * mm, bottomMargin=18 * mm, title=report_title(r), author="STAXIS")
     ss = getSampleStyleSheet()
-    h1 = ParagraphStyle("h1", parent=ss["Heading1"], fontName="Helvetica-Bold", fontSize=17, leading=21, textColor=NAVY, spaceAfter=2)
-    h2 = ParagraphStyle("h2", parent=ss["Heading2"], fontName="Helvetica-Bold", fontSize=11.5, leading=14, textColor=NAVY, spaceBefore=10, spaceAfter=4)
-    body = ParagraphStyle("b", parent=ss["BodyText"], fontName="Helvetica", fontSize=8.5, leading=11.5, textColor=GREY)
+    h1 = ParagraphStyle("h1", parent=ss["Heading1"], fontName="Helvetica-Bold", fontSize=19, leading=23, textColor=WHITE, spaceAfter=2)
+    h2 = ParagraphStyle("h2", parent=ss["Heading2"], fontName="Helvetica-Bold", fontSize=11.5, leading=14, textColor=BLUE, spaceBefore=10, spaceAfter=4)
+    body = ParagraphStyle("b", parent=ss["BodyText"], fontName="Helvetica", fontSize=8.5, leading=11.5, textColor=TEXT)
     story: list[Any] = []
     filters = r.get("filters") or {}
-    story.append(_para(escape(report_title(r)), h1))
+    story.append(_para(escape(report_title(r).upper()), h1))
     story.append(_para(escape(f"{_dates(r)}  |  Indian time  |  " + ("" if r.get("kind") == "briefing" else f"Genre: {r['genre'] or 'all genres'}  |  ") + f"Language: {filters.get('language') or 'all'}  |  Group: {filters.get('segment') or 'all'}"), body))
     try:
         as_of = ist_stamp(datetime.fromisoformat(r["generated_at"]))
     except (KeyError, TypeError, ValueError):
         as_of = downloaded
-    story.append(_para(f"<font color='#b8923a'><b>Downloaded {escape(downloaded)}</b></font>  |  Data as of {escape(as_of)}", body))
+    story.append(_para(f"<font color='#0b8ded'><b>Downloaded {escape(downloaded)}</b></font>  |  Data as of {escape(as_of)}", body))
     story.append(Spacer(1, 8))
     width = A4[0] - 32 * mm
     rows = r["rows"]
@@ -314,22 +325,22 @@ def report_pdf(r: dict[str, Any], protect: bool = True) -> bytes:
         story.append(Spacer(1, 8))
     if r.get("kind") == "briefing":
         b = r["briefing"]
-        kp = [[_para(f"<font size=15 color='#061322'><b>{escape(str(k['value']))}</b></font><br/><font size=7.5 color='#5b6b7b'>{escape(k['label'])}<br/>{escape(k['detail'])}</font>", body) for k in b["kpis"]]]
+        kp = [[_para(f"<font size=15 color='#fdfdfd'><b>{escape(str(k['value']))}</b></font><br/><font size=7.5 color='#9ba0a6'>{escape(k['label'])}<br/>{escape(k['detail'])}</font>", body) for k in b["kpis"]]]
         if kp[0]:
             t = Table(kp, colWidths=[width / len(kp[0])] * len(kp[0]))
-            t.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.4, LINE), ("INNERGRID", (0, 0), (-1, -1), 0.4, LINE), ("BACKGROUND", (0, 0), (-1, -1), BAND), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            t.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.4, LINE), ("INNERGRID", (0, 0), (-1, -1), 0.4, LINE), ("BACKGROUND", (0, 0), (-1, -1), PANEL), ("VALIGN", (0, 0), (-1, -1), "TOP"),
                                    ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7)]))
             story.append(t)
         story.append(_para("What the data shows, and what it means for you", h2))
         if not b["findings"]:
             story.append(_para(escape(b.get("note") or "No findings."), body))
-        small = ParagraphStyle("sm", parent=body, fontSize=7.8, leading=10, textColor=GREY)
-        head3 = ParagraphStyle("h3", parent=body, fontName="Helvetica-Bold", fontSize=10.2, leading=13, textColor=NAVY, spaceBefore=6)
+        small = ParagraphStyle("sm", parent=body, fontSize=7.8, leading=10, textColor=MUTE)
+        head3 = ParagraphStyle("h3", parent=body, fontName="Helvetica-Bold", fontSize=10.2, leading=13, textColor=WHITE, spaceBefore=6)
         for n, f in enumerate(b["findings"], start=1):
             ev = ", ".join(f"{k.replace('_', ' ')}: {v}" for k, v in f["evidence"].items() if isinstance(v, (int, float, str)) and v not in ("", None))[:230]
             story.append(_para(escape(f"{n}. {f['headline']}"), head3))
             story.append(_para(escape(f["detail"]), body))
-            story.append(_para(f"<font color='#b8923a'><b>For you:</b></font> {escape(f['so_what'])}", body))
+            story.append(_para(f"<font color='#0b8ded'><b>For you:</b></font> {escape(f['so_what'])}", body))
             story.append(_para(escape(f"Confidence: {f['confidence']}  |  Evidence: {ev}"), small))
         story.append(_para("Where to look next", h2))
         story.append(_para(escape("  |  ".join(x["label"] for x in b["recommended"])), body))
@@ -445,17 +456,17 @@ def screen_pdf(screen: dict[str, Any], prepared_for: str | None = None, protect:
     wide = any(b["t"] == "table" and len(b["head"]) > 7 for b in screen["blocks"])
     size = (A4[1], A4[0]) if wide else A4
     buf = BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=size, leftMargin=16 * mm, rightMargin=16 * mm, topMargin=26 * mm, bottomMargin=18 * mm, title=screen["title"], author="STAXIS")
+    doc = SimpleDocTemplate(buf, pagesize=size, leftMargin=16 * mm, rightMargin=16 * mm, topMargin=28 * mm, bottomMargin=18 * mm, title=screen["title"], author="STAXIS")
     width = size[0] - 32 * mm
     ss = getSampleStyleSheet()
-    h1 = ParagraphStyle("h1", parent=ss["Heading1"], fontName="Helvetica-Bold", fontSize=17, leading=21, textColor=NAVY, spaceAfter=2)
-    h2 = ParagraphStyle("h2", parent=ss["Heading2"], fontName="Helvetica-Bold", fontSize=11.5, leading=14, textColor=NAVY, spaceBefore=10, spaceAfter=4, keepWithNext=1)
-    body = ParagraphStyle("b", parent=ss["BodyText"], fontName="Helvetica", fontSize=8.8, leading=12, textColor=colors.HexColor("#2b3a49"), spaceAfter=2)
-    muted = ParagraphStyle("m", parent=body, fontSize=8, leading=10.5, textColor=GREY)
+    h1 = ParagraphStyle("h1", parent=ss["Heading1"], fontName="Helvetica-Bold", fontSize=19, leading=23, textColor=WHITE, spaceAfter=2)
+    h2 = ParagraphStyle("h2", parent=ss["Heading2"], fontName="Helvetica-Bold", fontSize=11.5, leading=14, textColor=BLUE, spaceBefore=10, spaceAfter=4, keepWithNext=1)
+    body = ParagraphStyle("b", parent=ss["BodyText"], fontName="Helvetica", fontSize=8.8, leading=12, textColor=TEXT, spaceAfter=2)
+    muted = ParagraphStyle("m", parent=body, fontSize=8, leading=10.5, textColor=MUTE)
     cell = ParagraphStyle("c", parent=body, fontSize=7.6, leading=9.4, spaceAfter=0)
     cellh = ParagraphStyle("ch", parent=cell, fontName="Helvetica-Bold", textColor=colors.white)
-    story: list[Any] = [_para(escape(screen["title"]), h1),
-                        _para(f"<font color='#b8923a'><b>Downloaded {escape(downloaded)}</b></font>" + (f"  |  {escape(screen['filters'])}" if screen["filters"] else ""), muted), Spacer(1, 8)]
+    story: list[Any] = [_para(escape(screen["title"].upper()), h1),
+                        _para(f"<font color='#0b8ded'><b>Downloaded {escape(downloaded)}</b></font>" + (f"  |  {escape(screen['filters'])}" if screen["filters"] else ""), muted), Spacer(1, 8)]
     for b in screen["blocks"]:
         if b["t"] == "h":
             story.append(_para(escape(b["text"]), h2))
@@ -477,7 +488,7 @@ def screen_pdf(screen: dict[str, Any], prepared_for: str | None = None, protect:
             widths = [width * w / total for w in weight]
             data = [[_para(escape(c), cellh) for c in b["head"]]] + [[_para(escape(c), cell) for c in r] for r in b["rows"]]
             t = Table(data, colWidths=widths, repeatRows=1)
-            t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), NAVY), ("VALIGN", (0, 0), (-1, -1), "TOP"), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BAND]),
+            t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), DEEP), ("VALIGN", (0, 0), (-1, -1), "TOP"), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [BG, PANEL]),
                                    ("LINEBELOW", (0, 0), (-1, -1), 0.25, LINE), ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3), ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3)]))
             story.append(Spacer(1, 3))
             story.append(t)

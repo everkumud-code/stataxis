@@ -210,7 +210,7 @@ def test_the_briefing_turns_into_a_branded_pdf_with_the_findings_first():
     assert re.fullmatch(rf"stataxis-briefing-buyer-{b['window']['from']}-to-{b['window']['to']}-downloaded-\d{{8}}-\d{{4}}\.pdf", filename(rep))
     plain = _mupdf().open(stream=report_pdf(rep, protect=False), filetype="pdf")
     text = " ".join(p.get_text() for p in plain)
-    assert "Briefing for media buyer" in text and b["findings"][0]["headline"][:30] in text and "For you:" in text and "Where to look next" in text
+    assert "briefing for media buyer" in text.lower() and b["findings"][0]["headline"][:30] in text and "For you:" in text and "Where to look next" in text
     protected = _mupdf().open(stream=report_pdf(rep), filetype="pdf")
     assert all(p.get_text().strip() == "" for p in protected)
 

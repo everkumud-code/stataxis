@@ -113,9 +113,7 @@
   }
 
   /* ---------- a picture to post: a dark card with the logo, the name of the thing, its figures as bars (or its key lines), ready for social media ---------- */
-  let logoImg = null;
-  const logo = () => logoImg || (logoImg = new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = "/assets/stataxis-logo.svg"; }));
-  const FONT = "Manrope, Inter, system-ui, sans-serif";
+  const logo = SXD.logo;   /* the blue-and-gold logo of the StatAxis design */
   const num = s => { const m = String(s == null ? "" : s).replace(/,/g, "").match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
   function wrap(x, text, width) {
     const out = []; let line = "";
@@ -220,92 +218,107 @@
     else if (zero > 0) out.push(`${zero} of ${chart.rows.length} show 0 in this period.`);
     return out.slice(0, 4);
   }
-  async function postPng(title, subtitle, blocks, plain = "", viewId = "", pg = {n: 1}) {   /* one post of a series: {canvas, pages} */
-    const W = 1080, P = 56, c0 = document.createElement("canvas"), m = c0.getContext("2d");
+  async function postPng(title, subtitle, blocks, plain = "", viewId = "", pg = {n: 1}) {   /* one post of a series: {canvas, pages}; the StatAxis design (sxdesign.js) */
+    const D = SXD, W = 1080, P = 64, m = document.createElement("canvas").getContext("2d");
     const result = blocks.filter(b => !b.m), kpis = result.filter(b => b.kpi && b.kpi.v).slice(0, 3).map(b => b.kpi);
-    m.font = `800 46px ${FONT}`; const titleLines = wrap(m, title, W - 2 * P).slice(0, 2);
-    m.font = `500 22px ${FONT}`; const subLines = wrap(m, subtitle, W - 2 * P).slice(0, 2);
-    m.font = `500 27px ${FONT}`; const plainLines = plain ? wrap(m, plain, W - 2 * P).slice(0, 4) : [];
-    const chart = barsOf(result), finds = [stxLine(result), ...findingsOf(chart)].filter(Boolean).slice(0, 4);   /* the STX Index leads every take-away */
-    m.font = `500 25px ${FONT}`; const findLines = finds.map(f => wrap(m, f, W - 2 * P - 34).slice(0, 2));
-    const findH = finds.length ? 64 + findLines.reduce((t, l) => t + l.length * 33 + 10, 0) : 0;
-    const vp = viewpointOf(chart, viewId, finds[0] && finds[0].startsWith("STX Index") ? finds[0] : ""); m.font = `500 25px ${FONT}`; const vpLines = vp ? wrap(m, vp, W - 2 * P).slice(0, 6) : [], vpH = vpLines.length ? 70 + vpLines.length * 33 : 0;
+    const chart = barsOf(result), allFinds = [stxLine(result), ...findingsOf(chart)].filter(Boolean).slice(0, 4);   /* the STX Index leads every take-away */
+    const stx = allFinds[0] && allFinds[0].startsWith("STX Index") ? allFinds[0] : "", finds = allFinds.filter(f => f !== stx);
+    const vp = viewpointOf(chart, viewId, stx);
     let body = [];   /* text lines when there is no table of numbers: {text, kind} */
-    const few = result.filter(b => (b.t === "p" || b.t === "h") && !b.kpi).length <= 5, fs = few ? 36 : 28, lh = few ? 54 : 42;   /* a short note is set larger, like a poster */
+    const few = result.filter(b => (b.t === "p" || b.t === "h") && !b.kpi).length <= 5, fs = few ? 38 : 30, lh = few ? 56 : 44;   /* a short note is set larger, like a poster */
     if (!chart) {
       for (const b of result) {
         if (b.t === "table") { for (const r of b.rows.filter(row => row.slice(1).some(c => /\d/.test(c))).slice(0, 6)) body.push({text: r.filter(Boolean).join("  ·  "), kind: "p"}); continue; }   /* rows with no figures are left out */
         if ((b.t === "p" || b.t === "h") && !b.kpi && !/^(review now|check|nothing unusual)(?![a-z])/i.test(b.text)) body.push({text: b.text, kind: b.t});   /* the radar's risk labels stay on the screen; they are not for a post */
       }
-      m.font = `600 ${fs}px ${FONT}`;
+      m.font = `500 ${fs}px ${D.F.body}`;
       body = body.flatMap(l => wrap(m, l.text, W - 2 * P).slice(0, l.kind === "h" ? 1 : 3).map((t, i) => ({text: t, kind: l.kind, first: i === 0}))).slice(0, 14);
     }
     /* more than one post can hold: eight bars (or twelve lines) to a post, numbered 1 of 3, 2 of 3 ... ; the introduction is on the first, our reading on the last */
     const ROWS_PER = 8, LINES_PER = 12, pages = Math.max(1, chart ? Math.ceil(chart.rows.length / ROWS_PER) : Math.ceil(body.length / LINES_PER)), n = Math.min(pg.n || 1, pages), first = n === 1, last = n === pages;
-    const chartP = chart ? {...chart, rows: chart.rows.slice((n - 1) * ROWS_PER, n * ROWS_PER)} : null, bodyP = body.slice((n - 1) * LINES_PER, n * LINES_PER);
-    const kpiShown = first ? kpis : [], plainShown = first ? plainLines : [], findShown = last ? findLines : [], vpShown = last ? vpLines : [];
-    const findHP = last ? findH : 0, vpHP = last ? vpH : 0;
-    const rowH = 70, kpiH = kpiShown.length ? 150 : 0;
-    const top = 150 + titleLines.length * 56 + subLines.length * 30 + 20 + plainShown.length * 38 + (plainShown.length ? 20 : 0) + kpiH;
-    const H = Math.max(1080, top + (chartP ? 70 + chartP.rows.length * rowH + findHP : bodyP.length * lh + 20) + vpHP + 130);
-    c0.width = W; c0.height = H; const x = c0.getContext("2d");
-    x.fillStyle = "#061322"; x.fillRect(0, 0, W, H);
-    const lg = await logo();
-    if (lg) {
-      x.save(); x.globalAlpha = 0.06; x.translate(W / 2, H / 2); x.rotate(-0.55);
-      for (let r = -10; r <= 10; r++) for (let k = -4; k <= 4; k++) x.drawImage(lg, k * 420 + (r % 2) * 210 - 150, r * 150 - 38, 300, 75);
-      x.restore(); x.drawImage(lg, P, 36, 300, 75);
-    } else { x.fillStyle = "#e1b94f"; x.font = `800 34px ${FONT}`; x.fillText("STATAXIS", P, 80); }
-    x.fillStyle = "#7f9ab2"; x.font = `500 20px ${FONT}`; x.textAlign = "right"; x.fillText("Stat the View. Axis the Viewpoint.", W - P, 76);
-    if (pages > 1) { x.fillStyle = "#e1b94f"; x.font = `800 26px ${FONT}`; x.fillText(`${n} of ${pages}`, W - P, 116); }
-    x.textAlign = "left";
-    let y = 170;
-    x.fillStyle = "#e8f1f8"; x.font = `800 46px ${FONT}`; titleLines.forEach(t => { x.fillText(t, P, y); y += 56; });
-    x.fillStyle = "#9db3c6"; x.font = `500 22px ${FONT}`; subLines.forEach(t => { y += 4; x.fillText(t, P, y + 6); y += 26; });
-    y += 20;
-    if (plainShown.length) { x.fillStyle = "#c3d4e2"; x.font = `500 27px ${FONT}`; plainShown.forEach(t => { x.fillText(t, P, y + 22); y += 38; }); y += 20; }
-    if (kpiShown.length) {   /* the headline numbers, big */
-      const gap = 20, w = (W - 2 * P - gap * (kpiShown.length - 1)) / kpiShown.length;
-      kpiShown.forEach((k, i) => {
-        const left = P + i * (w + gap);
-        x.fillStyle = "#0b1f31"; x.strokeStyle = "#20394e"; x.lineWidth = 2; x.beginPath(); x.roundRect(left, y, w, 124, 14); x.fill(); x.stroke();
-        x.fillStyle = "#9db3c6"; x.font = `600 20px ${FONT}`; x.fillText(String(k.l).slice(0, 26), left + 20, y + 34);
-        x.fillStyle = i === 0 ? "#e1b94f" : "#e8f1f8"; x.font = `800 52px ${FONT}`; x.fillText(String(k.v).slice(0, 12), left + 20, y + 92);
-        if (k.s && k.s.length <= 36) { x.fillStyle = "#7f9ab2"; x.font = `500 16px ${FONT}`; x.fillText(String(k.s).slice(0, Math.floor(w / 9)), left + 20, y + 114); }
-      });
-      y += kpiH;
-    }
-    if (chartP) {
-      x.fillStyle = "#7f9ab2"; x.font = `700 20px ${FONT}`; x.fillText(String(chart.caption || "").toUpperCase().slice(0, 40), P, y + 20); y += 46;
-      const max = Math.max(...chart.rows.map(r => r.value || 0), 1), left = 360, bar = W - left - P - 190;   /* one scale for the whole series */
-      chartP.rows.forEach((r, i) => {
-        const yy = y + i * rowH;
-        x.fillStyle = "#e8f1f8"; x.font = `700 26px ${FONT}`; x.fillText(String(r.label).slice(0, 22), P, yy + 42);
-        if (r.value == null) { x.fillStyle = "#7f9ab2"; x.font = `500 22px ${FONT}`; x.fillText(String(r.text).slice(0, 30), left, yy + 42); return; }
-        const w = Math.max(5, bar * r.value / max);
-        x.fillStyle = i === 0 && first ? "#e1b94f" : "#159de8"; x.fillRect(left, yy + 14, w, 38);
-        x.fillStyle = "#e8f1f8"; x.font = `800 26px ${FONT}`; x.fillText(String(r.text).slice(0, 14), left + w + 14, yy + 44);
-      });
-      if (last && finds.length) {
-        let fy = y + chartP.rows.length * rowH + 24;
-        x.fillStyle = "#7f9ab2"; x.font = `700 20px ${FONT}`; x.fillText("WHAT STANDS OUT", P, fy + 14); fy += 44;
-        findShown.forEach(lines => { lines.forEach((t, k) => { x.font = `500 25px ${FONT}`; if (k === 0) { x.fillStyle = "#e1b94f"; x.fillText("•", P, fy + 24); } x.fillStyle = "#d6e4ef"; x.fillText(t, P + 28, fy + 24); fy += 33; }); fy += 10; });
+    const chartP = chart ? {...chart, rows: chart.rows.slice((n - 1) * ROWS_PER, n * ROWS_PER)} : null, bodyP = body.slice((n - 1) * LINES_PER, n * LINES_PER), rowH = 76, hs = 90;
+    const label = String(viewId || "report").replace(/[^a-z0-9]+/gi, " ").trim() || "report";
+    /* one pass measures, the other draws: the same steps, so the picture is exactly as tall as what is on it */
+    const paint = (x, draw) => {
+      let y = 100;
+      if (draw) {
+        D.eyebrow(x, `Fig. ${String(n).padStart(2, "0")} — ${label}`, P, y);
+        if (pages > 1) { x.textAlign = "right"; x.fillStyle = D.C.blue; x.font = `400 40px ${D.F.head}`; x.fillText(`${n} of ${pages}`, W - P, y); x.textAlign = "left"; }
       }
-    } else {
-      bodyP.forEach((l, i) => {
-        x.fillStyle = l.kind === "h" ? "#e1b94f" : "#d6e4ef"; x.font = l.kind === "h" ? `800 ${fs}px ${FONT}` : `600 ${fs}px ${FONT}`;
-        x.fillText(l.text, P, y + fs + i * lh);
-      });
-    }
-    if (vpShown.length) {   /* our reading, last, in gold */
-      let vy = chartP ? y + chartP.rows.length * rowH + (finds.length ? findHP : 0) + 24 : y + bodyP.length * lh + 44;
-      x.fillStyle = "#e1b94f"; x.font = `800 20px ${FONT}`; x.fillText("STATAXIS VIEWPOINT", P, vy + 14); vy += 44;
-      x.fillStyle = "#e8f1f8"; x.font = `500 25px ${FONT}`; vpShown.forEach(t => { x.fillText(t, P, vy + 24); vy += 33; });
-    }
-    x.fillStyle = "#e1b94f"; x.fillRect(P, H - 96, W - 2 * P, 2);
-    x.fillStyle = "#7f9ab2"; x.font = `500 18px ${FONT}`; x.fillText("Measured by STAXIS from public YouTube data. Not TV ratings.", P, H - 62);
-    x.fillText("Data via YouTube. Processed and evaluated by StatAxis.", P, H - 32);
-    x.textAlign = "right"; x.fillStyle = "#e1b94f"; x.fillText(window.sxDownloadedAt(), W - P, H - 62); x.fillStyle = "#7f9ab2"; x.fillText("stataxis.org", W - P, H - 32); x.textAlign = "left";
+      const tl = D.headLines(x, title, W - 2 * P, hs, 3); y += 34 + hs * 0.86;
+      if (draw) D.headline(x, title, P, y, W - 2 * P, hs, 3);
+      y += (tl - 1) * hs * 0.98 + 30;
+      x.font = `500 24px ${D.F.body}`; const sub = wrap(x, subtitle, W - 2 * P).slice(0, 2);
+      sub.forEach(t => { if (draw) { x.fillStyle = D.C.mute; x.fillText(t, P, y + 6); } y += 32; });
+      y += 18;
+      if (first && plain) {
+        x.font = `500 28px ${D.F.body}`; wrap(x, plain, W - 2 * P).slice(0, 4).forEach(t => { if (draw) { x.fillStyle = D.C.text; x.fillText(t, P, y + 24); } y += 40; });
+        y += 18;
+      }
+      if (first && stx) {   /* the STX Index is the headline of every report: a framed callout right under the title */
+        x.font = `600 31px ${D.F.body}`; const lines = wrap(x, stx.replace(/^STX Index:\s*/, ""), W - 2 * P - 56).slice(0, 3), h = 74 + lines.length * 42;
+        if (draw) {
+          x.fillStyle = D.C.panel; x.strokeStyle = D.C.blue; x.lineWidth = 2.5; x.beginPath(); x.roundRect(P, y, W - 2 * P, h, 16); x.fill(); x.stroke();
+          x.fillStyle = D.C.blue; x.font = `500 20px ${D.F.mono}`; if ("letterSpacing" in x) x.letterSpacing = "4px"; x.fillText("STX INDEX", P + 28, y + 40); if ("letterSpacing" in x) x.letterSpacing = "0px";
+          x.fillStyle = D.C.white; x.font = `600 31px ${D.F.body}`; lines.forEach((t, i) => x.fillText(t, P + 28, y + 86 + i * 42));
+        }
+        y += h + 34;
+      }
+      if (first && kpis.length) {   /* the headline numbers, big */
+        const gap = 20, w = (W - 2 * P - gap * (kpis.length - 1)) / kpis.length;
+        kpis.forEach((k, i) => {
+          const left = P + i * (w + gap);
+          if (draw) {
+            x.fillStyle = D.C.panel; x.strokeStyle = D.C.line; x.lineWidth = 2; x.beginPath(); x.roundRect(left, y, w, 140, 14); x.fill(); x.stroke();
+            x.fillStyle = D.C.mute; x.font = `600 20px ${D.F.body}`; x.fillText(String(k.l).slice(0, 26), left + 20, y + 34);
+            x.fillStyle = i === 0 ? D.C.blue : D.C.white; x.font = `400 66px ${D.F.head}`; x.fillText(String(k.v).slice(0, 12), left + 20, y + 100);
+            if (k.s && k.s.length <= 36) { x.fillStyle = D.C.mute; x.font = `500 16px ${D.F.body}`; x.fillText(String(k.s).slice(0, Math.floor(w / 9)), left + 20, y + 126); }
+          }
+        });
+        y += 140 + 34;
+      }
+      if (chartP) {
+        if (draw) { x.fillStyle = D.C.mute; x.font = `500 20px ${D.F.mono}`; if ("letterSpacing" in x) x.letterSpacing = "3px"; x.fillText(String(chart.caption || "").toUpperCase().slice(0, 40), P, y + 20); if ("letterSpacing" in x) x.letterSpacing = "0px"; }
+        y += 50;
+        const max = Math.max(...chart.rows.map(r => r.value || 0), 1), left = 430, bar = W - left - P - 200;   /* one scale for the whole series */
+        chartP.rows.forEach((r, i) => {
+          const yy = y + i * rowH;
+          if (draw) {
+            D.number(x, String((n - 1) * ROWS_PER + i + 1).padStart(2, "0"), P, yy + 56, 58);
+            x.fillStyle = D.C.white; x.font = `600 27px ${D.F.body}`; x.fillText(String(r.label).slice(0, 18), P + 98, yy + 50);
+            if (r.value == null) { x.fillStyle = D.C.mute; x.font = `500 22px ${D.F.body}`; x.fillText(String(r.text).slice(0, 30), left, yy + 50); }
+            else {
+              const w = Math.max(5, bar * r.value / max);
+              x.fillStyle = i === 0 && first ? D.C.blue : D.C.blueDeep; x.fillRect(left, yy + 20, w, 38);
+              x.fillStyle = D.C.white; x.font = `700 27px ${D.F.body}`; x.fillText(String(r.text).slice(0, 14), left + w + 14, yy + 51);
+            }
+            x.fillStyle = D.C.line; x.fillRect(P, yy + rowH - 6, W - 2 * P, 1);
+          }
+        });
+        y += chartP.rows.length * rowH + 20;
+      } else {
+        bodyP.forEach((l, i) => { if (draw) { x.fillStyle = l.kind === "h" ? D.C.blue : D.C.text; x.font = l.kind === "h" ? `400 ${fs + 14}px ${D.F.head}` : `500 ${fs}px ${D.F.body}`; x.fillText(l.kind === "h" ? l.text.toUpperCase() : l.text, P, y + fs + i * lh); } });
+        y += bodyP.length * lh + 30;
+      }
+      if (last && finds.length) {
+        if (draw) { x.fillStyle = D.C.mute; x.font = `500 20px ${D.F.mono}`; if ("letterSpacing" in x) x.letterSpacing = "4px"; x.fillText("WHAT STANDS OUT", P, y + 14); if ("letterSpacing" in x) x.letterSpacing = "0px"; }
+        y += 44; x.font = `500 27px ${D.F.body}`;
+        finds.forEach(f => { wrap(x, f, W - 2 * P - 34).slice(0, 2).forEach((t, k) => { if (draw) { if (k === 0) { x.fillStyle = D.C.blue; x.beginPath(); x.arc(P + 8, y + 16, 6, 0, Math.PI * 2); x.fill(); } x.fillStyle = D.C.text; x.fillText(t, P + 34, y + 24); } y += 36; }); y += 8; });
+        y += 14;
+      }
+      if (last && vp) {   /* our viewpoint, last: the blue italic line to remember */
+        if (draw) { x.fillStyle = D.C.mute; x.font = `500 20px ${D.F.mono}`; if ("letterSpacing" in x) x.letterSpacing = "4px"; x.fillText("STATAXIS VIEWPOINT", P, y + 14); if ("letterSpacing" in x) x.letterSpacing = "0px"; }
+        y += 24; x.font = `italic 400 36px ${D.F.serif}`;
+        wrap(x, vp, W - 2 * P).slice(0, 8).forEach(t => { y += 48; if (draw) { x.fillStyle = D.C.blue; x.fillText(t, P, y); } });
+        y += 24;
+      }
+      return y;
+    };
+    const used = paint(m, false), H = Math.max(1080, Math.round(used + 220));
+    const c0 = document.createElement("canvas"); c0.width = W; c0.height = H; const x = c0.getContext("2d");
+    D.background(x, W, H); await D.watermark(x, W, H, 0.03);
+    paint(x, true);
+    await D.footer(x, W, H, P, ["Measured by StatAxis from public YouTube data. Not TV ratings.", "Data via YouTube. Processed and evaluated by StatAxis.", "Downloaded " + window.sxDownloadedAt()]);
     return {canvas: c0, pages};
   }
   async function makePost(view, screen, card, say) {

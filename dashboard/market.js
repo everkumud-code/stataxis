@@ -42,33 +42,26 @@
   const method = text => `<details class="card" style="margin-top:14px"><summary>How these numbers were worked out</summary><p class="muted" style="margin-top:8px">${esc(text)}</p></details>`;
 
   /* ---------- a picture card to post (PNG): branded, with the logo tiled faintly over it ---------- */
-  let logoImg = null;
-  const logo = () => logoImg || (logoImg = new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = "/assets/stataxis-logo.svg"; }));
-  async function cardPng(title, subtitle, rows, {unit = "", footer = ""} = {}) {
-    const W = 1080, rowH = 74, top = 220, H = top + rows.length * rowH + 130;
+  const logo = SXD.logo;   /* the blue-and-gold logo of the StatAxis design */
+  async function cardPng(title, subtitle, rows, {unit = "", footer = "", label = "STATAXIS DATA"} = {}) {
+    const D = SXD, W = 1080, P = 64, rowH = 88, hs = 96, m = document.createElement("canvas").getContext("2d");
+    const n = D.headLines(m, title, W - 2 * P, hs, 3), hy = 150 + hs * 0.86, y1 = hy + (n - 1) * hs * 0.98, top = y1 + 100, H = Math.round(top + rows.length * rowH + 250);
     const c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d");
-    x.fillStyle = "#061322"; x.fillRect(0, 0, W, H);
-    const lg = await logo();
-    if (lg) {
-      x.save(); x.globalAlpha = 0.06; x.translate(W / 2, H / 2); x.rotate(-0.55);
-      for (let r = -9; r <= 9; r++) for (let k = -4; k <= 4; k++) x.drawImage(lg, k * 420 + (r % 2) * 210 - 150, r * 150 - 38, 300, 75);
-      x.restore();
-      x.drawImage(lg, 44, 28, 300, 75);
-    } else { x.fillStyle = "#e1b94f"; x.font = "800 34px Manrope, Inter, system-ui, sans-serif"; x.fillText("STATAXIS", 50, 70); }
-    x.fillStyle = "#7f9ab2"; x.font = "500 20px Manrope, Inter, system-ui, sans-serif"; x.textAlign = "right"; x.fillText("Stat the View. Axis the Viewpoint.", W - 50, 66); x.textAlign = "left";
-    x.fillStyle = "#e8f1f8"; x.font = "800 38px Manrope, Inter, system-ui, sans-serif"; x.fillText(title.slice(0, 48), 50, 150);
-    x.fillStyle = "#9db3c6"; x.font = "500 22px Manrope, Inter, system-ui, sans-serif"; x.fillText(subtitle.slice(0, 80), 50, 188);
-    const max = Math.max(...rows.map(r => r.value), 1), left = 330, bar = W - left - 190;
+    D.background(x, W, H); await D.watermark(x, W, H, 0.03);
+    D.eyebrow(x, "Fig. 00 — " + label, P, 100);
+    D.headline(x, title, P, hy, W - 2 * P, hs, 3);
+    x.fillStyle = D.C.mute; x.font = `500 26px ${D.F.body}`; x.fillText(subtitle.slice(0, 72), P, y1 + 56);
+    const max = Math.max(...rows.map(r => r.value), 1), left = 440, bar = W - left - P - 210;
     rows.forEach((r, i) => {
       const y = top + i * rowH;
-      x.fillStyle = "#e8f1f8"; x.font = "700 26px Manrope, Inter, system-ui, sans-serif"; x.fillText(String(r.label).slice(0, 20), 50, y + 40);
-      x.fillStyle = i === 0 ? "#e1b94f" : "#159de8"; x.fillRect(left, y + 14, Math.max(4, bar * r.value / max), 36);
-      x.fillStyle = "#e8f1f8"; x.font = "800 26px Manrope, Inter, system-ui, sans-serif"; x.fillText(r.text || (compact(r.value) + unit), left + Math.max(4, bar * r.value / max) + 14, y + 42);
+      D.number(x, String(i + 1).padStart(2, "0"), P, y + 62, 64);
+      x.fillStyle = D.C.white; x.font = `600 28px ${D.F.body}`; x.fillText(String(r.label).slice(0, 17), P + 104, y + 56);
+      const w = Math.max(5, bar * r.value / max);
+      x.fillStyle = i === 0 ? D.C.blue : D.C.blueDeep; x.fillRect(left, y + 24, w, 40);
+      x.fillStyle = D.C.white; x.font = `700 28px ${D.F.body}`; x.fillText(r.text || (compact(r.value) + unit), left + w + 14, y + 56);
+      x.fillStyle = D.C.line; x.fillRect(P, y + rowH - 6, W - 2 * P, 1);
     });
-    x.fillStyle = "#e1b94f"; x.fillRect(50, H - 92, W - 100, 2);
-    x.fillStyle = "#7f9ab2"; x.font = "500 18px Manrope, Inter, system-ui, sans-serif"; x.fillText(footer.slice(0, 80), 50, H - 62);
-    x.textAlign = "right"; x.fillStyle = "#e1b94f"; x.fillText("Downloaded " + window.sxDownloadedAt(), W - 50, H - 62); x.textAlign = "left"; x.fillStyle = "#7f9ab2";
-    x.fillText("Data via YouTube. Processed and evaluated by StatAxis. Not TV ratings.   stataxis.org", 50, H - 32);
+    await D.footer(x, W, H, P, [footer.slice(0, 64), "Data via YouTube. Processed and evaluated by StatAxis.", "Downloaded " + window.sxDownloadedAt()]);
     return c;
   }
   function saveCanvas(canvas, name) { canvas.toBlob(b => { const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = name.replace(/\.png$/, "") + "-downloaded-" + window.sxFileStamp() + ".png"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }, "image/png"); }
@@ -98,41 +91,41 @@
       <span>Highest: <strong style="color:#e1b94f;font-size:1.25em">${esc(h.leader)} · ${dec(h.leader_score)}</strong></span><span>Average of the ${whole(h.scored)} scored channels: <strong>${dec(h.average)}</strong></span>
       <span class="muted">${h.scored < h.of ? `${whole(h.of - h.scored)} without a score yet. ` : ""}STX is StatAxis's own 0–100 score, over the last 7 days.</span></div>` : "";
   /* a table card in the style analysts post: a title, a coloured header, rank / channel / figure / share / STX, a Total row, the note and the brand */
-  async function tableCardPng(title, subtitle, head, rows, total, {note = "", highlight = -1} = {}) {
-    const W = 1200, rowH = 64, headH = 80, top = 230, H = top + headH + (rows.length + (total ? 1 : 0)) * rowH + 190;
+  async function tableCardPng(title, subtitle, head, rows, total, {note = "", label = "STATAXIS WEEKLY STATS"} = {}) {
+    const D = SXD, W = 1200, P = 56, rowH = 72, headH = 78, hs = 84, m = document.createElement("canvas").getContext("2d");
+    const n = D.headLines(m, title, W - 2 * P, hs, 2), hy = 150 + hs * 0.86, y1 = hy + (n - 1) * hs * 0.98, top = y1 + 96, all = total ? [...rows, total] : rows;
+    const noteLines = (note || "").split("\n").slice(0, 2), H = Math.round(top + headH + all.length * rowH + 40 + noteLines.length * 32 + 270);
     const c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d");
-    const font = (w, px) => `${w} ${px}px Manrope, Inter, system-ui, sans-serif`;
-    x.fillStyle = "#f7f9fb"; x.fillRect(0, 0, W, H);
-    const lg = await logo();
-    if (lg) { x.save(); x.globalAlpha = 0.05; x.translate(W / 2, H / 2); x.rotate(-0.55); for (let r = -9; r <= 9; r++) for (let k = -4; k <= 4; k++) x.drawImage(lg, k * 420 + (r % 2) * 210 - 150, r * 150 - 38, 300, 75); x.restore(); }
-    x.fillStyle = "#061322"; x.fillRect(0, 0, W, 120);
-    if (lg) x.drawImage(lg, 36, 22, 300, 75); else { x.fillStyle = "#e1b94f"; x.font = font(800, 34); x.fillText("STATAXIS", 40, 70); }
-    x.textAlign = "right"; x.fillStyle = "#e1b94f"; x.font = font(700, 22); x.fillText("Stat the View. Axis the Viewpoint.", W - 40, 70); x.textAlign = "left";
-    x.fillStyle = "#061322"; x.font = font(800, 42); x.fillText(title.slice(0, 52), 40, 175);
-    x.fillStyle = "#3d5266"; x.font = font(500, 24); x.fillText(subtitle.slice(0, 90), 40, 212);
-    const cols = head.length, wide = [90, 400], rest = (W - 80 - wide[0] - wide[1]) / Math.max(cols - 2, 1), xs = [40, 40 + wide[0]];
-    for (let i = 2; i < cols; i++) xs.push(40 + wide[0] + wide[1] + (i - 2) * rest);
-    const widths = [wide[0], wide[1], ...Array(Math.max(cols - 2, 0)).fill(rest)];
-    x.fillStyle = "#061322"; x.fillRect(40, top, W - 80, headH);
-    head.forEach((h, i) => { const isStx = /STX/i.test(h); if (isStx) { x.fillStyle = "#b8923a"; x.fillRect(xs[i], top, widths[i], headH); } x.fillStyle = isStx ? "#061322" : "#e8f1f8"; x.font = font(800, 25); x.textAlign = i === 1 ? "left" : "center"; x.fillText(h, i === 1 ? xs[i] + 22 : xs[i] + widths[i] / 2, top + 50); });
-    const all = total ? [...rows, total] : rows;
+    D.background(x, W, H); await D.watermark(x, W, H, 0.03);
+    D.eyebrow(x, "Fig. 00 — " + label, P, 100);
+    D.headline(x, title, P, hy, W - 2 * P, hs, 2);
+    x.fillStyle = D.C.mute; x.font = `500 25px ${D.F.body}`; x.fillText(subtitle.slice(0, 92), P, y1 + 54);
+    const cols = head.length, wide = [96, 400], rest = (W - 2 * P - wide[0] - wide[1]) / Math.max(cols - 2, 1), widths = [wide[0], wide[1], ...Array(Math.max(cols - 2, 0)).fill(rest)], xs = [];
+    widths.reduce((acc, w) => (xs.push(acc), acc + w), P);
+    x.fillStyle = D.C.blueDeep; x.fillRect(P, top, W - 2 * P, headH);
+    head.forEach((h, i) => {
+      const isStx = /STX/i.test(h);
+      if (isStx) { x.fillStyle = D.C.blue; x.fillRect(xs[i], top, widths[i], headH); }
+      x.fillStyle = D.C.white; x.font = `700 24px ${D.F.body}`; x.textAlign = i === 1 ? "left" : "center"; x.fillText(h, i === 1 ? xs[i] + 22 : xs[i] + widths[i] / 2, top + 49);
+    });
     all.forEach((r, ri) => {
       const y = top + headH + ri * rowH, isTotal = total && ri === rows.length;
-      x.fillStyle = isTotal ? "#dfe5ea" : ri % 2 ? "#eef3f7" : "#ffffff"; x.fillRect(40, y, W - 80, rowH);
+      x.fillStyle = isTotal ? "#071a30" : ri % 2 ? D.C.panel : "rgba(0,0,0,0)"; x.fillRect(P, y, W - 2 * P, rowH);
+      if (isTotal) { x.fillStyle = D.C.blue; x.fillRect(P, y, W - 2 * P, 3); }
       r.forEach((cell, i) => {
-        const isStx = /STX/i.test(head[i]);
-        if (isStx && !isTotal) { x.fillStyle = "#fbf3dc"; x.fillRect(xs[i], y, widths[i], rowH); }
-        x.fillStyle = "#061322"; x.font = font(isTotal || isStx ? 800 : 500, isStx ? 30 : 25); x.textAlign = i === 1 ? "left" : "center";
-        x.fillText(String(cell ?? "—").slice(0, i === 1 ? 30 : 14), i === 1 ? xs[i] + 22 : xs[i] + widths[i] / 2, y + 41);
+        const isStx = /STX/i.test(head[i]), text = String(cell ?? "—").slice(0, i === 1 ? 30 : 14);
+        if (isStx && !isTotal) { x.strokeStyle = D.C.blue; x.lineWidth = 2; x.strokeRect(xs[i] + 6, y + 6, widths[i] - 12, rowH - 12); }
+        x.textAlign = i === 1 ? "left" : "center"; const px = i === 1 ? xs[i] + 22 : xs[i] + widths[i] / 2;
+        if (i === 0 && !isTotal) { x.fillStyle = D.C.blue; x.font = `400 40px ${D.F.head}`; x.fillText(text.padStart(2, "0"), px, y + 52); }
+        else if (isStx) { x.fillStyle = D.C.blue; x.font = `400 44px ${D.F.head}`; x.fillText(text, px, y + 53); }
+        else { x.fillStyle = isTotal ? D.C.white : D.C.text; x.font = `${isTotal ? 700 : i === 1 ? 600 : 500} 27px ${D.F.body}`; x.fillText(text, px, y + 47); }
       });
-      x.fillStyle = "#c7d0d8"; x.fillRect(40, y + rowH - 1, W - 80, 1);
+      x.fillStyle = D.C.line; x.fillRect(P, y + rowH - 1, W - 2 * P, 1);
     });
     x.textAlign = "left";
-    const ny = top + headH + all.length * rowH + 40;
-    x.fillStyle = "#061322"; x.font = font(600, 20); (note || "").split("\n").slice(0, 2).forEach((ln, i) => x.fillText(ln.slice(0, 118), 40, ny + i * 28));
-    x.fillStyle = "#b8923a"; x.fillRect(40, H - 84, W - 80, 2);
-    x.fillStyle = "#3d5266"; x.font = font(500, 18); x.fillText("STX Index: StatAxis's own 0–100 score. Data via YouTube. Processed and evaluated by StatAxis. Not TV ratings.   stataxis.org", 40, H - 52);
-    x.textAlign = "right"; x.fillStyle = "#b8923a"; x.font = font(700, 18); x.fillText("Downloaded " + window.sxDownloadedAt(), W - 40, H - 22); x.textAlign = "left";
+    const ny = top + headH + all.length * rowH + 44;
+    x.fillStyle = D.C.mute; x.font = `500 22px ${D.F.body}`; noteLines.forEach((ln, i) => x.fillText(ln.slice(0, 120), P, ny + i * 32));
+    await D.footer(x, W, H, P, ["STX Index: StatAxis's own 0–100 score.", "Data via YouTube. Processed and evaluated by StatAxis. Not TV ratings.", "Downloaded " + window.sxDownloadedAt()]);
     return c;
   }
   const cardsBtn = (label, attrs) => `<button class="btn" type="button" ${attrs}>${esc(label)}</button>`;
@@ -154,7 +147,7 @@
           saveCanvas(await tableCardPng(g.label + " YouTube Weekly Stats", `View count and share for all videos uploaded from ${fdate(d.from)} – ${fdate(d.to)}`, ["Rank", "Channel", "STX Index", "#Views (Million)", "Views Share%"],
             rows.map(r => [r.rank, r.name, r.stx ? dec(r.stx.score) : "—", dec(r.views / 1e6, 1), (r.share_percent == null ? "—" : Math.round(r.share_percent) + "%")]),
             ["", "Total", g.stx ? "Avg " + dec(g.stx.average) : "—", dec(rows.reduce((t, r) => t + r.views, 0) / 1e6, 1), "100%"],
-            {note: `Note: Stats as of ${fdate(d.generated_at.slice(0, 10))} for all videos uploaded between ${fdate(d.from)} – ${fdate(d.to)}.\nViews as last measured by StatAxis. STX Index is each channel's current 7-day score.`}), `stataxis-weekly-table-${slug(g.label)}-${d.from}.png`); });
+            {label: "Weekly stats", note: `Note: Stats as of ${fdate(d.generated_at.slice(0, 10))} for all videos uploaded between ${fdate(d.from)} – ${fdate(d.to)}.\nViews as last measured by StatAxis. STX Index is each channel's current 7-day score.`}), `stataxis-weekly-table-${slug(g.label)}-${d.from}.png`); });
         out.querySelectorAll("[data-png]").forEach(b => b.onclick = async () => { const g = d.groups[+b.dataset.png];
           saveCanvas(await cardPng(g.label + " YouTube weekly", `Views of videos uploaded ${fdate(d.from)} – ${fdate(d.to)}`, g.channels.slice(0, 10).map(r => ({label: r.name, value: r.views, text: dec(r.views / 1e6, 1) + "M  ·  " + (r.share_percent ?? "—") + "%"})), {footer: `Share of ${g.label}. Views as last measured by STAXIS.`}), `stataxis-weekly-${slug(g.label)}-${d.from}.png`); });
       } catch (e) { out.innerHTML = fail(e); wireUpgrade(out); }
@@ -181,7 +174,7 @@
   });
 
   /* ---------- a ready chart of one date and one time interval: All streams and Primary stream side by side, average and peak, the top eight channels ---------- */
-  const CMP_COLORS = ["#c00000", "#ff3fb4", "#92d050", "#1f9bd6", "#ffc000", "#7030a0", "#0b4f6c", "#a0501e"];
+  const CMP_COLORS = SXD.SERIES;   /* the colours of the StatAxis design: blues, white, grey and the logo gold */
   const kfmt = v => v == null ? "–" : v >= 1000 ? (v / 1000).toFixed(1) + "K" : String(Math.round(v));
   const nth = n => n + (n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th");
   const longDay = iso => { const d = new Date(iso + "T00:00:00+05:30"); return `${nth(+d.toLocaleDateString("en-GB", {day: "numeric", timeZone: "Asia/Kolkata"}))} ${d.toLocaleDateString("en-GB", {month: "long", year: "numeric", timeZone: "Asia/Kolkata"})}`; };
@@ -208,50 +201,45 @@
     return parts.join(" ");
   }
   async function comparisonPng(all, prim, v) {
-    const rows = all.rows.slice(0, 8);
+    const D = SXD, rows = all.rows.slice(0, 8);
     if (!rows.length) throw new Error("Nothing was measured in these hours with these filters, so there is no chart to draw.");
     const names = rows.map(r => r.name), allBy = Object.fromEntries(all.rows.map(r => [r.name, r])), primBy = Object.fromEntries((prim.rows || []).map(r => [r.name, r]));
     const colour = Object.fromEntries(names.map((n, i) => [n, CMP_COLORS[i % CMP_COLORS.length]]));
-    const W = 1600, P = 48, title = cmpTitle(all, v), span = all.from === all.to ? "the interval" : "the days";
-    const c = document.createElement("canvas"), m = c.getContext("2d"), FONT_ = "Manrope, Inter, system-ui, sans-serif";
-    m.font = `700 20px ${FONT_}`; const vpLines = wrapText(m, cmpViewpoint(names, allBy, primBy, span), W - 2 * P).slice(0, 4);
-    const H = 150 + 560 + 120 + 40 + vpLines.length * 30 + 130; c.width = W; c.height = H;
-    const x = c.getContext("2d"); x.fillStyle = "#ffffff"; x.fillRect(0, 0, W, H);
-    /* the letterhead strip */
-    x.fillStyle = "#061322"; x.fillRect(0, 0, W, 86);
-    const lg = await logo(); if (lg) x.drawImage(lg, P, 6, 296, 74);
-    x.fillStyle = "#9db3c6"; x.font = `500 20px ${FONT_}`; x.textAlign = "right"; x.fillText("Stat the View. Axis the Viewpoint.", W - P, 52); x.textAlign = "left";
-    x.fillStyle = "#061322"; x.font = `800 34px ${FONT_}`; x.textAlign = "center"; x.fillText(title, W / 2, 140); x.textAlign = "left";
+    const W = 1600, P = 64, title = cmpTitle(all, v), span = all.from === all.to ? "the interval" : "the days", hs = 66;
+    const m = document.createElement("canvas").getContext("2d");
+    m.font = `italic 400 32px ${D.F.serif}`; const vpLines = wrapText(m, cmpViewpoint(names, allBy, primBy, span), W - 2 * P).slice(0, 4);
+    const n = D.headLines(m, title, W - 2 * P, hs, 2), hy = 150 + hs * 0.86, y1 = hy + (n - 1) * hs * 0.98, top = y1 + 70, height = 360;
+    const H = Math.round(top + height + 190 + 60 + vpLines.length * 44 + 270), c = document.createElement("canvas"); c.width = W; c.height = H;
+    const x = c.getContext("2d"); D.background(x, W, H); await D.watermark(x, W, H, 0.03);
+    D.eyebrow(x, "Fig. 00 — All streams and the primary stream", P, 100);
+    D.headline(x, title, P, hy, W - 2 * P, hs, 2);
     const panels = [{label: "All Streams", by: allBy, left: P}, {label: "Primary Stream", by: primBy, left: W / 2 + 10}];
-    const panelW = W / 2 - P - 10, top = 190, height = 360;
+    const panelW = W / 2 - P - 10;
     const max = Math.max(...names.flatMap(n => [allBy[n].peak || 0, (primBy[n] || {}).peak || 0]), 1), step = (() => { const raw = max / 6, p = 10 ** Math.floor(Math.log10(raw)); return [1, 2, 2.5, 5, 10].map(f => f * p).find(s => s >= raw) || p * 10; })(), topVal = Math.ceil(max / step) * step;
-    x.save(); x.globalAlpha = 0.05; x.translate(W / 2, H / 2); x.rotate(-0.5); if (lg) for (let r = -6; r <= 6; r++) for (let k = -4; k <= 4; k++) x.drawImage(lg, k * 420 + (r % 2) * 210 - 150, r * 160 - 38, 300, 75); x.restore();
     for (const pn of panels) {
       const axisX = pn.left + 70, plotW = panelW - 70, baseY = top + height;
-      x.strokeStyle = "#d8dee4"; x.lineWidth = 1; x.fillStyle = "#4b5563"; x.font = `600 16px ${FONT_}`; x.textAlign = "right";
+      x.strokeStyle = D.C.line; x.lineWidth = 1; x.fillStyle = D.C.mute; x.font = `600 16px ${D.F.body}`; x.textAlign = "right";
       for (let t = 0; t <= topVal + 1e-9; t += step) { const yy = baseY - height * t / topVal; x.beginPath(); x.moveTo(axisX, yy); x.lineTo(axisX + plotW, yy); x.stroke(); x.fillText(kfmt(t), axisX - 10, yy + 5); }
-      x.textAlign = "left"; x.strokeStyle = "#111"; x.lineWidth = 2; x.beginPath(); x.moveTo(axisX, baseY); x.lineTo(axisX + plotW, baseY); x.stroke();
+      x.textAlign = "left"; x.strokeStyle = D.C.text; x.lineWidth = 2; x.beginPath(); x.moveTo(axisX, baseY); x.lineTo(axisX + plotW, baseY); x.stroke();
       const groups = [["Avrg Concurrent", "average"], ["Peak Concurrent", "peak"]], gw = plotW / 2, bw = Math.min(34, (gw - 40) / names.length);
       groups.forEach(([gl, key], gi) => {
         const gx = axisX + gi * gw + (gw - bw * names.length) / 2;
-        names.forEach((n, i) => {
-          const val = ((pn.by[n] || {})[key]) || 0, h = height * val / topVal, bx = gx + i * bw;
-          x.fillStyle = colour[n]; x.fillRect(bx + 2, baseY - h, bw - 4, h);
-          x.save(); x.translate(bx + bw / 2 + 5, baseY - h - 8); x.rotate(-Math.PI / 2); x.fillStyle = "#111"; x.font = `800 17px ${FONT_}`; x.fillText(kfmt(val), 0, 0); x.restore();
+        names.forEach((nm, i) => {
+          const val = ((pn.by[nm] || {})[key]) || 0, h = height * val / topVal, bx = gx + i * bw;
+          x.fillStyle = colour[nm]; x.fillRect(bx + 2, baseY - h, bw - 4, h);
+          x.save(); x.translate(bx + bw / 2 + 5, baseY - h - 8); x.rotate(-Math.PI / 2); x.fillStyle = D.C.white; x.font = `700 17px ${D.F.body}`; x.fillText(kfmt(val), 0, 0); x.restore();
         });
-        x.fillStyle = "#111"; x.font = `700 17px ${FONT_}`; x.textAlign = "center"; x.fillText(gl, axisX + gi * gw + gw / 2, baseY + 28); x.textAlign = "left";
+        x.fillStyle = D.C.text; x.font = `600 17px ${D.F.body}`; x.textAlign = "center"; x.fillText(gl, axisX + gi * gw + gw / 2, baseY + 28); x.textAlign = "left";
       });
-      x.fillStyle = "#111"; x.font = `800 18px ${FONT_}`; x.textAlign = "center"; x.fillText(pn.label, axisX + plotW / 2, baseY + 62); x.textAlign = "left";
+      x.fillStyle = D.C.blue; x.font = `400 32px ${D.F.head}`; x.textAlign = "center"; x.fillText(pn.label.toUpperCase(), axisX + plotW / 2, baseY + 66); x.textAlign = "left";
       /* the legend, in this panel's order of strength */
       const order = [...names].sort((a, b) => ((pn.by[b] || {}).average || 0) - ((pn.by[a] || {}).average || 0));
-      order.forEach((n, i) => { const lx = pn.left + 20 + (i % 4) * (panelW / 4), ly = baseY + 100 + Math.floor(i / 4) * 30; x.fillStyle = colour[n]; x.fillRect(lx, ly - 13, 14, 14); x.fillStyle = "#111"; x.font = `700 16px ${FONT_}`; x.fillText(n.slice(0, 16), lx + 22, ly); });
+      order.forEach((nm, i) => { const lx = pn.left + 20 + (i % 4) * (panelW / 4), ly = baseY + 106 + Math.floor(i / 4) * 30; x.fillStyle = colour[nm]; x.fillRect(lx, ly - 13, 14, 14); x.fillStyle = D.C.white; x.font = `600 16px ${D.F.body}`; x.fillText(nm.slice(0, 16), lx + 22, ly); });
     }
     let y = top + height + 190;
-    x.fillStyle = "#b8923a"; x.font = `800 18px ${FONT_}`; x.fillText("STATAXIS VIEWPOINT", P, y); y += 14;
-    x.fillStyle = "#1f2937"; x.font = `500 20px ${FONT_}`; vpLines.forEach(t => { y += 30; x.fillText(t, P, y); });
-    x.fillStyle = "#b8923a"; x.fillRect(P, H - 84, W - 2 * P, 2);
-    x.fillStyle = "#4b5563"; x.font = `500 17px ${FONT_}`; x.fillText("Data via YouTube. Processed and evaluated by StatAxis.", P, H - 52); x.fillText("Measured from public YouTube data. Not TV ratings.", P, H - 26);
-    x.textAlign = "right"; x.fillStyle = "#8a6b1f"; x.fillText(window.sxDownloadedAt(), W - P, H - 52); x.fillStyle = "#4b5563"; x.fillText("stataxis.org", W - P, H - 26); x.textAlign = "left";
+    x.fillStyle = D.C.mute; x.font = `500 20px ${D.F.mono}`; if ("letterSpacing" in x) x.letterSpacing = "4px"; x.fillText("STATAXIS VIEWPOINT", P, y); if ("letterSpacing" in x) x.letterSpacing = "0px"; y += 18;
+    x.fillStyle = D.C.blue; x.font = `italic 400 32px ${D.F.serif}`; vpLines.forEach(t => { y += 44; x.fillText(t, P, y); });
+    await D.footer(x, W, H, P, ["Data via YouTube. Processed and evaluated by StatAxis.", "Measured from public YouTube data. Not TV ratings.", "Downloaded " + window.sxDownloadedAt()]);
     return c;
   }
 

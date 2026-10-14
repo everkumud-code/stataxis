@@ -52,8 +52,8 @@ def test_a_screen_report_is_a_branded_protected_pdf_that_says_when_it_was_downlo
     assert re.fullmatch(r"stataxis-market-downloaded-\d{8}-\d{4}\.pdf", screen_filename(s))
     plain = fitz.open(stream=screen_pdf(s, "owner@x.com (Org)", protect=False), filetype="pdf")
     text = " ".join(p.get_text() for p in plain)
-    assert "Market" in text and "Alpha News" in text and "1,20,000" in text and "Language: Hindi" in text
-    assert text.count("Downloaded ") >= 2 and " IST" in text and "owner@x.com" in text and "STATAXIS" in text     # header band and footer both carry it
+    assert "market" in text.lower() and "Alpha News" in text and "1,20,000" in text and "Language: Hindi" in text
+    assert text.count("Downloaded ") >= 2 and " IST" in text and "owner@x.com" in text and "stataxis" in text.lower()     # the header and the footer both carry it
     protected = fitz.open(stream=screen_pdf(s, "owner@x.com"), filetype="pdf")
     assert all(p.get_text().strip() == "" for p in protected) and all(p.get_images() for p in protected)         # a picture of the page, nothing to lift
 
@@ -113,7 +113,7 @@ def test_the_workspace_puts_the_report_bar_under_every_screen_and_stamps_csv_and
     assert '<script src="reportbar.js"></script>' in html and "window.addReportBar(host, el, v)" in html
     assert "Downloaded at (Indian time)" in html and "-downloaded-" in html
     assert "/api/v1/market/screen-report.pdf" in bar and "sxDownloadedAt" in bar and "sxFileStamp" in bar
-    assert 'x.fillText("Downloaded " + window.sxDownloadedAt()' in market and "-downloaded-" in market
+    assert '"Downloaded " + window.sxDownloadedAt()' in market and "-downloaded-" in market
 
 
 def test_every_block_has_its_own_pdf_and_post_image_and_nothing_says_branded_download():
@@ -135,11 +135,13 @@ def test_downloads_carry_the_tagline_and_say_where_the_data_comes_from_without_c
     assert YOUTUBE_NOTE == "Data via YouTube. Processed and evaluated by StatAxis." and "authoris" not in YOUTUBE_NOTE.lower() and "endorse" not in YOUTUBE_NOTE.lower()
     doc = _mupdf().open(stream=screen_pdf(clean_screen(screen()), "a@b.c", protect=False), filetype="pdf")
     text = " ".join(p.get_text() for p in doc)
-    assert "Stat the View. Axis the Viewpoint." in text and "Data via YouTube. Processed and evaluated by StatAxis." in text and "Digital Media Intelligence" not in text
+    assert "stat the view. axis the viewpoint." in text.lower() and "Data via YouTube. Processed and evaluated by StatAxis." in text and "Digital Media Intelligence" not in text
     root = Path(__file__).resolve().parent.parent / "dashboard"
     for name in ("reportbar.js", "market.js"):
         js = (root / name).read_text(encoding="utf-8")
-        assert "Stat the View. Axis the Viewpoint." in js and "Digital Media Intelligence" not in js and "Processed and evaluated by StatAxis." in js
+        assert "Digital Media Intelligence" not in js and "Processed and evaluated by StatAxis." in js
+    design = (root / "sxdesign.js").read_text(encoding="utf-8")
+    assert "Stat the View. " in design and "Axis the Viewpoint." in design and "x.com/stataxis" in design                       # every picture ends with the tagline, the site and the X handle
     bar = (root / "reportbar.js").read_text(encoding="utf-8")
     assert "(?![a-z])" in bar and "Weights and points are the method" in bar       # the radar's risk words stay out of a post, and so does the method (weights, points)
 
@@ -165,7 +167,7 @@ def test_a_long_result_is_split_into_numbered_posts_and_every_report_carries_our
     root = Path(__file__).resolve().parent.parent / "dashboard"
     bar = (root / "reportbar.js").read_text(encoding="utf-8")
     assert "ROWS_PER = 8" in bar and "LINES_PER = 12" in bar and "-${n}-of-${pages}" in bar and "`${n} of ${pages}`" in bar        # 1 of 3, 2 of 3, 3 of 3
-    assert "b.rows.slice(0, 24)" in bar and "first ? kpis : []" in bar and "last ? findLines : []" in bar                     # the introduction on the first post, our reading on the last
+    assert "b.rows.slice(0, 24)" in bar and "first && kpis.length" in bar and "last && finds.length" in bar and "last && vp" in bar                     # the introduction on the first post, our reading on the last
     assert "function viewpointOf(chart, viewId, stx = \"\")" in bar and '"StatAxis viewpoint"' in bar and "STATAXIS VIEWPOINT" in bar            # in the PDF and on the post
     assert "not proof of anything" in bar                                                                                          # the radar's reading describes, it does not accuse
 
@@ -206,3 +208,22 @@ def test_hindi_and_other_scripts_are_drawn_as_letters_not_as_black_boxes():
     base = fitz.open(stream=screen_pdf(clean_screen(plain), protect=False), filetype="pdf")
     assert sum(len(page.get_images()) for page in doc) > sum(len(page.get_images()) for page in base)       # the Hindi cells and line are pictures of real letters
     assert screen_pdf(clean_screen(hindi))[:4] == b"%PDF"   # the protected download works too
+
+
+def test_every_picture_and_pdf_uses_the_one_design_of_the_reference():
+    from pathlib import Path
+    from api import report_pdf as rp
+    root = Path(__file__).resolve().parent.parent
+    assert (root / "design" / "reference.png").is_file() and (root / "dashboard" / "assets" / "stataxis-logo-dark.svg").is_file()
+    design = (root / "dashboard" / "sxdesign.js").read_text(encoding="utf-8")
+    for token in ("#010509", "#0b8ded", "#fdfdfd", "#ccd5dd", "Anton", "Instrument Serif", "FIG." if False else "background(x, W, H)"):
+        assert token in design, token
+    market, bar = ((root / "dashboard" / n).read_text(encoding="utf-8") for n in ("market.js", "reportbar.js"))
+    for js in (market, bar):
+        assert "SXD" in js and "D.background(x, W, H)" in js and "D.footer(x, W, H, P" in js        # the picture cards, the table card, the comparison chart and the posts all draw through the design
+    assert market.count("D.background(x, W, H)") == 3 and bar.count("D.background(x, W, H)") == 1
+    assert "#061322" not in market[market.index("async function cardPng"):market.index("/* ---------- report builder")] and "#e1b94f" not in bar[bar.index("async function postPng"):bar.index("async function makePost")]
+    assert str(rp.BG) .lower().endswith("010509") or rp.BG.hexval().lower().endswith("010509")           # the PDF page is the same black
+    assert rp.BLUE.hexval().lower().endswith("0b8ded") and rp.HANDLE.endswith("x.com/stataxis")
+    png = rp.logo_png()
+    assert png[:8] == b"\x89PNG\r\n\x1a\n" and len(png) > 5_000                                         # the blue-and-gold logo renders
