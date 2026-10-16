@@ -24,6 +24,7 @@ fetch("/api/v1/public/methodology").then(r => r.json()).then(m => {
      <h2>Collection</h2><p>${esc(m.collection.source)} ${esc(m.collection.live_reading)} ${esc(m.collection.uploads)}</p>
      <h2>Primary, Secondary and All feeds</h2><ul><li><b>Primary.</b> ${esc(m.feeds.primary)}</li><li><b>Secondary.</b> ${esc(m.feeds.secondary)}</li><li><b>All.</b> ${esc(m.feeds.all)}</li></ul>
      <h2>Shorts</h2><p>${esc(m.shorts)}</p>
+     ${m.social ? `<h2>Facebook, Instagram and X</h2><p>${esc(m.social.source)}</p><p>${esc(m.social.method)}</p><ul>${m.social.limits.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
      <h2>Measures</h2><ul>${m.measures.map(x => `<li><b>${esc(x.name)}.</b> ${esc(x.definition)}</li>`).join("")}</ul>
      <h2>Windows</h2><p>${esc(m.windows)}</p>
      <h2>Forecasts</h2><p>${esc(m.forecasts)}</p>

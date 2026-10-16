@@ -28,14 +28,15 @@ VIEWS: list[tuple[str, str, str]] = [
     ("audience", "Audience (geography and age)", "audience"), ("liveevent", "Live event compare", "live_compare"),
     ("operations", "Operations", "operations"), ("integrity", "Data integrity", "integrity"),
     ("spikes", "Spikes and movement", "spikes"), ("forecasts", "Forecasts", "forecasts"), ("notes", "Notes", "notes"), ("alerts", "Alerts", "alerts"), ("completeness", "Data completeness", "integrity"), ("reportmail", "Report e-mails", "report_email"),
+    ("social", "Social media: rankings", "social"), ("socialpresence", "Social media: beside YouTube", "social"), ("socialchannel", "Social media: one channel", "social"), ("socialposts", "Social media: top posts", "social"),
 ]
 VIEW_FEATURE = {vid: feature for vid, _label, feature in VIEWS}
 ALWAYS = ("mychannels", "profile")   # every login has these two
 PERSONAS: dict[str, tuple[str, list[str]]] = {
-    "media": ("Media company", ["briefing", "overview", "market", "channel", "stream", "competition", "live", "stx", "changed", "weekly", "primetime", "liveevent", "builder"]),
-    "buyer": ("Media buyer or agency", ["briefing", "market", "channel", "stx", "weekly", "primetime", "planner", "audience", "authenticity", "builder", "liveevent"]),
-    "politician": ("Politician or campaign", ["briefing", "market", "live", "liveevent", "primetime", "weekly", "changed", "audience"]),
-    "influencer": ("Influencer or journalist", ["briefing", "creators", "stx", "content", "trends", "audience", "authenticity"]),
+    "media": ("Media company", ["briefing", "overview", "market", "channel", "stream", "competition", "live", "stx", "changed", "weekly", "primetime", "liveevent", "builder", "social", "socialpresence", "socialposts"]),
+    "buyer": ("Media buyer or agency", ["briefing", "market", "channel", "stx", "weekly", "primetime", "planner", "audience", "authenticity", "builder", "liveevent", "social", "socialposts"]),
+    "politician": ("Politician or campaign", ["briefing", "market", "live", "liveevent", "primetime", "weekly", "changed", "audience", "social", "socialposts"]),
+    "influencer": ("Influencer or journalist", ["briefing", "creators", "stx", "content", "trends", "audience", "authenticity", "socialchannel", "social"]),
     "audience": ("Audience member", ["briefing", "overview", "market", "live", "stx"]),
 }
 LANGUAGES = [*KNOWN_LANGUAGES, "Regional", "Other"]

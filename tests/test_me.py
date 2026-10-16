@@ -58,7 +58,7 @@ def test_the_first_choice_narrows_the_menu_to_what_is_relevant_and_never_adds_wh
     assert me.me_payload(s, u["analyst"])["preferences"]["onboarded"] is False
     out = me.set_preferences(s, u["analyst"], {"persona": "buyer", "languages": ["Hindi"], "segments": ["news"], "start_view": "planner"})
     assert out["preferences"]["onboarded"] is True and out["start_view"] == "planner"
-    assert set(out["nav"]) == {"briefing", "market", "channel", "stx", "weekly", "primetime", "planner", "audience", "builder", "liveevent"}     # the buyer's set, minus what this package lacks (the authenticity radar)
+    assert set(out["nav"]) == {"briefing", "market", "channel", "stx", "weekly", "primetime", "planner", "audience", "builder", "liveevent", "social", "socialposts"}     # the buyer's set, minus what this package lacks (the authenticity radar)
     out = me.set_preferences(s, u["analyst"], {"persona": "buyer", "views": ["planner", "creators", "live"], "start_view": "profile"})
     assert out["nav"] == ["live", "creators", "planner"] and out["start_view"] == "profile"
     chosen_but_not_allowed = me.set_preferences(s, u["free"], {"views": ["planner", "authenticity"]})

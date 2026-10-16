@@ -344,6 +344,71 @@ def _widen_observation_counters(connection) -> None:
         connection.execute(text("ALTER TABLE stx_observations " + ", ".join(f"ALTER COLUMN {name} TYPE BIGINT" for name in narrow)))
 
 
+SOCIAL_PLATFORMS = ("facebook", "instagram", "x")
+
+
+class SocialAccount(Base):
+    """One public Facebook page, Instagram account or X account that belongs to a tracked channel. The handle is what the platform shows (no @, no address).
+    The collector reads it through the platform's official API when a key is set; its figures can also be imported from a sheet or typed in by an administrator."""
+    __tablename__ = "stx_social_accounts"
+    __table_args__ = (UniqueConstraint("platform", "handle", name="uq_stx_social_account"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    channel_id: Mapped[int] = mapped_column(ForeignKey("stx_channels.id"), index=True)
+    platform: Mapped[str] = mapped_column(String(16), index=True)          # facebook | instagram | x
+    handle: Mapped[str] = mapped_column(String(255))
+    external_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    added_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_ok_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_status: Mapped[str | None] = mapped_column(String(24), nullable=True)   # ok | not_configured | not_found | unsupported | auth | rate_limited | error
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class SocialStats(Base):
+    """The followers (and, where the platform says, the accounts followed and the posts made) of one account at one moment, and where the figure came from."""
+    __tablename__ = "stx_social_stats"
+    __table_args__ = (UniqueConstraint("account_id", "observed_at", name="uq_stx_social_stats_account_time"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("stx_social_accounts.id"), index=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    followers: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    following: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    posts_total: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    source: Mapped[str] = mapped_column(String(16), default="api")          # api | import | manual
+
+
+class SocialPost(Base):
+    """A public post of an account. Only a short start of the text is kept, for the topic of the post; the platform's own link is kept so anyone can open the original."""
+    __tablename__ = "stx_social_posts"
+    __table_args__ = (UniqueConstraint("account_id", "platform_post_id", name="uq_stx_social_post"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("stx_social_accounts.id"), index=True)
+    platform_post_id: Mapped[str] = mapped_column(String(64))
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    permalink: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    media_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    api_refreshed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=lambda: datetime.now(UTC))
+
+
+class SocialPostStats(Base):
+    """What a post had gathered at one moment. A value the platform does not give is left empty, never zero."""
+    __tablename__ = "stx_social_post_stats"
+    __table_args__ = (UniqueConstraint("post_id", "observed_at", name="uq_stx_social_post_stats_time"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    post_id: Mapped[int] = mapped_column(ForeignKey("stx_social_posts.id"), index=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    likes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    comments: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    shares: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    views: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    source: Mapped[str] = mapped_column(String(16), default="api")
+
+
 def create_database(url: str):
     if url.startswith(("postgres://", "postgresql://")):
         url = "postgresql+psycopg://" + url.split("://", 1)[1]

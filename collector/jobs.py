@@ -1,7 +1,7 @@
 """The collector's small scheduled jobs, run in their own thread beside the live poll and the collection pass:
 
   every minute   check people's alerts against the live audiences (api/alerts.py)
-  every 10 min   send the report e-mails that are due (api/report_subscriptions.py); close collection runs a restart cut short; write the day's note from 09:00 IST (and the week's on Monday); write the 19:00-22:00 forecasts from 06:00 IST until the slot
+  every 10 min   send the report e-mails that are due (api/report_subscriptions.py); read the Facebook, Instagram and X accounts that are due (collector/social/service.py); close collection runs a restart cut short; write the day's note from 09:00 IST (and the week's on Monday); write the 19:00-22:00 forecasts from 06:00 IST until the slot
                  starts; score the forecasts of a slot once it is over
 Each job has its own database session and its own error handling, so a failing job never stops the others or the collection.
 """
@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 IST = timedelta(hours=5, minutes=30)
+_SOCIAL_RETENTION_LAST = [-1e9]
 
 
 def _guarded(engine: Any, name: str, job: Any) -> None:
@@ -39,6 +40,19 @@ def _remove_old_snapshots(session: Session, now: datetime) -> int:
     return removed
 
 
+def _social_pass(session: Session, now: datetime) -> dict[str, Any]:
+    """Read the Facebook, Instagram and X accounts that are due (40 at most each pass; the rest follow on the next passes)."""
+    from collector.social.service import collect_social
+
+    counts = collect_social(session, now=now, limit=40)
+    if time.monotonic() - _SOCIAL_RETENTION_LAST[0] > 3600:   # the keeping rules (36 months of figures, 30 days of post text) are applied about once an hour
+        _SOCIAL_RETENTION_LAST[0] = time.monotonic()
+        from collector.social.retention import run_social_retention
+
+        counts.update({f"retention_{k}": v for k, v in run_social_retention(session, now).items()})
+    return {k: v for k, v in counts.items() if v}
+
+
 def minute_jobs(engine: Any, now: datetime) -> None:
     from api.alerts import evaluate_alerts
 
@@ -55,6 +69,7 @@ def periodic_jobs(engine: Any, now: datetime) -> None:
     local = now + IST
     _guarded(engine, "close_interrupted_runs", close_interrupted_runs)
     _guarded(engine, "report_emails", lambda s: send_due(s, now=now))
+    _guarded(engine, "social", lambda s: _social_pass(s, now))
     _guarded(engine, "old_snapshots_removed", lambda s: _remove_old_snapshots(s, now))
     for kind, day in due_notes(now):
         _guarded(engine, f"note_{kind}", lambda s, k=kind, d=day: int(generate_note(s, k, d, now=now)))

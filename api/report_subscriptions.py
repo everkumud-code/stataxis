@@ -26,7 +26,7 @@ from collector.storage import ReportDelivery, ReportSubscription, User
 
 logger = logging.getLogger(__name__)
 LAYOUTS = {"one_pager": "One-pager", "booklet": "Booklet"}
-SECTION_LABELS = {"highlights": "Highlights (what stands out)", "findings": "Detailed findings", "data": "Data (tables and trend)", "observations": "Observations", "viewpoint": "StatAxis viewpoint"}
+SECTION_LABELS = {"highlights": "Highlights (what stands out)", "findings": "Detailed findings", "data": "Data (tables and trend)", "social": "Social media (Facebook, Instagram and X)", "observations": "Observations", "viewpoint": "StatAxis viewpoint"}
 MAX_PER_PERSON = 12
 MANUAL_PER_HOUR = 4
 

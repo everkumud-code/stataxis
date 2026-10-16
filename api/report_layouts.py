@@ -42,7 +42,7 @@ SAMPLE = {   # the period shown on a sample, and the labels of its chart
 }
 CHANNELS = [("Sample News A", 162.9, 72.4), ("Sample News B", 152.3, 68.1), ("Sample News C", 151.5, 61.0), ("Sample News D", 108.0, 58.2), ("Sample News E", 101.0, 55.0),
             ("Sample News F", 73.8, 49.5), ("Sample News G", 40.1, 44.3), ("Sample News H", 22.3, 41.0)]   # fictional: weekly million views and an STX Index each
-ALL_SECTIONS = ("highlights", "findings", "data", "observations", "viewpoint")
+ALL_SECTIONS = ("highlights", "findings", "data", "social", "observations", "viewpoint")
 ONE_PAGER_SECTIONS = ("highlights", "data", "viewpoint")   # what fits on one page by default; a client may swap in findings or observations
 
 
@@ -114,6 +114,20 @@ def _chart(c: dict[str, Any], width: float, height: float = 78) -> Drawing:
     return d
 
 
+def _social(c: dict[str, Any], st: dict[str, ParagraphStyle], width: float) -> list[Any]:
+    """The Facebook, Instagram and X part: the five biggest accounts of each platform with followers and growth. Nothing is drawn when the report has no social figures."""
+    block = c.get("social")
+    if not block:
+        return []
+    out: list[Any] = [_para("SOCIAL MEDIA: FACEBOOK, INSTAGRAM AND X", st["h2"])]
+    for p in block["platforms"]:
+        out.append(_para(f"<b>{escape(p['platform'])}</b>: {p['total']:,} followers across {p['accounts']} account{'s' if p['accounts'] != 1 else ''}" + (f", {p['growth_pct']:+.2f}% in {block['days']} days" if p.get("growth_pct") is not None else ""), st["body"]))
+        out.append(_table([["#", "Channel", "Handle", "Followers", "Growth %"]] + [[f"{i:02d}", r["name"], r["handle"], f"{r['followers']:,}", "-" if r.get("growth_pct") is None else f"{r['growth_pct']:+.2f}"] for i, r in enumerate(p["top"], start=1)],
+                          [12 * mm, width - 12 * mm - 3 * 30 * mm, 30 * mm, 30 * mm, 30 * mm], right_from=3))
+        out.append(Spacer(1, 4))
+    return out + [_para(escape(block["note"]), st["small"])]
+
+
 def _bullets(items: list[str], st: dict[str, ParagraphStyle]) -> list[Any]:
     return [_para("<font color='#0b8ded'>&#8226;</font>&nbsp;&nbsp;" + escape(t), st["body"]) for t in items]
 
@@ -157,6 +171,8 @@ def one_pager(c: dict[str, Any], prepared_for: str | None = None, sections: tupl
         story += [_para("WHAT STANDS OUT", st["h2"])] + _bullets(c["highlights"], st)
     if "findings" in want:
         story += [_para("FINDINGS", st["h2"])] + [_para(f"<b>{escape(f['headline'])}.</b> {escape(f['detail'])}", st["body"]) for f in c["findings"][:3]]
+    if "social" in want:
+        story += _social(c, st, width)
     if "observations" in want:
         story += [_para("OBSERVATIONS", st["h2"])] + _bullets(c["observations"][:3], st)
     if "viewpoint" in want:
@@ -200,6 +216,8 @@ def booklet(c: dict[str, Any], prepared_for: str | None = None, sections: tuple[
         story += [_para("THE DATA, PERIOD BY PERIOD", st["h2"]), _para(escape(c["trend"]["title"] + ": " + c["trend"]["unit"]), st["small"]), Spacer(1, 5),
                   _table([["Period", "Value", "Against the average"]] + [[str(lab), f"{v:,.1f}" if v < 1000 else f"{v:,.0f}", f"{100 * (v / mean - 1):+.0f}%"] for lab, v in pts], [60 * mm, 40 * mm, 40 * mm], right_from=1),
                   Spacer(1, 12), _para("EVERY CHANNEL", st["h2"]), _ranking(c, width), PageBreak()]
+    if "social" in want and c.get("social"):
+        story += _social(c, st, width) + [PageBreak()]
     if "observations" in want:
         story += [_para("OBSERVATIONS", st["h2"])] + _bullets(c["observations"], st) + [Spacer(1, 10)]
     story += [_para("HOW THESE NUMBERS WERE WORKED OUT", st["h2"]),

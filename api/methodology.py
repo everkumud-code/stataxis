@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from api.social import METHOD as SOCIAL_METHOD
 from collector.classification import LEGACY_SHORT_MAX_SECONDS, SHORT_MAX_SECONDS, SHORTS_EXTENDED_FROM
 from metrics.feeds import min_primary_hours
 from metrics.stx_index import WEIGHTS
@@ -16,6 +17,7 @@ CHANGELOG: list[dict[str, Any]] = [
     {"date": "2026-10-11", "version": "v0", "changes": ["Primary, Secondary and All feeds defined from YouTube's own start time (a stream live for 30 days or more is the primary feed).", "Shorts are collected but kept out of rankings, STX and analysis."]},
     {"date": "2026-10-12", "version": "v0", "changes": ["The window called Today now starts at midnight Indian time (it started at 00:00 UTC, 5:30 am in India), and is compared with yesterday over the same hours.", "Primary feeds of the tracked channels were added to the measurement; earlier figures understate Primary and All for these channels."]},
     {"date": "2026-10-13", "version": "v0", "changes": ["Market-wide STX is worked out from up to 250 evenly spread readings per channel plus every reading of the last twenty minutes, instead of every reading (the totals shown are still exact). The weights and formulas did not change.", "Hours watched, audience spikes with the stream behind them, audience movement, daily and weekly notes, prime-time forecasts with a published track record, alerts and a data-completeness figure were added."]},
+    {"date": "2026-10-16", "version": "v0", "changes": ["Facebook, Instagram and X were added beside YouTube: followers, growth, reactions to posts (likes, comments, shares, and views where the platform gives them), engagement rate and the best posts. The figures come only from each platform's official API or from sheets supplied by a channel or entered by StatAxis, and every figure shows when it was read. The STX Index and the IFX Score are unchanged and still use YouTube data only."]},
 ]
 SIGNALS = [
     ("audience", "Change in concurrent viewers against the previous window: 50 + percent change, limited to 0-100."),
@@ -47,6 +49,8 @@ def methodology() -> dict[str, Any]:
         ],
         "windows": "All times are Indian time. Last hour, 3 hours and 6 hours end now; Today runs from midnight; prime time is the hourly slots 17:00-23:00. Each window is compared with the one of equal length before it.",
         "forecasts": "Expected prime-time audience = median of the same slot over up to 7 earlier days, written down at 06:00 IST and scored afterwards; a hit is within 20%. The track record is shown on the Forecasts screen.",
+        "social": {"source": "Facebook, Instagram and X figures come only from each platform's official API, with the access the platform grants StatAxis, or from sheets that a channel supplies or StatAxis staff enter. Nothing is scraped. Each figure carries the time it was read.",
+                   "method": SOCIAL_METHOD, "limits": ["The STX Index and the IFX Score use YouTube data only; the social figures are shown beside them, not inside them.", "Reach and impressions are not public on any of the three platforms, so the engagement rate says how many people reacted, not how many saw a post.", "Instagram can be read only for business and creator accounts; Facebook posts of a page need the platform's public-content permission; X is read only as far as the access StatAxis has bought."]},
         "limits": ["Figures are measured on YouTube, not on television, and are not TV ratings.", "A flag in the authenticity radar is an unusual pattern in public numbers, not proof of anything."],
         "changelog": CHANGELOG,
     }

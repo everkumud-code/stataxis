@@ -43,6 +43,7 @@ FEATURES: dict[str, tuple[str, str]] = {
     "audience": ("Audience geography and age", SXPlan.ANALYST.value),
     "data_export": ("Excel data exports (machine-readable)", SXPlan.ANALYST.value),
     "report_email": ("Report e-mails: daily to yearly reports sent to you", SXPlan.FREE.value),
+    "social": ("Social media: Facebook, Instagram and X beside YouTube", SXPlan.INTELLIGENCE.value),
 }
 DESCRIPTIONS = {
     "spikes": "Sudden rises in a channel's live audience with the stream that carried them, and who gained while who lost in the same minutes.",
@@ -75,6 +76,7 @@ DESCRIPTIONS = {
     "authenticity": "The authenticity radar: viewership that looks unusual, with the evidence.",
     "audience": "Audience geography and age, where a channel or a study supplied it.",
     "data_export": "Excel files with the raw numbers. These are machine-readable, unlike the branded PDF and picture cards.",
+    "social": "Followers, growth, reactions and the best posts of the Facebook, Instagram and X accounts of each channel, ranked, compared and set beside YouTube.",
 }
 
 

@@ -245,5 +245,11 @@ def build_content(session: Session, interval: str, start: date, end: date, *, la
             points.append((label, rnd(sum(v["views"] for cid, v in sub.items() if cid in ids) / 1e6, 1) or 0.0))
         trend = ("Views " + {"weekly": "day by day", "fortnightly": "day by day", "monthly": "week by week"}.get(interval, "month by month"), "million views of new videos")
     notes = [f"StatAxis has measured from {since:%d %b %Y}; this report covers {start_eff:%d %b} to {end:%d %b %Y}."] if start_eff > start else []
-    return compose(interval, group, period_label(interval, start, end), rows, points, trend, days=days, notes=notes,
-                   third_kpi={"label": "New videos", "value": f"{sum(acc[r['channel_id']]['videos'] for r in rows):,}", "detail": "measured in the period"}, mover=mover)
+    content = compose(interval, group, period_label(interval, start, end), rows, points, trend, days=days, notes=notes,
+                      third_kpi={"label": "New videos", "value": f"{sum(acc[r['channel_id']]['videos'] for r in rows):,}", "detail": "measured in the period"}, mover=mover)
+    try:
+        from api.social import report_block   # the social media part is optional: a report is still complete without it
+        content["social"] = report_block(session, language=language, segment=segment, days=days)
+    except Exception:   # noqa: BLE001
+        content["social"] = None
+    return content

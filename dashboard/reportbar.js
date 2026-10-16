@@ -154,6 +154,10 @@
     notes: "A dated note on what the data said, written each day and each week.",
     alerts: "Alerts a person has set on a channel's live audience, and what fired.",
     completeness: "How many of the live readings that should be in StatAxis's record are there, per channel and day.",
+    social: "Facebook, Instagram and X: which channels have the most followers, which are growing fastest and whose posts people react to most.",
+    socialpresence: "Each channel's YouTube subscribers and its followers on Facebook, Instagram and X, side by side.",
+    socialchannel: "One channel on every platform: follower history, best posts and the hours its posts do best.",
+    socialposts: "The posts that got the most reactions on Facebook, Instagram and X.",
   };
   const plainOf = view => PLAIN[view.id] || (typeof MENU_HINT !== "undefined" && MENU_HINT[view.id]) || "";
   /* the first table that has a column of numbers worth drawing: its first text column labels the bars. Weights and points are the method, not the result, so they are never the bars. */

@@ -470,6 +470,7 @@
     const m = b.closest("section").querySelector(".upmsg");
     try { const d = await post("/api/v1/market/upgrade-request", {plan: b.dataset.upgrade}); m.hidden = false; m.className = "upmsg msg ok"; m.textContent = d.message; b.disabled = true; }
     catch (e) { m.hidden = false; m.className = "upmsg msg bad"; m.textContent = e.message; } });
+  Object.assign(window.__sxMarket, {opt, formValues, LANGS, SEGMENTS, fail, wireUpgrade});   /* shared with social.js */
   const miniSpark = (series, color = "#159de8") => {
     const pts = (series || []).map((v, i) => [i, v]).filter(p => p[1] != null);
     if (pts.length < 2) return `<span class="muted">—</span>`;

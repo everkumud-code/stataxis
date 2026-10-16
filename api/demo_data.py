@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from api import audience
 from api.auth import hash_password
-from collector.storage import Channel, ChannelStats, Observation, User, UserPref, Video
+from collector.storage import Channel, ChannelStats, Observation, SocialAccount, SocialPost, SocialPostStats, SocialStats, User, UserPref, Video
 
 DEMO_LOGIN = "demo@stataxis.org"
 DEMO_USER_ID = 2_000_000_001   # no real account can have this number, so a demo session token can never be used as a real login
@@ -119,4 +119,29 @@ def seed(session: Session, now: datetime | None = None, *, days: int = 8, seed_v
                                ("Sample Creator A", {"13-17": 8, "18-24": 34, "25-34": 33, "35-44": 15, "45-54": 7, "55-64": 3, "65+": 0}, {"Maharashtra": 15, "Karnataka": 12, "Delhi": 11, "Uttar Pradesh": 10})):
         audience.set_profile(session, channel_id=by_name[name].id, source="channel_media_kit", source_note="INVENTED sample profile for the demo; it is not a real audience", as_of=today, age=ages,
                              gender={"male": 66, "female": 34}, states=states, countries={"India": 96, "United States": 2, "United Arab Emirates": 2}, by="demo")
+    _seed_social(session, channels, now, rnd)
     return {"channels": len(channels), "live_samples": len(rows), "uploads": len(obs)}
+
+
+def _seed_social(session: Session, channels: list[Channel], now: datetime, rnd: random.Random) -> None:
+    """Invented Facebook, Instagram and X accounts for the sample channels: handles that say sample, no address, a week of daily follower readings and a few posts each."""
+    for i, ch in enumerate(channels[:12]):
+        base = rnd.uniform(40_000, 900_000)
+        for platform, share in (("instagram", 1.0), ("facebook", 1.6), ("x", 0.7)):
+            if platform == "x" and i % 3 == 2:
+                continue    # not every channel is on every platform
+            acc = SocialAccount(channel_id=ch.id, platform=platform, handle=f"sample_{platform}_{i:02d}", display_name=f"{ch.name} (invented sample account)", active=True, last_status="ok", last_checked_at=now, last_ok_at=now)
+            session.add(acc)
+            session.flush()
+            followers = base * share
+            growth = rnd.uniform(0.0004, 0.004)
+            for d in range(8, -1, -1):
+                session.add(SocialStats(account_id=acc.id, observed_at=now - timedelta(days=d, hours=1), followers=int(followers * (1 + growth) ** (8 - d)), following=rnd.randint(20, 400), posts_total=3000 + (8 - d) * 3, source="demo"))
+            for k in range(8):
+                post = SocialPost(account_id=acc.id, platform_post_id=f"demo-{platform}-{i}-{k}", posted_at=now - timedelta(days=k * 0.9, hours=2 + k), text=f"Invented sample post {k + 1} of {ch.name}", media_type="post", api_refreshed_at=now)
+                session.add(post)
+                session.flush()
+                reach = followers * rnd.uniform(0.002, 0.02) * (2.5 if k == 2 else 1.0)
+                session.add(SocialPostStats(post_id=post.id, observed_at=now - timedelta(minutes=30), likes=int(reach), comments=int(reach * rnd.uniform(0.03, 0.1)), shares=int(reach * rnd.uniform(0.01, 0.06)) if platform != "instagram" else None,
+                                            views=int(reach * rnd.uniform(8, 30)) if platform == "x" else None, source="demo"))
+    session.commit()
