@@ -41,6 +41,26 @@
     ${age ? `<div><div class="muted">Age group</div>${AGES.map(a => `<label style="display:block"><input type="checkbox" name="ages" value="${a}"${has(f.ages, a) ? " checked" : ""}> ${a}</label>`).join("")}
       <label style="display:block;margin-top:8px">Gender<br><select name="gender">${opt([["", "Any"], ["male", "Male"], ["female", "Female"]], f.gender || "")}</select></label></div>` : ""}
     ${known && (place || age) ? `<label style="max-width:240px"><input type="checkbox" name="known_only"${f.known_only ? " checked" : ""}> Only channels whose audience is known<br><span class="muted">Place and age work only where the channel or a study supplied its audience; other channels show "no audience data".</span></label>` : ""}</div></details>`;
+  /* A box with every channel as a tick-box, grouped by language, with a search: for screens where a person chooses the channels to compare (the ticked boxes are the "channels" field). */
+  const channelBox = (f, max = 30) => {
+    const sel = String(f.channels || "").split(",").filter(Boolean), list = [...(typeof channels !== "undefined" ? channels : [])].sort(byLanguage);
+    let last = null, html = "";
+    list.forEach(c => {
+      if (c.language !== last) { last = c.language; html += `<div class="langhead" style="grid-column:1/-1;margin-top:6px"><b>${esc(langName(c.language))}</b></div>`; }
+      html += `<label class="chpick" data-name="${esc(String(c.name).toLowerCase())}" style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="channels" value="${esc(c.id)}"${sel.includes(String(c.id)) ? " checked" : ""}> ${esc(c.name)}</label>`;
+    });
+    return `<div style="flex:1 1 100%"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px"><b>Channels to compare</b><span class="muted" id="chcount"></span><input type="search" id="chsearch" placeholder="Search a channel…" style="min-width:220px"><button class="btn" type="button" id="chclear">Clear all</button>${MINE.length ? `<button class="btn" type="button" data-mine>Select my channels</button>` : ""}</div>
+      <div id="chbox" style="max-height:230px;overflow:auto;border:1px solid #152c40;border-radius:8px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 12px">${html}</div>
+      <div class="muted" style="margin-top:4px">Choose up to ${max}. Choose none to take every channel that is live and matches the event words.</div></div>`;
+  };
+  const wireChannelBox = (el, max = 30) => {
+    const box = $("#chbox", el); if (!box) return;
+    const count = () => { const n = box.querySelectorAll("input:checked").length; $("#chcount", el).textContent = n ? `${n} chosen` : "none chosen: every live channel"; };
+    box.addEventListener("change", e => { if (box.querySelectorAll("input:checked").length > max) { e.target.checked = false; alert(`At most ${max} channels can be compared at a time.`); } count(); });
+    $("#chsearch", el).oninput = e => { const q = e.target.value.trim().toLowerCase(); box.querySelectorAll(".chpick").forEach(l => { l.style.display = !q || l.dataset.name.includes(q) ? "" : "none"; }); };
+    $("#chclear", el).onclick = () => { box.querySelectorAll("input:checked").forEach(i => { i.checked = false; }); count(); };
+    count();
+  };
   const method = text => `<details class="card" style="margin-top:14px"><summary>How these numbers were worked out</summary><p class="muted" style="margin-top:8px">${esc(text)}</p></details>`;
 
   /* ---------- a picture card to post (PNG): branded, with the logo tiled faintly over it ---------- */
@@ -515,6 +535,8 @@
   /* ---------- my channels: every login maps its own channels to itself ---------- */
   document.addEventListener("click", ev => {
     const b = ev.target.closest && ev.target.closest("[data-mine]"); if (!b) return;
+    const boxes = b.closest("form")?.querySelectorAll('#chbox input[name="channels"]');   /* the tick-box list of Live event compare */
+    if (boxes && boxes.length) { boxes.forEach(i => { i.checked = MINE.map(String).includes(i.value); }); boxes[0].dispatchEvent(new Event("change", {bubbles: true})); return; }
     const sel = b.closest("label, details, form")?.querySelector('select[name="channels"]') || b.closest("form")?.querySelector('select[name="channels"]'); if (!sel) return;
     [...sel.options].forEach(o => { o.selected = MINE.map(String).includes(o.value); });
   });
@@ -591,18 +613,19 @@
       <label>Feed<br><select name="feed">${opt([["all", "Live (all streams)"], ["primary", "Primary stream"], ["secondary", "Secondary streams"]], f.feed || "all")}</select></label>
       <label>Window<br><select name="minutes">${opt([["30", "Last 30 min"], ["60", "Last hour"], ["120", "Last 2 hours"], ["180", "Last 3 hours"]], f.minutes)}</select></label>
       <label>STX period<br><select name="stx_period">${opt([["today", "Today"], ["7d", "7 days"], ["month", "Month"]], f.stx_period)}</select></label>
-      ${filterFields(f, {place: false, age: false, known: false})}<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="auto"${f.auto ? " checked" : ""}> Refresh every 15 s</label><button class="btn primary" type="submit">Compare now</button></form>
+      ${channelBox(f)}<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="auto"${f.auto ? " checked" : ""}> Refresh every 15 s</label><button class="btn primary" type="submit">Compare now</button></form>
       <p class="muted" id="lstat" style="margin:8px 0"></p><div id="lout"></div>`;
+    wireChannelBox(el);
     let timer = null, last = null;
     const eventName = () => (($("#lname", el) || {}).value || "").trim() || String(f.terms || "").split(",")[0].trim().replace(/^./, c => c.toUpperCase()) || "Live event";
     $("#lname", el).addEventListener("input", () => { f.name = $("#lname", el).value; keep("live", f); const t = $("#ltitle", el); if (t) t.textContent = eventName(); });
     const feedWord = () => ({all: "all streams", primary: "primary stream", secondary: "secondary streams"})[f.feed || "all"];
-    const read = () => { const form = $("#lf", el), v = formValues(form); v.auto = new FormData(form).has("auto"); Object.assign(f, v); keep("live", f); return v; };
+    const read = () => { const form = $("#lf", el), v = formValues(form); v.channels = v.channels || ""; v.auto = new FormData(form).has("auto"); Object.assign(f, v); keep("live", f); return v; };
     const toneCls = {positive: "green", negative: "red", "mixed/neutral": ""};
     const draw = d => {
       last = d;
       const s = d.summary, mix = s.tone_mix, tot = Math.max(mix.positive + mix.negative + mix["mixed/neutral"], 1), out = $("#lout", el);
-      if (!d.channels.length) { out.innerHTML = `<h2 id="ltitle" style="margin:6px 0 12px;font-size:28px">${esc(eventName())}</h2>` + state("Nobody to compare yet", d.note || "No channel is live with these filters.") + (d.not_live.length ? `<p class="muted">Not live: ${esc(d.not_live.join(", "))}</p>` : ""); return; }
+      if (!d.channels.length) { out.innerHTML = `<h2 id="ltitle" style="margin:6px 0 12px;font-size:28px">${esc(eventName())}</h2>` + state("Nobody to compare yet", (d.note || "No channel is live with these filters.") + (String(f.terms || "").trim() ? ` The event words "${String(f.terms).trim()}" keep out a channel whose live titles do not contain them: clear the event words to take any live stream.` : "")) + (d.not_live.length ? `<p class="muted">Not live: ${esc(d.not_live.join(", "))}</p>` : ""); return; }
       out.innerHTML = `<h2 id="ltitle" style="margin:6px 0 12px;font-size:28px">${esc(eventName())}</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px">${kpi("Channels live", s.channels_live, "covering the event")}${kpi("Live viewers now", whole(s.total_live_now), "all channels together")}${kpi("Leader", s.leader || "—", (s.leader_share_percent ?? "—") + "% of the audience")}
         ${kpi("Tone of what is on screen", s.audience_weighted_tone == null ? "—" : (s.audience_weighted_tone > 0.15 ? "Positive" : s.audience_weighted_tone < -0.15 ? "Negative" : "Mixed"), "weighted by audience")}${kpi("Strongest STX", s.best_stx || "—", "STX " + d.stx_period)}</div>
         <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;margin:12px 0" title="positive ${mix.positive}, mixed ${mix["mixed/neutral"]}, negative ${mix.negative}"><span style="width:${100 * mix.positive / tot}%;background:#35d399"></span><span style="width:${100 * mix["mixed/neutral"] / tot}%;background:#6b8299"></span><span style="width:${100 * mix.negative / tot}%;background:#ff7180"></span></div>
