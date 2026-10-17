@@ -283,6 +283,7 @@ def test_slow_collection_does_not_block_live_polling(monkeypatch):
 
 def test_collection_client_gets_live_reserve_and_live_client_does_not(monkeypatch):
     monkeypatch.setenv("STAXIS_YOUTUBE_LIVE_RESERVE_PER_MINUTE", "40")
+    monkeypatch.setenv("DISCOVER_SECONDS", "0")      # this test is about the collection and live clients; the scan for new streams has its own test below
     stop_event = Event()
     clients = []
 
@@ -307,3 +308,37 @@ def test_collection_client_gets_live_reserve_and_live_client_does_not(monkeypatc
     service.run_service("sqlite:///:memory:", client_factory=FakeClient, stop_event=stop_event)
 
     assert [c.reserve_per_minute for c in clients] == [40, 0]
+
+
+def test_the_scan_for_new_streams_has_its_own_client_with_the_live_reserve_and_can_be_switched_off(monkeypatch):
+    for seconds, expected in (("1800", [40, 0, 40]), ("0", [40, 0])):
+        monkeypatch.setenv("STAXIS_YOUTUBE_LIVE_RESERVE_PER_MINUTE", "40")
+        monkeypatch.setenv("DISCOVER_SECONDS", seconds)
+        stop_event = Event()
+        clients = []
+
+        class FakeClient:
+            reserve_per_minute = 0
+
+            def __init__(self):
+                clients.append(self)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return None
+
+        monkeypatch.setattr(service, "create_database", lambda url: create_database("sqlite:///:memory:"))
+        monkeypatch.setattr(service, "load_targets", lambda path: [])
+        monkeypatch.setattr(service, "run_collection_pass", lambda *a, **k: SimpleNamespace(videos_observed=0, intelligence=SimpleNamespace(snapshots_built=0, errors=0)))
+        monkeypatch.setattr(service, "poll_live_once", lambda *a, **k: stop_event.set() or service.LivePollResult(0, 0, 0, 0, 0))
+        monkeypatch.setattr(service, "install_signal_handlers", lambda event: None)
+        service.run_service("sqlite:///:memory:", client_factory=FakeClient, stop_event=stop_event)
+        assert [c.reserve_per_minute for c in clients] == expected
+
+
+def test_the_scan_interval_must_be_at_least_five_minutes(monkeypatch):
+    monkeypatch.setenv("DISCOVER_SECONDS", "60")
+    with pytest.raises(ValueError):
+        service.run_service("sqlite:///:memory:", client_factory=lambda: None, stop_event=Event())

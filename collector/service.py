@@ -275,6 +275,40 @@ def _live_loop(
         stop.wait(min(max(0.0, next_live - time.monotonic()), 1.0))
 
 
+def _discovery_loop(
+    engine,
+    client: YouTubeClient,
+    stop: Event,
+    discover_seconds: int,
+    secrets: tuple[str | None, ...],
+) -> None:
+    """Looks for new live streams of the tracked channels (collector/discovery.py), on its own schedule. Never raises."""
+    from collector.discovery import discover_new_streams
+
+    next_run = time.monotonic() + 180   # let the first collection pass and live poll settle
+    quota_attempt = 0
+    while not stop.is_set():
+        now = time.monotonic()
+        if now >= next_run:
+            try:
+                with Session(engine) as session:
+                    result = discover_new_streams(session, client)
+                logger.info("discovery counts channels=%d unknown=%d added=%d errors=%d", result.channels, result.unknown, result.added, result.errors)
+                quota_attempt = 0
+                next_run = now + discover_seconds
+            except YouTubeAPIError as exc:
+                quota_attempt += 1
+                delay = quota_backoff_seconds(quota_attempt) if exc.status_code in {403, 429} else discover_seconds
+                _log_loop_error("discovery", exc, secrets)
+                logger.info("discovery counts channels=0 unknown=0 added=0 errors=1")
+                next_run = now + delay
+            except Exception as exc:
+                _log_loop_error("discovery", exc, secrets)
+                logger.info("discovery counts channels=0 unknown=0 added=0 errors=1")
+                next_run = now + discover_seconds
+        stop.wait(min(max(0.0, next_run - time.monotonic()), 1.0))
+
+
 def run_service(
     database_url: str,
     *,
@@ -291,6 +325,8 @@ def run_service(
     collect_seconds = interval_seconds("COLLECT_SECONDS", 600, 60)
     live_poll_seconds = interval_seconds("LIVE_POLL_SECONDS", 30, 5)
     live_reserve = env_non_negative_int("STAXIS_YOUTUBE_LIVE_RESERVE_PER_MINUTE", 0)
+    raw_discover = (os.getenv("DISCOVER_SECONDS") or "1800").strip()
+    discover_seconds = 0 if raw_discover == "0" else interval_seconds("DISCOVER_SECONDS", 1800, 300)   # 0 switches the scan for new live streams off
     engine = create_database(database_url)
     stop = stop_event or Event()
     install_signal_handlers(stop)
@@ -305,6 +341,10 @@ def run_service(
             daemon=True,
         )
         collector.start()
+        if discover_seconds:
+            discovery_client = client_factory()
+            discovery_client.reserve_per_minute = live_reserve
+            Thread(target=_discovery_loop, args=(engine, discovery_client, stop, discover_seconds, secrets), name="discovery-loop", daemon=True).start()   # new live streams, found within minutes
         from collector.warmer import warm_forever
 
         Thread(target=warm_forever, args=(engine, stop), name="warm-up-loop", daemon=True).start()   # the heavy screens' answers, ready before anyone asks
