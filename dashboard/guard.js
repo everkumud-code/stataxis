@@ -6,7 +6,7 @@
 (() => {
   try { const a = JSON.parse(sessionStorage.getItem("stataxis_account") || localStorage.getItem("stataxis_account") || "null"); if (a && a.is_admin) return; } catch (e) { /* no stored account */ }
   const css = document.createElement("style");
-  css.textContent = "html,body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}input,textarea,select,[contenteditable=true],.allow-copy,.allow-copy *,a[href^='mailto:']{-webkit-user-select:text;user-select:text}img,svg,canvas,a{-webkit-user-drag:none}@media print{body{display:none!important}}";
+  css.textContent = "html,body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}input,textarea,select,[contenteditable=true],.allow-copy,.allow-copy *,a[href^='mailto:']{-webkit-user-select:text;user-select:text}img,svg,canvas,a{-webkit-user-drag:none}";
   (document.head || document.documentElement).appendChild(css);
   const allowed = t => !!(t && t.closest && t.closest("input,textarea,select,[contenteditable=true],.allow-copy,a[href^='mailto:']"));
   const stop = e => { if (!allowed(e.target)) e.preventDefault(); };
