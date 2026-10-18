@@ -245,6 +245,26 @@ input[type=number],input[type=text]{min-width:0}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 .langrow td{background:#0b2032;color:#9fb0c4;padding:7px 10px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;border-top:1px solid #1d3550}.langrow td span{margin-left:8px;opacity:.7;letter-spacing:0;text-transform:none}
 .langhead{flex-basis:100%;margin:8px 0 2px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#7d8ba0}
+/* Printing (Ctrl+P, then Save as PDF): the page prints light on white with the menu and buttons left out, a StatAxis line with the screen, the time (Indian time) and who printed it on top, and the data note at the bottom. */
+@media print{
+  :root{--bg:#fff;--panel:#fff;--panel2:#f3f6f9;--line:#c9d3dc;--muted:#44566a;--text:#0b1620;--blue:#0a6fb0;--gold:#8a6a10;--green:#0c7a55;--red:#b3261e;--amber:#9a5b00}
+  html{color-scheme:light}
+  body{background:#fff !important;color:#0b1620 !important;font-size:12px}
+  .top,.crumbbar,.side,.sidehandle,.skip,.reportbar,.unitbar,[data-noreport],.btn,button,select,input[type=checkbox],input[type=search],dialog,.toast{display:none !important}
+  .layout{display:block !important;min-height:0 !important}
+  .main{padding:0 !important;max-width:none !important}
+  *{background:transparent !important;color:#0b1620 !important;border-color:#c9d3dc !important;box-shadow:none !important;text-shadow:none !important}
+  a{color:#0a5a96 !important;text-decoration:none}
+  svg text{fill:#0b1620 !important}
+  .card,.kpi,.state,section{break-inside:avoid}
+  .wrap{overflow:visible !important}
+  table{border-collapse:collapse;width:100% !important;font-size:10px}
+  th,td{padding:3px 4px !important;white-space:normal !important}
+  tr{break-inside:avoid}
+  .muted,.lede,.s,.l{color:#44566a !important}
+  body::before{content:attr(data-printed);display:block;font-weight:800;font-size:13px;border-bottom:2px solid #0a6fb0;padding-bottom:6px;margin-bottom:12px}
+  body::after{content:"Data via YouTube. Processed and evaluated by StatAxis.";display:block;margin-top:16px;padding-top:6px;border-top:1px solid #c9d3dc;font-size:10px;color:#44566a}
+}
 </style>
 </head>
 <body>
@@ -1169,6 +1189,14 @@ const forcePassword = () => {
   if (ME && window.applyPreferenceDefaults) window.applyPreferenceDefaults(ME);
   render();
 })();
+</script>
+<script>
+/* what the printed page says on top: the screen, the time in Indian time, and who printed it */
+window.addEventListener("beforeprint", () => {
+  let who = ""; try { const a = JSON.parse(sessionStorage.getItem("stataxis_account") || localStorage.getItem("stataxis_account") || "null"); who = a ? (a.full_name || a.email || "") : ""; } catch (e) { /* no stored account */ }
+  const when = new Date().toLocaleString("en-IN", {timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true}) + " IST";
+  document.body.setAttribute("data-printed", "StatAxis · " + document.title.replace(/ — .*$/, "") + " · printed " + when + (who ? " · " + who : ""));
+});
 </script>
 <script src="guard.js"></script>
 <script src="sxdesign.js"></script>

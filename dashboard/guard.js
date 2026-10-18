@@ -1,7 +1,7 @@
 /* Copy guard: a deterrent for casual copying of the site's text and numbers.
    It stops selecting, copying, cutting, dragging, saving and the usual view-source and developer-tool shortcuts on the page, and the right-click menu.
    It leaves form fields alone (a person must be able to type and paste into a form), anything marked class="allow-copy" (a temporary password, a verification code) and e-mail links.
-   Printing (Ctrl+P) gives the screen's own branded PDF instead. Administrators are not restricted. Be clear about what this is: a browser can always be made to show what it received, so this keeps honest visitors from copying by accident and slows the rest.
+   Printing (Ctrl+P, then Save as PDF) is allowed for everyone: the printed page carries the StatAxis line, the time of printing and the data note (see workspace.html). Administrators are not restricted. Be clear about what this is: a browser can always be made to show what it received, so this keeps honest visitors from copying by accident and slows the rest.
    The real protection is that nothing private is ever sent to the browser: every private figure sits behind a login and a package check on the server, and the downloadable reports are not machine-readable. */
 (() => {
   try { const a = JSON.parse(sessionStorage.getItem("stataxis_account") || localStorage.getItem("stataxis_account") || "null"); if (a && a.is_admin) return; } catch (e) { /* no stored account */ }
@@ -13,8 +13,6 @@
   ["contextmenu", "copy", "cut", "dragstart", "selectstart"].forEach(ev => document.addEventListener(ev, stop, true));
   document.addEventListener("keydown", e => {
     const mod = e.ctrlKey || e.metaKey, k = (e.key || "").toLowerCase();
-    /* Ctrl+P: a browser print would carry no StatAxis letterhead, no time of download and no protection, so it gives the screen's own branded PDF instead (the same as "Download PDF" under the screen). */
-    if (mod && k === "p") { e.preventDefault(); const pdf = document.querySelector('.reportbar [data-k="pdf"]'); if (pdf) pdf.click(); return; }
     if (e.key === "F12" || (mod && e.shiftKey && ["i", "j", "c", "k"].includes(k)) || (mod && ["u", "s"].includes(k))) { e.preventDefault(); return; }
     if (mod && ["c", "x", "a"].includes(k) && !allowed(e.target)) e.preventDefault();
   }, true);
