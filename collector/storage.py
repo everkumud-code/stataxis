@@ -391,6 +391,19 @@ class PostRevision(Base):
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
 
 
+class RecoveryCode(Base):
+    """A one-time code that lets someone who forgot their password choose a new one. 'email' codes are sent to the account's address and last thirty minutes; 'backup' codes are made by the person while signed in and do not expire.
+    Only a hash is kept, bound to the account, so a stolen copy of the table reveals no usable code."""
+    __tablename__ = "stx_recovery_codes"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("stx_users.id"), index=True)
+    code_hash: Mapped[str] = mapped_column(String(64), index=True)
+    kind: Mapped[str] = mapped_column(String(8), default="email")   # email | backup
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 def _add_column_if_missing(connection, table: str, name: str, definition: str, known_columns: set[str]) -> None:
     if name in known_columns:
         return

@@ -287,7 +287,19 @@ input[type=number],input[type=text]{min-width:0}
     <label>New password<input type="password" name="new_password" required minlength="12" maxlength="256" autocomplete="new-password"></label>
     <label>Repeat new password<input type="password" name="confirm" required minlength="12" maxlength="256" autocomplete="new-password"></label>
     <div id="pwmsg" class="msg" aria-live="polite" hidden></div>
-    <div class="btnrow"><button class="btn" type="button" id="pwcancel">Cancel</button><button class="btn primary" type="submit" id="pwsave">Change password</button></div>
+    <div class="btnrow"><button class="btn" type="button" id="rcopen" style="margin-right:auto">Recovery codes…</button><button class="btn" type="button" id="pwcancel">Cancel</button><button class="btn primary" type="submit" id="pwsave">Change password</button></div>
+  </form>
+</dialog>
+
+<dialog class="pwdlg" id="rcdlg" aria-labelledby="rctitle">
+  <form id="rcform" method="dialog" autocomplete="off">
+    <h2 id="rctitle">Recovery codes</h2>
+    <p class="hint">If you ever forget your password, a recovery code lets you choose a new one on the sign-in page (Forgot your password?), even when e-mail does not arrive. Each code works once. Keep them somewhere safe, not on this computer alone.</p>
+    <p class="hint" id="rcstatus">Checking…</p>
+    <label>Your current password<input type="password" name="current_password" required autocomplete="current-password"></label>
+    <div id="rccodes" hidden style="margin-top:14px"><pre id="rclist" style="background:#071727;border:1px solid var(--line);border-radius:8px;padding:12px;font-size:15px;letter-spacing:1.5px;line-height:1.8;margin:0"></pre><p class="hint" style="margin-top:8px">These are shown only now. The older unused codes no longer work.</p></div>
+    <div id="rcmsg" class="msg" aria-live="polite" hidden></div>
+    <div class="btnrow"><button class="btn" type="button" id="rcclose">Close</button><button class="btn" type="button" id="rccopy" hidden>Copy codes</button><button class="btn primary" type="submit" id="rcmake">Make new recovery codes</button></div>
   </form>
 </dialog>
 
@@ -1171,11 +1183,27 @@ pwForm.onsubmit = async ev => {
   btn.disabled = false;
 };
 
+/* ---------- recovery codes (for a forgotten password) ---------- */
+const rcDialog = $("#rcdlg"), rcForm = $("#rcform"), rcMsg = $("#rcmsg");
+const rcSay = (text, ok) => { rcMsg.hidden = !text; rcMsg.textContent = text || ""; rcMsg.className = "msg " + (ok ? "ok" : "bad"); };
+const rcCall = async (path, body) => { const res = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json", Authorization: "Bearer " + token()}, body: JSON.stringify(body)});
+  let d = null; try { d = await res.json(); } catch { /* non-JSON body */ } if (res.status === 401) { signOut(); throw new Error("Please sign in again."); }
+  if (!res.ok) throw new Error(res.status === 429 ? "Too many tries. Please wait a few minutes and try again." : (d && d.error) || "That did not work."); return d; };
+$("#rcopen").onclick = async () => { pwDialog.close(); rcForm.reset(); rcSay(""); $("#rccodes").hidden = true; $("#rccopy").hidden = true; $("#rcstatus").textContent = "Checking…";
+  if (rcDialog.showModal) rcDialog.showModal(); else rcDialog.setAttribute("open", "");
+  try { const s = await rcCall("/api/v1/auth/recovery-status", {}); $("#rcstatus").textContent = s.unused ? `You have ${s.unused} unused recovery code${s.unused === 1 ? "" : "s"}.` + (s.email_possible ? "" : " Your login ID is not an e-mail address, so these codes are your only way back in.") : "You have no recovery codes yet. Make them now."; } catch (e) { $("#rcstatus").textContent = e.message; } };
+$("#rcclose").onclick = () => rcDialog.close();
+rcForm.onsubmit = async ev => { ev.preventDefault(); const btn = $("#rcmake"); btn.disabled = true; rcSay("Making codes…", true);
+  try { const d = await rcCall("/api/v1/auth/recovery-codes", {current_password: rcForm.elements.current_password.value}); rcForm.elements.current_password.value = "";
+    $("#rclist").textContent = d.codes.join("\n"); $("#rccodes").hidden = false; $("#rccopy").hidden = false; $("#rcstatus").textContent = `${d.codes.length} new codes. Write them down or save them in a password manager.`; rcSay(d.message, true); }
+  catch (e) { rcSay(e.message); } btn.disabled = false; };
+$("#rccopy").onclick = async () => { try { await navigator.clipboard.writeText($("#rclist").textContent); rcSay("Copied. Paste them into a safe place now.", true); } catch { rcSay("Could not copy. Select the codes and copy them by hand."); } };
+
 const forcePassword = () => {
   forcedPw = true;
   $("#pwtitle").textContent = "Choose your own password";
   document.querySelector("#pwdlg .hint").textContent = "You signed in with a password an administrator made for you. Choose your own now: use at least 12 characters. You cannot use the workspace until you do.";
-  $("#pwcancel").hidden = true; pwDialog.addEventListener("cancel", ev => ev.preventDefault());
+  $("#pwcancel").hidden = true; $("#rcopen").hidden = true; pwDialog.addEventListener("cancel", ev => ev.preventDefault());
   $("#view").innerHTML = state("One step first", "Choose your own password to continue.");
   pwForm.reset(); pwSay(""); if (pwDialog.showModal) pwDialog.showModal(); else pwDialog.setAttribute("open", "");
 };

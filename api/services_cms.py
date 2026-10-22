@@ -462,7 +462,7 @@ def sitemap_xml(session: Any) -> str:
 
 
 def robots_txt() -> str:
-    return "\n".join(["User-agent: *", "Allow: /", "Disallow: /workspace", "Disallow: /admin", "Disallow: /login", "Disallow: /api/", "Disallow: /demo-api/", "", f"Sitemap: {BASE_URL}/sitemap.xml", ""])
+    return "\n".join(["User-agent: *", "Allow: /", "Disallow: /workspace", "Disallow: /admin", "Disallow: /login", "Disallow: /forgot", "Disallow: /api/", "Disallow: /demo-api/", "", f"Sitemap: {BASE_URL}/sitemap.xml", ""])
 
 
 def llms_txt(session: Any) -> str:
