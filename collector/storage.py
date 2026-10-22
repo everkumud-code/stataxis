@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, create_engine, event, inspect, text
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from collector.topics import assign_topic
@@ -504,7 +506,14 @@ def create_database(url: str):
         engine = create_engine(url, future=True)
     else:
         engine = create_engine(url, future=True, pool_pre_ping=True, pool_recycle=240)
-    Base.metadata.create_all(engine)
+    for attempt in range(4):   # two web workers may start together and both create a new table: the loser tries again and finds it there
+        try:
+            Base.metadata.create_all(engine)
+            break
+        except (IntegrityError, ProgrammingError, OperationalError):
+            if attempt == 3:
+                raise
+            time.sleep(1 + attempt)
     with engine.begin() as connection:
         columns = {item["name"] for item in inspect(connection).get_columns("stx_users")}
         additions = {

@@ -251,3 +251,19 @@ def test_the_workspace_script_still_parses():
     for name in ("cms.js", "social.js", "market.js", "me.js"):
         done = subprocess.run([node, "--check", str(DASH / name)], capture_output=True, text=True)
         assert done.returncode == 0, (name, done.stderr[:300])
+
+
+def test_two_workers_creating_a_new_table_at_once_do_not_crash_the_second(monkeypatch):
+    """On the first start after a release adds a table, both web workers may try to create it; the one that loses must try again, not die."""
+    import collector.storage as storage
+    real, calls = storage.Base.metadata.create_all, []
+
+    def flaky(engine, *a, **k):
+        calls.append(1)
+        if len(calls) == 1:
+            raise storage.IntegrityError("create", {}, Exception("duplicate key value violates unique constraint pg_type_typname_nsp_index"))
+        return real(engine, *a, **k)
+    monkeypatch.setattr(storage.Base.metadata, "create_all", flaky)
+    monkeypatch.setattr(storage.time, "sleep", lambda s: None)
+    storage.create_database("sqlite://")
+    assert len(calls) == 2
