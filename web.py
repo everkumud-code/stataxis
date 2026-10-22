@@ -24,6 +24,8 @@ from api.lab_http import lab_application
 from api.market_http import market_application
 from api.my_channels_http import my_channels_application
 from api.public_http import public_application
+from api import blog_cms, services_cms
+from api.services_http import cms_application, site_response
 from api.social_http import social_application
 from collector.storage import create_database
 
@@ -66,6 +68,10 @@ def _session() -> Session:
 
 with _session() as _bootstrap_session:
     bootstrap_admin(_bootstrap_session)
+    try:
+        services_cms.ensure_seed(_bootstrap_session)
+    except Exception:   # the site must start even if the starter services cannot be written; they are tried again on the next start
+        _bootstrap_session.rollback()
 
 def _make_routes(session_factory: Callable[[], Session]) -> dict[str, Callable[..., Any]]:
     """Every API of the product, bound to one database. The real site and the demo each get their own set."""
@@ -76,7 +82,7 @@ def _make_routes(session_factory: Callable[[], Session]) -> dict[str, Callable[.
         "api": gated(protect_application(wsgi_application(session_factory))), "auth": auth_application(session_factory), "evaluate": gated(evaluate_application(session_factory)),
         "live": gated(live_application(session_factory)), "admin": gated(admin_application(session_factory)), "insight": gated(protect_application(insight_application(session_factory))),
         "market": gated(market_application(session_factory)), "my": gated(my_channels_application(session_factory)), "public": public_application(session_factory),
-        "me": gated(me_application(session_factory)), "lab": gated(lab_application(session_factory)), "social": gated(social_application(session_factory)),
+        "me": gated(me_application(session_factory)), "lab": gated(lab_application(session_factory)), "social": gated(social_application(session_factory)), "cms": gated(cms_application(session_factory)),
     }
 
 
@@ -106,6 +112,8 @@ def _dispatch_api(routes: dict[str, Callable[..., Any]], environ: dict[str, Any]
         return routes["public"](environ, lambda status, headers, *args: _start_response(start_response, status, headers))
     if path == "/api/v1/me" or path.startswith("/api/v1/me/"):
         return routes["me"](environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
+    if path.startswith("/api/v1/cms/"):
+        return routes["cms"](environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
     if path.startswith("/api/v1/social/"):
         return routes["social"](environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
     if path.startswith("/api/v1/lab/"):
@@ -150,6 +158,10 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         _start_response(start_response, "200 OK", [("Content-Type", "text/html; charset=utf-8"), ("Content-Length", str(len(body)))], no_store=True)
         return [body]
 
+    page = site_response(_session, environ, lambda status, headers, *args: _start_response(start_response, status, headers), [])   # /services, /sitemap.xml, /robots.txt, /llms.txt
+    if page is not None:
+        return page
+
     if path == "/":
         path = "/index.html"
     elif path == "/admin":
@@ -177,6 +189,8 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
                        b'<a href="/plans">SX Packages</a>')
                 if marker in body:
                     body = body.replace(marker, nav, 1)
+            if path == "/insights.html":
+                body = blog_cms.inject_cards(_session, body)   # the articles written in the workspace, ahead of the built-in ones
             content_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
             fresh = [("Cache-Control", "no-cache")] if file_path.suffix.lower() in {".js", ".html", ".css", ".svg"} else []   # pages, scripts and styles are checked again every time, so a release is seen at once
             _start_response(start_response, "200 OK", [("Content-Type", content_type), ("Content-Length", str(len(body)))] + fresh)

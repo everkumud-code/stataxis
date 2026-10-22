@@ -316,6 +316,81 @@ class PackageConfig(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
 
+class Service(Base):
+    """One page of the website's Services section. The administrator writes and changes it in the workspace (Website services); lists are kept as JSON text so a point can be added or removed without a migration."""
+    __tablename__ = "stx_services"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slug: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(160))
+    nav_label: Mapped[str] = mapped_column(String(80), default="")
+    tagline: Mapped[str] = mapped_column(String(400), default="")
+    intro: Mapped[str] = mapped_column(Text, default="")
+    audience_json: Mapped[str] = mapped_column(Text, default="[]")
+    deliverables_json: Mapped[str] = mapped_column(Text, default="[]")
+    steps_json: Mapped[str] = mapped_column(Text, default="[]")
+    limits_json: Mapped[str] = mapped_column(Text, default="[]")
+    faqs_json: Mapped[str] = mapped_column(Text, default="[]")
+    related_json: Mapped[str] = mapped_column(Text, default="[]")
+    seo_title: Mapped[str] = mapped_column(String(200), default="")
+    seo_description: Mapped[str] = mapped_column(String(400), default="")
+    seo_keywords: Mapped[str] = mapped_column(String(300), default="")
+    canonical_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    noindex: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(12), default="draft", index=True)   # draft | published
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    updated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+
+
+class ServiceRevision(Base):
+    """Every change to a service, kept whole, so an earlier version can be read and put back. Survives the deletion of the service."""
+    __tablename__ = "stx_service_revisions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    service_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    slug: Mapped[str] = mapped_column(String(120), default="")
+    action: Mapped[str] = mapped_column(String(16), default="update")   # create | update | publish | unpublish | delete | restore | starter
+    snapshot: Mapped[str] = mapped_column(Text, default="{}")
+    by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
+
+
+class Post(Base):
+    """One article of the website's blog (Insights), written in the workspace (Website blog). The six articles that were built into the site as files stay as they are; this table holds the ones written here."""
+    __tablename__ = "stx_posts"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slug: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    excerpt: Mapped[str] = mapped_column(String(400), default="")
+    category: Mapped[str] = mapped_column(String(60), default="")
+    author: Mapped[str] = mapped_column(String(120), default="StatAxis")
+    body: Mapped[str] = mapped_column(Text, default="")
+    related_json: Mapped[str] = mapped_column(Text, default="[]")
+    seo_title: Mapped[str] = mapped_column(String(200), default="")
+    seo_description: Mapped[str] = mapped_column(String(400), default="")
+    seo_keywords: Mapped[str] = mapped_column(String(300), default="")
+    canonical_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    noindex: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(12), default="draft", index=True)   # draft | published | scheduled
+    publish_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    updated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+
+
+class PostRevision(Base):
+    """Every change to an article, kept whole, so an earlier version can be read and put back. Survives the deletion of the article."""
+    __tablename__ = "stx_post_revisions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    post_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    slug: Mapped[str] = mapped_column(String(120), default="")
+    action: Mapped[str] = mapped_column(String(16), default="update")   # create | update | publish | unpublish | schedule | delete | restore
+    snapshot: Mapped[str] = mapped_column(Text, default="{}")
+    by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
+
+
 def _add_column_if_missing(connection, table: str, name: str, definition: str, known_columns: set[str]) -> None:
     if name in known_columns:
         return

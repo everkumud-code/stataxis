@@ -971,8 +971,9 @@ const MENU_LAYOUT = [
   ["System health", ["operations", "integrity", "completeness"]],
   ["People and access", ["adm-users", "adm-apps", "adm-access", "adm-claims", "adm-packages", "adm-email"]],
   ["Channels and data", ["adm-channels", "adm-groups", "adm-audience", "adm-quota", "adm-social"]],
+  ["Website", ["adm-services", "adm-blog"]],
 ];
-const MENU_LABEL = {social: "Rankings: Facebook, Instagram, X", socialpresence: "Beside YouTube", socialchannel: "One channel and compare", socialposts: "Top posts", "adm-social": "Social media setup", reportmail: "Report e-mails (daily to yearly)", "adm-email": "Email delivery (Resend)", builder: "Report builder (day and hours)", stream: "Live, replay, video, Shorts", evaluate: "Check a video", trends: "Audience over time", audience: "Audience: place and age", creators: "IFX Score (creators)"};
+const MENU_LABEL = {social: "Rankings: Facebook, Instagram, X", socialpresence: "Beside YouTube", socialchannel: "One channel and compare", socialposts: "Top posts", "adm-social": "Social media setup", "adm-services": "Website services", "adm-blog": "Website blog", reportmail: "Report e-mails (daily to yearly)", "adm-email": "Email delivery (Resend)", builder: "Report builder (day and hours)", stream: "Live, replay, video, Shorts", evaluate: "Check a video", trends: "Audience over time", audience: "Audience: place and age", creators: "IFX Score (creators)"};
 const MENU_HINT = {
   briefing: "What the data says this week, written for your role", overview: "The market today at a glance", live: "Who is live right now and how many are watching", liveevent: "Up to 30 channels on one live event, side by side",
   primetime: "Which channel owns each evening hour", stream: "Live, replay, video and Shorts audiences compared", market: "Every channel ranked by views gained", channel: "One channel: audience, momentum, content",
@@ -982,7 +983,7 @@ const MENU_HINT = {
   spikes: "Sudden rises in a channel's audience, with the stream behind each, and who gained while who lost", forecasts: "What we expected each channel's prime time to be, and how close it was", notes: "A dated note on what the data said, each day and each week",
   alerts: "Tell us a level or a change on a channel's live audience; it shows here when it happens", completeness: "How many of the live readings that should be there are there, per channel per day",
   reportmail: "Choose how often, the layout and the parts: the report arrives in your e-mail, STX first", "adm-email": "The mail service report e-mails go through: key, From address, test",
-  social: "Followers, growth and reactions on Facebook, Instagram and X, ranked", socialpresence: "Each channel's YouTube subscribers and its followers on the three platforms, side by side", socialchannel: "One channel on every platform, its best posts, and several channels compared", socialposts: "The posts that got the most reactions", "adm-social": "Platform keys, linked accounts, and sheets of figures",
+  social: "Followers, growth and reactions on Facebook, Instagram and X, ranked", socialpresence: "Each channel's YouTube subscribers and its followers on the three platforms, side by side", socialchannel: "One channel on every platform, its best posts, and several channels compared", socialposts: "The posts that got the most reactions", "adm-social": "Platform keys, linked accounts, and sheets of figures", "adm-services": "Write, order and publish the Services pages of the public website, with their search settings", "adm-blog": "Write, schedule and publish blog articles for the Insights page, with their search settings",
   mychannels: "Map your own channels to your login", profile: "Your details, your menu, your password", operations: "How collection is running", integrity: "Checks on the stored data",
   "adm-users": "Create logins, reset passwords, tick privileges", "adm-apps": "People who asked for access", "adm-access": "Packages on or off, and who may use what", "adm-claims": "Who says which channel is theirs", "adm-packages": "Package names and prices",
   "adm-channels": "Every channel, with its On/Off switch", "adm-groups": "Which group each channel belongs to", "adm-audience": "Audience profiles supplied for channels", "adm-quota": "YouTube quota: what we use and what we need",
@@ -998,6 +999,7 @@ const MENU_ICON = {
   "My account": '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>',
   "System health": '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   "People and access": '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.4c2.2.7 3.5 2.6 3.5 5.6"/>',
+  "Website": '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
   "Channels and data": '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
   "More": '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
 };
@@ -1203,6 +1205,7 @@ window.addEventListener("beforeprint", () => {
 <script src="sxdesign.js"></script>
 <script src="market.js"></script>
 <script src="social.js"></script>
+<script src="cms.js"></script>
 <script src="reportbar.js"></script>
 <script src="me.js"></script>
 <p class="sx-derived-note" style="max-width:1100px;margin:24px auto;padding:0 16px;font-size:12px;line-height:1.5;color:#64748b;text-align:center">STX Index and other scores on this page are generated independently by StatAxis. They are not sourced from, provided by or endorsed by YouTube. Underlying statistics come from public YouTube API data. <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms &amp; Conditions</a></p>

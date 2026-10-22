@@ -382,3 +382,12 @@ body.fx-on #vx-glow,body.fx-on #vx-ring{opacity:1}
 .s9-body small{display:block;margin-top:16px;font-size:12px;color:#6c7b90;font-style:italic;line-height:1.5}
 @media(prefers-reduced-motion:reduce){.s9 *,.s9-btn,.s9-panel{animation:none!important;transition:none!important}.s9-g{opacity:.5}}
 @media(max-width:560px){.s9{left:12px;bottom:12px}.s9-hi{display:none}.s9-btn{padding:5px}.s9-fig{height:240px}}
+
+/* Services: breadcrumb, intro text, linked cards, the coverage note, and the Services drop-down in the menu */
+.sx-crumbs{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:#8d9bb0;margin:0 0 18px}.sx-crumbs a{color:#9fb0c6}.sx-crumbs a:hover{color:#fff}.sx-crumbs b{color:#e8eef6;font-weight:600}.sx-crumbs span{opacity:.5}
+.sx-prose{max-width:860px}.sx-prose p{font-size:18px;line-height:1.75;color:#cdd6e2;margin:0 0 18px}
+.sx-linkcard{display:block;color:inherit;text-decoration:none}.sx-linkcard:hover{border-color:var(--blue);transform:translateY(-3px)}.sx-linkcard h3{margin:6px 0 8px}.sx-linkcard p{color:#b7c3d4;margin:0 0 14px}
+.sx-more{color:var(--blue);font-weight:600;font-size:14px}.sx-note{max-width:860px;margin:10px auto 0;font-size:13px;color:#8d9bb0;text-align:center}
+.vx-dd{position:relative;display:inline-block}.vx-dd-list{display:none;position:absolute;top:100%;left:0;min-width:310px;background:#0d121a;border:1px solid #26324a;border-radius:12px;padding:8px;box-shadow:0 24px 60px rgba(0,0,0,.6);z-index:90}
+.vx-dd:hover .vx-dd-list,.vx-dd:focus-within .vx-dd-list{display:block}.vx-dd-list a{display:block;padding:10px 12px;border-radius:8px;font-size:14px;white-space:nowrap}.vx-dd-list a:after{display:none!important}.vx-dd-list a.all{color:var(--blue);border-top:1px solid rgba(255,255,255,.08);border-radius:0 0 8px 8px;margin-top:4px}
+.vx-drawer a.sub{padding-left:18px;font-size:14px;color:#9fb0c6}

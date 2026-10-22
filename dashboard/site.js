@@ -1,12 +1,12 @@
 /* Shared parts of the public pages: the favicon, the navigation, the footer (with the legal notices), the mobile menu and the terms-and-cookies gate. The logo file is the original one. */
 const favicon = document.createElement("link"); favicon.rel = "icon"; favicon.type = "image/svg+xml"; favicon.href = "/assets/stataxis-favicon.svg"; document.head.appendChild(favicon);
-const MENU = [["/platform", "Platform"], ["/solutions", "Solutions"], ["/ifx", "IFX Score"], ["/stx", "STX Index"], ["/research", "Research"], ["/insights", "Insights"]];
+const MENU = [["/platform", "Platform"], ["/solutions", "Solutions"], ["/services", "Services"], ["/ifx", "IFX Score"], ["/stx", "STX Index"], ["/research", "Research"], ["/insights", "Insights"]];
 const nav = '<header class="vx-nav"><div class="vx-nav-in"><a class="vx-logo" href="/" aria-label="StatAxis home"><img src="/assets/stataxis-logo.svg" alt="StatAxis — Stat the View. Axis the Viewpoint."></a><nav class="vx-menu" aria-label="Main">'
   + MENU.map(([h, l]) => `<a href="${h}">${l}</a>`).join("") + '<a class="login" href="/login" data-client-login>Enter StatAxis</a><a class="cta" href="/apply">Get early access</a></nav><button class="vx-burger" aria-label="Open menu" aria-expanded="false">☰</button></div><div class="vx-drawer">'
   + MENU.map(([h, l]) => `<a href="${h}">${l}</a>`).join("") + '<a href="/stax9">STAX9</a><a href="/apply">Get early access</a><a href="/login" data-client-login>Enter StatAxis</a></div></header>';
 const col = (h, items) => `<div class="vx-ft-col"><h5>${h}</h5>${items.map(([u, l]) => `<a href="${u}">${l}</a>`).join("")}</div>`;
 const footer = '<footer class="vx-footer vx-ft"><div class="vx-ft-wrap"><div class="vx-ft-top"><div class="vx-ft-cta"><h2>Tell us who you<br>want to reach.</h2><a class="vx-btn" href="/apply">Start a conversation <span class="arr">→</span></a></div><div class="vx-ft-cols">'
-  + col("Data", [["/platform", "Platform"], ["/solutions", "Solutions"], ["/ifx", "IFX Score"], ["/stx", "STX Index"]])
+  + col("Data", [["/platform", "Platform"], ["/solutions", "Solutions"], ["/services", "Services"], ["/ifx", "IFX Score"], ["/stx", "STX Index"]])
   + col("Company", [["/research", "Research"], ["/insights", "Insights"], ["/methodology", "Methodology"], ["/status", "Status"], ["/stax9", "STAX9"], ["mailto:stax9@stataxis.org", "Contact"]])
   + col("Access", [["/login", "Enter StatAxis"], ["/apply", "Apply"], ["/privacy", "Privacy Policy"], ["/terms", "Terms & Conditions"]])
   + '</div></div><div class="vx-ft-legal"><div><strong>StatAxis Technology Lab</strong><br>Lab-grown website, developed in the State-of-the-Art Technology Data Lab of StatAxis.<br>Built indigenously with our own systems, processes and technology.</div>'
@@ -14,6 +14,16 @@ const footer = '<footer class="vx-footer vx-ft"><div class="vx-ft-wrap"><div cla
   + '<div class="vx-ft-bar"><span>© 2026 STATAXIS · DIGITAL MEDIA MARKET INTELLIGENCE &amp; DATA SERVICES</span><a href="#" class="vx-top" onclick="window.scrollTo({top:0,behavior:\'smooth\'});return false">BACK TO TOP ↑</a></div></div>'
   + '<div class="vx-wordmark" aria-hidden="true"><canvas></canvas><div class="vx-wm-tag"></div></div></footer>';
 document.getElementById("nav").innerHTML = nav; document.getElementById("footer").innerHTML = footer;
+/* the Services link opens a list of the published services (written in the workspace under Website services); without the list the plain link still works */
+fetch("/api/v1/public/services").then(r => r.ok ? r.json() : null).then(d => {
+  const items = d && d.services || []; if (!items.length) return;
+  const e = t => String(t).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  const link = document.querySelector('.vx-menu a[href="/services"]');
+  if (link) { const wrap = document.createElement("div"); wrap.className = "vx-dd"; link.replaceWith(wrap); wrap.appendChild(link);
+    const list = document.createElement("div"); list.className = "vx-dd-list"; list.innerHTML = items.map(s => `<a href="/services/${encodeURIComponent(s.slug)}">${e(s.name)}</a>`).join("") + '<a class="all" href="/services">All services →</a>'; wrap.appendChild(list); }
+  const dl = document.querySelector('.vx-drawer a[href="/services"]');
+  if (dl) dl.insertAdjacentHTML("afterend", items.map(s => `<a class="sub" href="/services/${encodeURIComponent(s.slug)}">${e(s.name)}</a>`).join(""));
+}).catch(() => { /* the plain link stays */ });
 /* a client who is already signed in on this device goes straight to their workspace */
 try { const t = localStorage.getItem("stataxis_access_token") || sessionStorage.getItem("stataxis_token"), a = JSON.parse(localStorage.getItem("stataxis_account") || sessionStorage.getItem("stataxis_account") || "null");
   if (t && a && (a.is_admin || a.approval_status === "approved")) document.querySelectorAll("[data-client-login]").forEach(el => { el.href = "/workspace"; el.textContent = "My workspace"; }); } catch (e) { /* storage blocked: the plain login link stays */ }

@@ -19,6 +19,7 @@ from api.market_common import now_utc, utc
 from api.methodology import methodology
 from api.status import status_snapshot
 from api.package_config import _payload as package_payload
+from api import services_cms
 from api.rate_limit import client_ip, limiter
 from collector.storage import Channel, Observation, PackageConfig
 
@@ -83,7 +84,7 @@ def public_application(session_factory: Callable[[], Any]):
             return _unsubscribe(session_factory, environ, start_response)
         if method != "GET":
             return _json(start_response, 405, {"error": "method not allowed"})
-        if path not in {"/api/v1/public/pulse", "/api/v1/public/packages", "/api/v1/public/status", "/api/v1/public/methodology"}:
+        if path not in {"/api/v1/public/pulse", "/api/v1/public/packages", "/api/v1/public/status", "/api/v1/public/methodology", "/api/v1/public/services"}:
             return _json(start_response, 404, {"error": "not found"})
         retry = limiter.check(f"public:{client_ip(environ)}", 90, 60)
         if retry:
@@ -100,6 +101,8 @@ def public_application(session_factory: Callable[[], Any]):
                 data = status_snapshot(session)
             elif path.endswith("/methodology"):
                 data = methodology()
+            elif path.endswith("/services"):
+                data = services_cms.public_list(session)
             else:
                 data = packages(session)
         finally:
