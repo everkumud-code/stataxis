@@ -437,6 +437,8 @@ class Survey(Base):
     allow_repeat: Mapped[bool] = mapped_column(Boolean, default=False)      # several answers from one device (a kiosk, a shared phone)
     listed: Mapped[bool] = mapped_column(Boolean, default=False)            # shown on the public Polls page
     promote: Mapped[bool] = mapped_column(Boolean, default=True)           # shown on the home page (a popup and a section) while it is open
+    owner_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)   # the account that made it; a client sees only its own
+    review_note: Mapped[str] = mapped_column(String(400), default="")        # why an administrator sent it back
     redirect_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     logo_image: Mapped[str | None] = mapped_column(String(24), nullable=True)   # key of a SurveyImage: the logo or cover picture shown at the top
     questions_json: Mapped[str] = mapped_column(Text, default="[]")

@@ -54,3 +54,20 @@ Every open, public poll or survey that has "show it on the home page" ticked (th
 - Invitation-only, draft, closed, scheduled and full polls never appear. Switch "show it on the home page" off (Settings) to keep one off the page. Changes show within seconds.
 - With no open poll the home page is byte for byte the page as it was. Reading the polls can never break the page: on any error the page is served unchanged.
 - Button words follow the survey's language (English or Hindi).
+
+## Clients running their own polls (privileges)
+
+Under **Users -> Privileges** an administrator ticks, per person, what a client may do. The list is now grouped, each group has "Tick all" and "Un-tick all", and the tools of Polls and surveys are marked **off until ticked**: they are never given by a package, and switching packages off does not give them either (`feature_access.OPT_IN`).
+
+| Tick | What it allows |
+|---|---|
+| Polls and surveys (`surveys`) | the screen itself; the client sees and changes only its own polls (`owner_id`); the administrator sees all, with the owner |
+| `survey_publish` | open a poll at once. Without it "Open" becomes "Send for approval": the poll waits (state `review`, not public) until an administrator approves or sends it back with a reason. An approved poll cannot be changed quietly: close it, change it, send it again |
+| `survey_export` | download CSV or Excel |
+| `survey_invites` | personal invitation links |
+| `survey_pictures` | logos and pictures (a client can use only pictures its own account uploaded) |
+| `survey_contact` | ask for name, mobile or e-mail, and see them (also in exports) |
+| `survey_public_results` | show results after answering or on a public page |
+| `survey_political` | political polls and the political starter |
+
+Always the administrators' own: showing a poll on the StatAxis home page, listing it on the public Polls page, and approving other people's polls. A client's save always sets both of those off. Every rule is enforced on the server; the screen only hides what is not allowed.

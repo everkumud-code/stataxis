@@ -182,7 +182,7 @@ def test_with_packages_off_every_login_sees_every_screen_and_menu_choices_wait(w
     me.set_preferences(s, u["analyst"], {"persona": "audience"})
     assert len(me.nav_views(s, u["analyst"])) < 10 and feature_access.packages_enabled(s) is True
     feature_access.set_packages_enabled(s, False, "boss@x.com")
-    everything = {v[0] for v in me.VIEWS}
+    everything = {v[0] for v in me.VIEWS if v[2] not in feature_access.OPT_IN}   # tools that need a tick (polls and surveys) are not part of "every screen"
     for key in ("free", "idea", "analyst"):
         assert set(me.nav_views(s, u[key])) == everything, key
     payload = me.me_payload(s, u["free"])

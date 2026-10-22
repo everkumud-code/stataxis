@@ -27,7 +27,7 @@ from collector.storage import Survey, SurveyImage, SurveyInvite, SurveyResponse,
 
 KINDS = ("poll", "survey")
 CATEGORIES = ("opinion", "political", "brand", "customer", "employee", "media", "other")
-STATUSES = ("draft", "live", "closed")
+STATUSES = ("draft", "review", "live", "closed")
 ACCESS = ("public", "invite")
 RESULTS_MODES = ("private", "after_vote", "public", "after_close")
 SAMPLING = ("self_selected", "random_sample", "panel")
@@ -194,11 +194,11 @@ def referenced_image_keys(questions: list[dict[str, Any]], logo: str | None = No
     return keys
 
 
-def _verify_images(session: Session, keys: set[str], survey_id: int | None) -> None:
+def _verify_images(session: Session, keys: set[str], survey_id: int | None, image_owner: str | None = None) -> None:
     if not keys:
         return
     rows = session.query(SurveyImage).filter(SurveyImage.key.in_(keys)).all()
-    if len(rows) != len(keys):
+    if len(rows) != len(keys) or (image_owner is not None and any(r.created_by != image_owner for r in rows)):
         raise ValueError("A picture in this survey is missing. Please add it again.")
     if any(r.survey_id not in (None, survey_id) for r in rows):
         raise ValueError("A picture belongs to another survey. Please upload it again.")
@@ -407,7 +407,7 @@ def serialize(row: Survey, session: Session | None = None) -> dict[str, Any]:
            "status": row.status, "state": state_of(row), "access": row.access, "results_mode": row.results_mode, "results_hold": bool(row.results_hold), "min_results": row.min_results, "sampling": row.sampling,
            "population_size": row.population_size, "contact_mode": row.contact_mode, "contact_fields": [f for f in (row.contact_fields or "").split(",") if f], "consent_text": row.consent_text, "sponsor": row.sponsor,
            "method_note": row.method_note, "opens_at": row.opens_at.isoformat() if row.opens_at else None, "closes_at": row.closes_at.isoformat() if row.closes_at else None, "max_responses": row.max_responses,
-           "allow_repeat": bool(row.allow_repeat), "listed": bool(row.listed), "promote": bool(row.promote), "redirect_url": row.redirect_url or "", "logo_image": row.logo_image or "", "logo_url": image_url(row.logo_image), "questions": json.loads(row.questions_json or "[]"),
+           "allow_repeat": bool(row.allow_repeat), "listed": bool(row.listed), "promote": bool(row.promote), "redirect_url": row.redirect_url or "", "owner_id": row.owner_id, "review_note": row.review_note or "", "logo_image": row.logo_image or "", "logo_url": image_url(row.logo_image), "questions": json.loads(row.questions_json or "[]"),
            "created_at": row.created_at.isoformat() if row.created_at else None, "updated_at": row.updated_at.isoformat() if row.updated_at else None, "updated_by": row.updated_by}
     if session is not None:
         out["responses"] = response_count(session, row.id)
@@ -420,6 +420,8 @@ def state_of(row: Survey, now: datetime | None = None) -> str:
     now = now or _now()
     if row.status == "draft":
         return "draft"
+    if row.status == "review":
+        return "review"
     if row.status == "closed":
         return "closed"
     if row.opens_at and _aware(row.opens_at) > now:
@@ -455,40 +457,69 @@ def _go_live_checks(data: dict[str, Any]) -> None:
         raise ValueError("to open it, add at least one question")
 
 
-def save_survey(session: Session, by: str, payload: dict[str, Any], survey_id: int | None = None) -> dict[str, Any]:
+def save_survey(session: Session, by: str, payload: dict[str, Any], survey_id: int | None = None, *, owner_id: int | None = None, can_publish: bool = True, image_owner: str | None = None) -> dict[str, Any]:
+    """Save a survey. `can_publish` False (a client without the publish tick): asking for "live" sends it to review instead, and an open survey cannot be changed (close it, change it, send it again).
+    `image_owner` limits the pictures to those that account uploaded."""
     row = get_survey(session, survey_id) if survey_id else None
+    if row is not None and row.status == "live" and not can_publish and str(payload.get("status") or "live") == "live":
+        raise PermissionError("This poll is open, so it cannot be changed. Close it, make the change, and send it for approval again.")
     data = clean_survey(payload, session, row)
     status = str(payload.get("status") or (row.status if row else "draft"))
     if status not in STATUSES:
-        raise ValueError("the state must be draft, live or closed")
-    if status == "live":
+        raise ValueError("the state must be draft, review, live or closed")
+    if status == "review" and can_publish:
+        status = "live"
+    if status in ("live", "review"):
         _go_live_checks(data)
+    if status == "live" and not can_publish:
+        status = "review"
     keys = referenced_image_keys(data["questions"], data.get("logo_image"))
-    _verify_images(session, keys, row.id if row else None)
+    _verify_images(session, keys, row.id if row else None, image_owner)
     created = row is None
     if created:
-        row = Survey(created_at=_now())
+        row = Survey(created_at=_now(), owner_id=owner_id)
         session.add(row)
     before = None if created else row.status
     _apply(row, data)
     row.status, row.updated_at, row.updated_by = status, _now(), by
     session.flush()
     _attach_images(session, keys, row.id)
-    _revise(session, row, "create" if created else ("open" if status == "live" and before != "live" else "close" if status == "closed" and before != "closed" else "update"), by)
+    if row.review_note and status in ("review", "live"):
+        row.review_note = ""
+    _revise(session, row, "create" if created else ("open" if status == "live" and before != "live" else "request" if status == "review" and before != "review" else "close" if status == "closed" and before != "closed" else "update"), by)
     session.commit()
     return serialize(row, session)
 
 
-def set_status(session: Session, by: str, survey_id: int, status: str) -> dict[str, Any]:
+def set_status(session: Session, by: str, survey_id: int, status: str, *, can_publish: bool = True) -> dict[str, Any]:
     row = get_survey(session, survey_id)
     if status not in STATUSES:
-        raise ValueError("the state must be draft, live or closed")
-    if status == "live":
+        raise ValueError("the state must be draft, review, live or closed")
+    if status == "review" and can_publish:
+        status = "live"
+    if status in ("live", "review"):
         _go_live_checks({"questions": json.loads(row.questions_json or "[]")})
+    if status == "live" and not can_publish:
+        if row.status == "live":
+            return serialize(row, session)
+        status = "review"
     if row.status != status:
         row.status, row.updated_at, row.updated_by = status, _now(), by
-        _revise(session, row, {"live": "open", "closed": "close", "draft": "update"}[status], by)
+        if status in ("review", "live"):
+            row.review_note = ""
+        _revise(session, row, {"live": "open", "closed": "close", "draft": "update", "review": "request"}[status], by)
         session.commit()
+    return serialize(row, session)
+
+
+def reject_review(session: Session, by: str, survey_id: int, note: str) -> dict[str, Any]:
+    """An administrator sends a poll that was waiting for approval back to its owner as a draft, with the reason."""
+    row = get_survey(session, survey_id)
+    if row.status != "review":
+        raise ValueError("that poll is not waiting for approval")
+    row.status, row.review_note, row.updated_at, row.updated_by = "draft", _text(note, "the reason", 400), _now(), by
+    _revise(session, row, "reject", by)
+    session.commit()
     return serialize(row, session)
 
 
@@ -509,7 +540,7 @@ def delete_survey(session: Session, by: str, survey_id: int) -> dict[str, Any]:
     return {"deleted": snap["slug"]}
 
 
-def duplicate_survey(session: Session, by: str, survey_id: int) -> dict[str, Any]:
+def duplicate_survey(session: Session, by: str, survey_id: int, *, owner_id: int | None = None) -> dict[str, Any]:
     src = serialize(get_survey(session, survey_id))
     base = src["slug"] + "-copy"
     slug, n = base, 1
@@ -517,11 +548,14 @@ def duplicate_survey(session: Session, by: str, survey_id: int) -> dict[str, Any
         n += 1
         slug = f"{base}-{n}"
     questions, logo = _clone_images(session, src["questions"], src.get("logo_image"))
-    return save_survey(session, by, {**src, "slug": slug, "title": src["title"] + " (copy)", "status": "draft", "questions": questions, "logo_image": logo, "opens_at": None, "closes_at": None, "listed": False})
+    return save_survey(session, by, {**src, "slug": slug, "title": src["title"] + " (copy)", "status": "draft", "questions": questions, "logo_image": logo, "opens_at": None, "closes_at": None, "listed": False}, owner_id=owner_id)
 
 
-def list_surveys(session: Session) -> list[dict[str, Any]]:
-    return [serialize(r, session) for r in session.query(Survey).order_by(Survey.created_at.desc(), Survey.id.desc()).all()]
+def list_surveys(session: Session, owner_id: int | None = None) -> list[dict[str, Any]]:
+    query = session.query(Survey)
+    if owner_id is not None:
+        query = query.filter(Survey.owner_id == owner_id)
+    return [serialize(r, session) for r in query.order_by(Survey.created_at.desc(), Survey.id.desc()).all()]
 
 
 def revisions(session: Session, survey_id: int) -> list[dict[str, Any]]:
@@ -564,7 +598,7 @@ def home_polls(session: Session, limit: int = 3, now: datetime | None = None) ->
 def accepting(session: Session, row: Survey, now: datetime | None = None) -> tuple[bool, str]:
     """Whether new answers are accepted, and if not, the key of the sentence to tell the respondent."""
     state = state_of(row, now)
-    if state == "draft":
+    if state in ("draft", "review"):
         return False, "closed"
     if state == "scheduled":
         return False, "not_yet"

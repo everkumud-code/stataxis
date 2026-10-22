@@ -29,6 +29,7 @@ VIEWS: list[tuple[str, str, str]] = [
     ("operations", "Operations", "operations"), ("integrity", "Data integrity", "integrity"),
     ("spikes", "Spikes and movement", "spikes"), ("forecasts", "Forecasts", "forecasts"), ("notes", "Notes", "notes"), ("alerts", "Alerts", "alerts"), ("completeness", "Data completeness", "integrity"), ("reportmail", "Report e-mails", "report_email"),
     ("social", "Social media: rankings", "social"), ("socialpresence", "Social media: beside YouTube", "social"), ("socialchannel", "Social media: one channel", "social"), ("socialposts", "Social media: top posts", "social"),
+    ("surveys", "Polls and surveys", "surveys"),
 ]
 VIEW_FEATURE = {vid: feature for vid, _label, feature in VIEWS}
 ALWAYS = ("mychannels", "profile")   # every login has these two

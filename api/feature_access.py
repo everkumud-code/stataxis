@@ -44,7 +44,26 @@ FEATURES: dict[str, tuple[str, str]] = {
     "data_export": ("Excel data exports (machine-readable)", SXPlan.ANALYST.value),
     "report_email": ("Report e-mails: daily to yearly reports sent to you", SXPlan.FREE.value),
     "social": ("Social media: Facebook, Instagram and X beside YouTube", SXPlan.INTELLIGENCE.value),
+    "surveys": ("Polls and surveys: build and run your own, read your results", SXPlan.ENTERPRISE.value),
+    "survey_publish": ("Polls and surveys: open them to the public without waiting for approval", SXPlan.ENTERPRISE.value),
+    "survey_export": ("Polls and surveys: download the answers (CSV and Excel)", SXPlan.ENTERPRISE.value),
+    "survey_invites": ("Polls and surveys: personal invitation links", SXPlan.ENTERPRISE.value),
+    "survey_pictures": ("Polls and surveys: logos and pictures", SXPlan.ENTERPRISE.value),
+    "survey_contact": ("Polls and surveys: ask people for name, mobile or e-mail", SXPlan.ENTERPRISE.value),
+    "survey_public_results": ("Polls and surveys: show results to the people who answer or on a public page", SXPlan.ENTERPRISE.value),
+    "survey_political": ("Polls and surveys: run political polls", SXPlan.ENTERPRISE.value),
 }
+# Tools that are never given by a package: an administrator ticks them for each person who may use them (they let a client run polls under the StatAxis name, collect personal details or publish results).
+OPT_IN = frozenset({"surveys", "survey_publish", "survey_export", "survey_invites", "survey_pictures", "survey_contact", "survey_public_results", "survey_political"})
+GROUPS: list[tuple[str, tuple[str, ...]]] = [
+    ("Market and channels", ("overview", "market", "channel", "stx", "dashboard", "streams", "content", "trends", "changed", "competition", "research", "briefing", "notes")),
+    ("Live", ("live", "spikes", "live_compare", "alerts")),
+    ("Reports and exports", ("weekly", "prime_time", "report_builder", "report_email", "data_export", "forecasts", "evaluate")),
+    ("Creators, audience and planning", ("creators", "authenticity", "audience", "planner")),
+    ("Social media", ("social",)),
+    ("Polls and surveys", ("surveys", "survey_publish", "survey_export", "survey_invites", "survey_pictures", "survey_contact", "survey_public_results", "survey_political")),
+    ("System health", ("operations", "integrity")),
+]
 DESCRIPTIONS = {
     "spikes": "Sudden rises in a channel's live audience with the stream that carried them, and who gained while who lost in the same minutes.",
     "forecasts": "What StatAxis expected each channel's prime-time audience to be, written down before the slot and scored afterwards, with the hit rate.",
@@ -77,6 +96,14 @@ DESCRIPTIONS = {
     "audience": "Audience geography and age, where a channel or a study supplied it.",
     "data_export": "Excel files with the raw numbers. These are machine-readable, unlike the branded PDF and picture cards.",
     "social": "Followers, growth, reactions and the best posts of the Facebook, Instagram and X accounts of each channel, ranked, compared and set beside YouTube.",
+    "surveys": "Build polls and surveys, share the link, and read the results. A person sees only their own. Tick this first: the other Polls and surveys ticks add to it.",
+    "survey_publish": "Without this tick, opening a poll sends it to an administrator for approval first; with it, the poll opens at once.",
+    "survey_export": "Download the answers as CSV or Excel.",
+    "survey_invites": "Make personal links for an invitation-only survey (one answer per link).",
+    "survey_pictures": "Put a logo or picture on an option, above a question, or at the top of the survey.",
+    "survey_contact": "Ask people for their name, mobile number or e-mail (with a consent text) and see what they give. Personal data: tick it only for people who need it.",
+    "survey_public_results": "Show the results to people after they answer, or on a public results page.",
+    "survey_political": "Run political polls (voting intention, government ratings). Such polls carry election-law and fairness duties; tick it only for people who understand them.",
 }
 
 
@@ -101,6 +128,10 @@ def set_packages_enabled(session: Session, enabled: bool, by: str) -> dict[str, 
     return {"packages_enabled": bool(enabled)}
 
 
+def group_of(feature: str) -> str:
+    return next((name for name, keys in GROUPS if feature in keys), "Other")
+
+
 def plan_rank(plan: str) -> int:
     return PLAN_ORDER.index(plan) if plan in PLAN_ORDER else 0
 
@@ -111,7 +142,7 @@ def matrix(session: Session) -> list[dict[str, object]]:
     for key, (label, default) in FEATURES.items():
         row = rows.get(key)
         out.append({"feature": key, "label": label, "min_plan": row.min_plan if row else default, "default": default, "changed": bool(row and row.min_plan != default),
-                    "updated_by": row.updated_by if row else None})
+                    "updated_by": row.updated_by if row else None, "opt_in": key in OPT_IN})
     return out
 
 
@@ -131,6 +162,8 @@ def allowed(session: Session, feature: str, plan: str, is_admin: bool, user_id: 
     if is_admin:
         return True
     row = override_for(session, user_id, feature)
+    if feature in OPT_IN:
+        return bool(row and row.allowed)   # never from a package, never because packages are off: only a tick
     if row is not None:
         return bool(row.allowed)
     if not packages_enabled(session):
@@ -140,6 +173,8 @@ def allowed(session: Session, feature: str, plan: str, is_admin: bool, user_id: 
 
 def explain_denied(session: Session, feature: str, plan: str, user_id: int | None = None) -> str:
     row = override_for(session, user_id, feature)
+    if feature in OPT_IN:
+        return f"{FEATURES[feature][0]} is not switched on for your account. Ask your admin to tick it."
     if row is not None and not row.allowed:
         return f"{FEATURES[feature][0]} has been switched off for your account by your admin."
     need = get_plan(min_plan_for(session, feature))
@@ -150,6 +185,8 @@ def explain_denied(session: Session, feature: str, plan: str, user_id: int | Non
 def set_min_plan(session: Session, feature: str, plan: str, by: str) -> dict[str, object]:
     if feature not in FEATURES:
         raise ValueError("unknown feature")
+    if feature in OPT_IN:
+        raise ValueError("this tool is not part of any package: tick it for each person under Users")
     code = get_plan(plan).code.value  # raises for an unknown package
     row = session.query(FeatureAccess).filter_by(feature=feature).one_or_none()
     if row is None:
@@ -166,9 +203,9 @@ def user_matrix(session: Session, user: User) -> list[dict[str, object]]:
     overrides = {r.feature: r for r in session.query(UserFeatureOverride).filter_by(user_id=user.id).all()}
     out = []
     for key, (label, _default) in FEATURES.items():
-        by_package = user.is_admin or plan_rank(user.plan) >= plan_rank(min_plan_for(session, key))
+        by_package = user.is_admin or (key not in OPT_IN and plan_rank(user.plan) >= plan_rank(min_plan_for(session, key)))
         row = overrides.get(key)
-        out.append({"feature": key, "label": label, "description": DESCRIPTIONS.get(key, ""), "allowed": True if user.is_admin else (bool(row.allowed) if row else by_package),
+        out.append({"feature": key, "label": label, "description": DESCRIPTIONS.get(key, ""), "allowed": True if user.is_admin else (bool(row.allowed) if row else by_package), "group": group_of(key), "opt_in": key in OPT_IN,
                     "by_package": by_package, "source": "admin" if row else "package", "min_plan": min_plan_for(session, key), "set_by": row.set_by if row else None})
     return out
 

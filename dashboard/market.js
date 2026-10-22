@@ -669,18 +669,22 @@
     const privileges = async uid => {
       const box = $("#upriv", el);
       const draw = (who, features) => {
-        box.innerHTML = `<section class="card" style="margin-top:14px;border-color:#159de8"><div class="head"><h2>Privileges: ${esc(who.name || who.email)}</h2></div>
-          <p class="muted">${esc(who.email)} · package <strong>${esc((plans.find(p => p.code === who.plan) || {}).name || who.plan)}</strong>. Tick what this person may use. A tick or un-tick you make here wins over the package; <em>Use the package</em> removes it.</p>
-          <div class="btnrow" style="margin:8px 0"><button class="btn" type="button" id="pall">Tick everything</button><button class="btn" type="button" id="pnone">Un-tick everything</button><button class="btn" type="button" id="ppkg">Use the package for all</button><button class="btn" type="button" id="pclose">Close</button></div>
-          ${features.map(f => `<label style="display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:start;padding:10px 0;border-top:1px solid #152c40;cursor:pointer">
+        const rowHtml = f => `<label style="display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:start;padding:10px 0;border-top:1px solid #152c40;cursor:pointer">
             <input type="checkbox" data-pf="${esc(f.feature)}" ${f.allowed ? "checked" : ""} style="width:20px;height:20px;margin-top:2px">
             <span><strong>${esc(f.label)}</strong><br><span class="muted">${esc(f.description)}</span></span>
-            <span style="text-align:right">${f.source === "admin" ? `<span class="tag">set by ${esc((f.set_by || "an admin").split("@")[0])}</span><br><a href="#" data-pk="${esc(f.feature)}" class="muted">Use the package</a>` : `<span class="tag ${f.allowed ? "green" : ""}">${f.allowed ? "from the package" : "not in the package"}</span>`}<br><span class="muted">from ${esc((plans.find(p => p.code === f.min_plan) || {}).name || f.min_plan)}</span></span></label>`).join("")}
+            <span style="text-align:right">${f.source === "admin" ? `<span class="tag">set by ${esc((f.set_by || "an admin").split("@")[0])}</span><br><a href="#" data-pk="${esc(f.feature)}" class="muted">Use the package</a>` : `<span class="tag ${f.allowed ? "green" : ""}">${f.allowed ? "from the package" : (f.opt_in ? "off until ticked" : "not in the package")}</span>`}${f.opt_in ? "" : `<br><span class="muted">from ${esc((plans.find(p => p.code === f.min_plan) || {}).name || f.min_plan)}</span>`}</span></label>`;
+        const groupsOf = fs => { const m = new Map(); fs.forEach(f => { const g = f.group || "Other"; if (!m.has(g)) m.set(g, []); m.get(g).push(f); }); return [...m]; };
+        box.innerHTML = `<section class="card" style="margin-top:14px;border-color:#159de8"><div class="head"><h2>Privileges: ${esc(who.name || who.email)}</h2></div>
+          <p class="muted">${esc(who.email)} · package <strong>${esc((plans.find(p => p.code === who.plan) || {}).name || who.plan)}</strong>. Tick what this person may use. A tick or un-tick you make here wins over the package; <em>Use the package</em> removes it. Tools marked <em>off until ticked</em> (Polls and surveys) are never given by a package: they let a client run polls under the StatAxis name, collect personal details or publish results, so you tick them one by one.</p>
+          <div class="btnrow" style="margin:8px 0"><button class="btn" type="button" id="pall">Tick everything</button><button class="btn" type="button" id="pnone">Un-tick everything</button><button class="btn" type="button" id="ppkg">Use the package for all</button><button class="btn" type="button" id="pclose">Close</button></div>
+          ${groupsOf(features).map(([name, list]) => `<div class="btnrow" style="margin-top:18px;align-items:center"><h3 style="margin:0;font-size:15px">${esc(name)}</h3><span style="flex:1"></span><button class="btn" type="button" data-gall="${esc(name)}">Tick all</button><button class="btn" type="button" data-gnone="${esc(name)}">Un-tick all</button></div>${list.map(rowHtml).join("")}`).join("")}
           <div id="pmsg" class="msg" hidden></div></section>`;
         const set = async (feature, value) => { try { const r = await post("/api/v1/admin/users/features/set", {user_id: uid, feature, allowed: value}); draw(who, r.features); } catch (e) { const m = $("#pmsg", box); m.hidden = false; m.className = "msg bad"; m.textContent = e.message; } };
         box.querySelectorAll("[data-pf]").forEach(c => c.onchange = () => set(c.dataset.pf, c.checked));
         box.querySelectorAll("[data-pk]").forEach(a => a.onclick = ev => { ev.preventDefault(); set(a.dataset.pk, null); });
         const all = async v => { for (const f of features) await post("/api/v1/admin/users/features/set", {user_id: uid, feature: f.feature, allowed: v}); privileges(uid); };
+        const inGroup = name => features.filter(x => (x.group || "Other") === name);
+        box.querySelectorAll("[data-gall],[data-gnone]").forEach(b => b.onclick = async () => { const on = b.dataset.gall !== undefined; for (const f of inGroup(b.dataset.gall ?? b.dataset.gnone)) await post("/api/v1/admin/users/features/set", {user_id: uid, feature: f.feature, allowed: on}); privileges(uid); });
         $("#pall", box).onclick = () => all(true); $("#pnone", box).onclick = () => all(false); $("#ppkg", box).onclick = () => all(null); $("#pclose", box).onclick = () => { box.innerHTML = ""; };
         box.scrollIntoView({behavior: "smooth", block: "nearest"});
       };

@@ -48,7 +48,7 @@ def pulse(session: Any) -> dict[str, Any]:
 def packages(session: Any) -> dict[str, Any]:
     matrix = feature_access.matrix(session)
     priced = {p["name"]: p for p in (package_payload(r) for r in session.query(PackageConfig).filter(PackageConfig.active.is_(True)).order_by(PackageConfig.slot).all()) if p["name"]}
-    return {"plans": feature_access.plans_overview(), "features": [{"feature": m["feature"], "label": m["label"], "description": feature_access.DESCRIPTIONS.get(m["feature"], ""), "min_plan": m["min_plan"]} for m in matrix],
+    return {"plans": feature_access.plans_overview(), "features": [{"feature": m["feature"], "label": m["label"], "description": feature_access.DESCRIPTIONS.get(m["feature"], ""), "min_plan": m["min_plan"]} for m in matrix if not m.get("opt_in")],
             "order": feature_access.PLAN_ORDER, "commercial_packages": [{"name": p["name"], "criteria": p["criteria"], "amount": p["amount"], "currency": p["currency"]} for p in priced.values()]}
 
 
