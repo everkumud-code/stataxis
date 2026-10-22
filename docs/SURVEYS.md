@@ -36,3 +36,21 @@ Every question and option has a stable id (q1, o1). Once answers exist nothing t
 ## Invitation-only surveys
 
 Make personal links (one per name or a number of them). Each works once; only a hash of each code is kept, so the links can be downloaded only at the moment they are made.
+
+## Pictures and logos
+
+A logo or picture can go on any option of a choice question (shown as tiles), above any question, and at the top of the survey (its own logo, also used when the link is shared). Upload from the builder (Picture buttons; Settings -> Logo).
+
+- Only PNG, JPEG, WebP or GIF, checked by the file's own first bytes (never by its name); SVG is refused because it can carry script. At most 2.5 MB and 40 million pixels.
+- The server turns the picture upright, removes camera and location data, shrinks it (options 480 px, logo 600 px, question picture 1200 px, never enlarged) and keeps it as WebP in the database (`stx_survey_images`).
+- Pictures are served at `/survey-img/<random key>.webp`, as images only (`Content-Security-Policy: default-src 'none'; sandbox`, `nosniff`), cached for a year (the key never changes its picture).
+- A picture belongs to the survey that uses it: it is attached when the survey is saved, copies of a survey get their own copies of the pictures, deleting a survey deletes its pictures, and pictures uploaded but never used are cleared after two days.
+
+## On the home page
+
+Every open, public poll or survey that has "show it on the home page" ticked (the default) appears on www.stataxis.org: a **section right after the top banner** (the second section, not the bottom; up to three, newest first) and a **pop-up** for the newest one with a button to the poll.
+
+- The pop-up waits until the visitor has passed the cookie and terms notice, appears after about 2.5 seconds, closes with the x, "Not now", Esc or a click outside, is not shown again for three days after it is closed, and never for a poll the visitor has already answered.
+- Invitation-only, draft, closed, scheduled and full polls never appear. Switch "show it on the home page" off (Settings) to keep one off the page. Changes show within seconds.
+- With no open poll the home page is byte for byte the page as it was. Reading the polls can never break the page: on any error the page is served unchanged.
+- Button words follow the survey's language (English or Hindi).

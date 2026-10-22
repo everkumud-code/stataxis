@@ -26,7 +26,7 @@ from api.my_channels_http import my_channels_application
 from api.public_http import public_application
 from api import blog_cms, services_cms
 from api.services_http import cms_application, site_response
-from api.survey_http import survey_admin_application, survey_public_application, survey_site_response
+from api.survey_http import inject_home_polls, survey_admin_application, survey_public_application, survey_site_response
 from api.social_http import social_application
 from collector.storage import create_database
 
@@ -197,6 +197,7 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
                        b'<a href="/plans">SX Packages</a>')
                 if marker in body:
                     body = body.replace(marker, nav, 1)
+                body = inject_home_polls(_session, body)   # a live poll: its section right after the hero and its popup
             if path == "/insights.html":
                 body = blog_cms.inject_cards(_session, body)   # the articles written in the workspace, ahead of the built-in ones
             content_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"

@@ -9,7 +9,7 @@
   const fresh = (path, params = {}) => api(path, {...params, _: Date.now()});
   const css = document.createElement("style");
   css.textContent = ".svgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.svgrid label,.svq label{display:block;font-size:13px}.svgrid input:not([type=checkbox]),.svgrid textarea,.svgrid select,.svq input:not([type=checkbox]),.svq textarea,.svq select{width:100%;box-sizing:border-box}"
-    + ".svq{border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0;background:#08192a}.svq.arch{opacity:.55}.svq .bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}.svq .opt{display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;margin:5px 0}"
+    + ".svq{border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0;background:#08192a}.svq.arch{opacity:.55}.svq .bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}.svq .opt{display:grid;grid-template-columns:auto 1fr auto auto auto;gap:6px;align-items:center;margin:5px 0}.svthumb{height:34px;width:34px;object-fit:contain;background:#fff;border-radius:6px;vertical-align:middle}"
     + ".svtabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}.svtabs button.on{background:var(--blue);color:#021018;border-color:var(--blue)}.svbar{height:10px;border-radius:6px;background:#11283d;overflow:hidden}.svbar i{display:block;height:100%;background:var(--blue)}"
     + ".svres .row{display:grid;grid-template-columns:minmax(120px,1fr) 2fr 90px;gap:10px;align-items:center;margin:7px 0;font-size:14px}.svx td,.svx th{padding:6px 8px;border:1px solid var(--line);font-size:13px}.svwarn{border:1px solid #b08a2e;background:#2a2210;border-radius:10px;padding:12px;margin:12px 0;font-size:13.5px;line-height:1.55}"
     + ".svstarter{display:block;text-align:left;padding:14px;border:1px solid var(--line);border-radius:12px;background:#08192a;color:inherit;cursor:pointer}.svstarter:hover{border-color:var(--blue)}.svstarter b{display:block;margin-bottom:4px}";
@@ -20,6 +20,12 @@
   const stateTag = s => `<span class="tag ${s.state === "open" ? "green" : s.state === "closed" ? "red" : ""}">${esc(s.state)}</span>`;
   const modal = (title, bodyHtml) => { document.querySelector(".cmsmodal")?.remove(); const m = document.createElement("div"); m.className = "cmsmodal"; m.innerHTML = `<div><header><b>${esc(title)}</b><button class="btn" id="svx">Close</button></header>${bodyHtml}</div>`; document.body.appendChild(m); m.querySelector("#svx").onclick = () => m.remove(); return m; };
   const download = async (path, params, name) => { const q = new URLSearchParams(params); const res = await fetch(path + "?" + q, {headers: {Authorization: "Bearer " + token()}}); if (!res.ok) throw new Error("Could not download."); const url = URL.createObjectURL(await res.blob()); const a = document.createElement("a"); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 4000); };
+  const imgUrl = key => key ? "/survey-img/" + key + ".webp" : "";
+  /* choose a picture from the computer, send it to the server (which checks it, shrinks it and keeps it as WebP) and get its key back */
+  const pickImage = purpose => new Promise((resolve, reject) => { const f = document.createElement("input"); f.type = "file"; f.accept = "image/png,image/jpeg,image/webp,image/gif";
+    f.onchange = () => { const file = f.files[0]; if (!file) return resolve(null); if (file.size > 2500000) return reject(new Error("The picture is too large: the most is 2.5 MB."));
+      const r = new FileReader(); r.onload = async () => { try { resolve(await post("/api/v1/surveys/images/upload", {filename: file.name, data: r.result, purpose})); } catch (e) { reject(e); } }; r.onerror = () => reject(new Error("Could not read the file.")); r.readAsDataURL(file); };
+    f.click(); });
   const blankQuestion = type => ({type, text: "", help: "", required: false, ...(CHOICE.includes(type) ? {options: [{text: ""}, {text: ""}]} : {}), ...(type === "rating" ? {scale_max: 5} : {})});
 
   add("adm-surveys", "Admin", "Polls & surveys", async el => {
@@ -38,7 +44,7 @@
       out.innerHTML = `<div id="svmsg" class="msg" hidden></div><section class="card"><h2>Start a new one</h2><div class="svgrid"><button class="svstarter" data-tpl=""><b>Blank survey</b><span class="muted">Write your own questions.</span></button>${starters}</div>
         <p class="muted" style="margin-top:8px">A starter is only a draft to edit: the questions, party or brand names and wording are placeholders you change. Nothing is public until you open it.</p></section>
         <section class="card" style="margin-top:14px"><h2>Your polls and surveys (${data.surveys.length})</h2><div style="overflow:auto"><table><thead><tr><th>Name</th><th>State</th><th>Answers</th><th>Changed</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5">None yet. Pick a starter above.</td></tr>'}</tbody></table></div></section>`;
-      out.querySelectorAll("[data-tpl]").forEach(b => b.onclick = async () => { try { const t = b.dataset.tpl ? (await api("/api/v1/surveys/template", {key: b.dataset.tpl})).survey : {title: "", kind: "survey", category: "opinion", questions: []}; cur = {status: "draft", language: "en", access: "public", results_mode: "private", sampling: "self_selected", contact_mode: "none", contact_fields: [], min_results: 10, ...t}; tab = "questions"; edit(); } catch (e) { say(e.message); } });
+      out.querySelectorAll("[data-tpl]").forEach(b => b.onclick = async () => { try { const t = b.dataset.tpl ? (await api("/api/v1/surveys/template", {key: b.dataset.tpl})).survey : {title: "", kind: "survey", category: "opinion", questions: []}; cur = {status: "draft", language: "en", access: "public", promote: true, results_mode: "private", sampling: "self_selected", contact_mode: "none", contact_fields: [], min_results: 10, ...t}; tab = "questions"; edit(); } catch (e) { say(e.message); } });
       out.querySelectorAll("[data-open]").forEach(b => b.onclick = async () => { cur = (await fresh("/api/v1/surveys/get", {id: b.dataset.open})).survey; tab = "questions"; edit(); });
       out.querySelectorAll("[data-res]").forEach(b => b.onclick = async () => { cur = (await fresh("/api/v1/surveys/get", {id: b.dataset.res})).survey; tab = "results"; edit(); });
       out.querySelectorAll("[data-dup]").forEach(b => b.onclick = async () => { try { await post("/api/v1/surveys/duplicate", {id: +b.dataset.dup}); await list(); say("Copied as a draft.", true); } catch (e) { say(e.message); } });
@@ -70,13 +76,14 @@
       qs.forEach((q, i) => {
         const card = document.createElement("div"); card.className = "svq" + (q.archived ? " arch" : "");
         const isChoice = CHOICE.includes(q.type), canDelete = !(locked && q.id);
-        const opts = (q.options || []).map((o, k) => `<div class="opt" data-o="${k}"><input type="text" value="${esc(o.text)}" maxlength="200" placeholder="Option ${k + 1}">
+        const opts = (q.options || []).map((o, k) => `<div class="opt" data-o="${k}"><span class="btnrow">${o.image ? `<img class="svthumb" src="${esc(imgUrl(o.image))}" alt=""><button class="btn" data-oi-x title="Remove the picture">×</button>` : (q.type === "dropdown" ? "" : '<button class="btn" data-oi title="Add a logo or picture to this option">Picture</button>')}</span><input type="text" value="${esc(o.text)}" maxlength="200" placeholder="Option ${k + 1}">
           ${["single", "multi", "dropdown"].includes(q.type) ? `<label title="Respondent writes in their own answer"><input type="checkbox" data-f="other"${o.other ? " checked" : ""}> other</label>` : "<span></span>"}${q.type === "multi" ? `<label title="Cannot be combined with other choices"><input type="checkbox" data-f="exclusive"${o.exclusive ? " checked" : ""}> alone</label>` : "<span></span>"}
           <span class="btnrow"><button class="btn" data-ou>↑</button><button class="btn" data-od>↓</button>${locked && o.id ? `<button class="btn" data-oa>${o.archived ? "Show" : "Hide"}</button>` : '<button class="btn" data-ox>×</button>'}</span></div>`).join("");
         const cond = q.show_if ? q.show_if : null, ref = cond && qs.find(z => z.id === cond.q);
         card.innerHTML = `<div class="bar"><span class="tag">${i + 1}</span><span class="tag">${esc(TYPE_LABEL[q.type])}</span>${q.archived ? '<span class="tag red">hidden from new respondents</span>' : ""}<span style="flex:1"></span>
           <button class="btn" data-qu>↑</button><button class="btn" data-qd>↓</button><button class="btn" data-qc>Copy</button>${locked && q.id ? `<button class="btn" data-qa>${q.archived ? "Show again" : "Archive"}</button>` : ""}${canDelete ? '<button class="btn" data-qx>Delete</button>' : ""}</div>
           <label>${q.type === "section" ? "Heading text" : "Question"}<textarea rows="2" data-f="text" maxlength="400">${esc(q.text)}</textarea></label><label>Help text (optional)<input type="text" data-f="help" maxlength="300" value="${esc(q.help || "")}"></label>
+          <div class="btnrow" style="margin:6px 0;align-items:center">${q.image ? `<img class="svthumb" style="height:60px;width:auto;max-width:160px" src="${esc(imgUrl(q.image))}" alt=""><button class="btn" data-qi-x>Remove the picture</button>` : '<button class="btn" data-qi>Add a picture above the question</button>'}</div>
           ${q.type !== "section" ? `<label><input type="checkbox" data-f="required"${q.required ? " checked" : ""}> must be answered</label>` : ""}
           ${isChoice ? `<div style="margin-top:8px"><b style="font-size:13px">Options</b>${opts}<div class="btnrow"><button class="btn" data-oadd>+ Option</button><button class="btn" data-opaste>Paste many (one per line)</button></div>${q.type !== "ranking" ? `<label><input type="checkbox" data-f="randomize"${q.randomize ? " checked" : ""}> show the options in random order (other and alone stay last)</label>` : ""}${q.type === "multi" ? `<label>Most choices allowed (empty = any)<input type="number" min="1" data-f="max_select" value="${q.max_select || ""}"></label>` : ""}</div>` : ""}
           ${q.type === "rating" ? `<div class="svgrid"><label>Scale from 1 to<input type="number" min="3" max="10" data-f="scale_max" value="${q.scale_max || 5}"></label><label>Low end label<input type="text" data-f="label_low" maxlength="40" value="${esc(q.label_low || "")}"></label><label>High end label<input type="text" data-f="label_high" maxlength="40" value="${esc(q.label_high || "")}"></label></div>` : ""}
@@ -89,6 +96,8 @@
         card.querySelectorAll("[data-f]").forEach(inp => { if (inp.closest("[data-o]")) return; inp.onchange = inp.oninput = () => { const f = inp.dataset.f; if (inp.type === "checkbox") q[f] = inp.checked; else if (inp.type === "number") set(f, inp.value === "" ? "" : +inp.value); else q[f] = inp.value; }; });
         card.querySelectorAll("[data-o]").forEach(row => { const k = +row.dataset.o, o = q.options[k];
           row.querySelector("input[type=text]").oninput = e => { o.text = e.target.value; };
+          const oi = row.querySelector("[data-oi]"); if (oi) oi.onclick = async () => { try { const r = await pickImage("option"); if (r) { o.image = r.key; drawQuestions(body); } } catch (e) { say(e.message); } };
+          const oix = row.querySelector("[data-oi-x]"); if (oix) oix.onclick = () => { delete o.image; drawQuestions(body); };
           row.querySelectorAll("input[type=checkbox]").forEach(c => c.onchange = () => { o[c.dataset.f] = c.checked; });
           const mv = d => { const j = k + d; if (j >= 0 && j < q.options.length) { [q.options[k], q.options[j]] = [q.options[j], q.options[k]]; drawQuestions(body); } };
           row.querySelector("[data-ou]").onclick = () => mv(-1); row.querySelector("[data-od]").onclick = () => mv(1);
@@ -104,6 +113,8 @@
         card.querySelector("[data-qc]").onclick = () => { const c = JSON.parse(JSON.stringify(q)); delete c.id; delete c.archived; delete c.show_if; (c.options || []).forEach(o => { delete o.id; delete o.archived; }); qs.splice(i + 1, 0, c); drawQuestions(body); };
         const qa = card.querySelector("[data-qa]"); if (qa) qa.onclick = () => { q.archived = !q.archived; drawQuestions(body); };
         const qx = card.querySelector("[data-qx]"); if (qx) qx.onclick = () => { if (confirm("Delete this question?")) { qs.splice(i, 1); drawQuestions(body); } };
+        const qi = card.querySelector("[data-qi]"); if (qi) qi.onclick = async () => { try { const r = await pickImage("question"); if (r) { q.image = r.key; drawQuestions(body); } } catch (e) { say(e.message); } };
+        const qix = card.querySelector("[data-qi-x]"); if (qix) qix.onclick = () => { delete q.image; drawQuestions(body); };
         box.append(card);
       });
       if (!qs.length) box.innerHTML = '<p class="muted">No questions yet. Add one below.</p>';
@@ -117,12 +128,14 @@
       body.innerHTML = `<section class="card"><h2>About it</h2><div class="svgrid"><label>Name<input data-s="title" maxlength="200" value="${esc(c.title || "")}"></label><label>Web address /survey/<input data-s="slug" maxlength="70" value="${esc(c.slug || "")}" placeholder="made from the name"></label>
           <label>Kind${sel("kind", [["poll", "Poll (1 to 3 questions, quick result)"], ["survey", "Survey (many questions)"]], c.kind)}</label><label>Subject${sel("category", Object.entries(CATEGORY), c.category)}</label><label>Words on buttons${sel("language", [["en", "English"], ["hi", "हिन्दी"]], c.language)}</label></div>
         <label style="display:block;margin-top:10px">Short description (also for search results)<textarea data-s="description" rows="2" maxlength="700">${esc(c.description || "")}</textarea></label>
+        <div class="btnrow" style="margin-top:10px;align-items:center"><b style="font-size:13px">Logo or cover picture (shown at the top, and when the link is shared)</b>${c.logo_image ? `<img class="svthumb" style="height:48px;width:auto;max-width:180px" src="${esc(imgUrl(c.logo_image))}" alt=""><button class="btn" id="svlogox">Remove</button>` : '<button class="btn" id="svlogo">Add a logo</button>'}</div>
         <label style="display:block;margin-top:10px">Introduction shown above the questions<textarea data-s="intro" rows="3" maxlength="3000">${esc(c.intro || "")}</textarea></label>
         <label style="display:block;margin-top:10px">Thank-you text (empty = the standard one)<textarea data-s="thank_you" rows="2" maxlength="1000">${esc(c.thank_you || "")}</textarea></label></section>
         <section class="card" style="margin-top:14px"><h2>Who can answer, and when</h2><div class="svgrid"><label>Access${sel("access", [["public", "Anyone with the link"], ["invite", "Invitation links only (one answer per link)"]], c.access)}</label>
           <label>Opens (Indian time)<input type="datetime-local" data-s="opens_at" value="${esc(istInput(c.opens_at))}"></label><label>Closes (Indian time)<input type="datetime-local" data-s="closes_at" value="${esc(istInput(c.closes_at))}"></label><label>Stop after this many answers<input type="number" min="1" data-s="max_responses" value="${c.max_responses || ""}"></label>
           <label>After the last question go to (https address, optional)<input data-s="redirect_url" maxlength="500" value="${esc(c.redirect_url || "")}"></label></div>
           <label style="display:block;margin-top:10px"><input type="checkbox" data-s="allow_repeat"${c.allow_repeat ? " checked" : ""}> allow several answers from one device (a kiosk or a shared phone). Otherwise one answer per browser.</label>
+          <label style="display:block"><input type="checkbox" data-s="promote"${c.promote !== false ? " checked" : ""}> show it on the home page while it is open (a pop-up with a button, and a section right after the top banner)</label>
           <label style="display:block"><input type="checkbox" data-s="listed"${c.listed ? " checked" : ""}> show it on the public Polls page (/polls) and let search engines find it</label></section>
         <section class="card" style="margin-top:14px"><h2>Personal details and consent</h2><p class="muted">The default is no personal details at all: answers are anonymous. Ask only when you need to call or e-mail people back, and say why.</p><div class="svgrid"><label>Ask for contact details${sel("contact_mode", [["none", "No (anonymous)"], ["optional", "Optional"], ["required", "Required"]], c.contact_mode)}</label>
           <label>Which details<select multiple size="3" data-s="contact_fields">${[["name", "Name"], ["mobile", "Mobile number"], ["email", "E-mail"]].map(([v, l]) => `<option value="${v}"${(c.contact_fields || []).includes(v) ? " selected" : ""}>${l}</option>`).join("")}</select></label></div>
@@ -137,6 +150,8 @@
       body.querySelectorAll("[data-s]").forEach(inp => { const k = inp.dataset.s; inp.onchange = inp.oninput = () => {
         if (inp.type === "checkbox") c[k] = inp.checked; else if (inp.multiple) c[k] = [...inp.selectedOptions].map(o => o.value); else if (inp.type === "number") c[k] = inp.value === "" ? null : +inp.value; else if (inp.type === "datetime-local") c[k] = istIso(inp.value); else c[k] = inp.value;
         if (["category"].includes(k)) drawSettings(body); }; });
+      const lg = $("#svlogo", body); if (lg) lg.onclick = async () => { try { const r = await pickImage("logo"); if (r) { c.logo_image = r.key; drawSettings(body); } } catch (e) { say(e.message); } };
+      const lgx = $("#svlogox", body); if (lgx) lgx.onclick = () => { c.logo_image = ""; drawSettings(body); };
     };
 
     /* ------------------------------------------------------------------ share and open */

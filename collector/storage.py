@@ -6,7 +6,7 @@ import time
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, create_engine, event, inspect, text
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, Numeric, String, Text, UniqueConstraint, create_engine, event, inspect, text
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
@@ -436,11 +436,27 @@ class Survey(Base):
     max_responses: Mapped[int | None] = mapped_column(Integer, nullable=True)
     allow_repeat: Mapped[bool] = mapped_column(Boolean, default=False)      # several answers from one device (a kiosk, a shared phone)
     listed: Mapped[bool] = mapped_column(Boolean, default=False)            # shown on the public Polls page
+    promote: Mapped[bool] = mapped_column(Boolean, default=True)           # shown on the home page (a popup and a section) while it is open
     redirect_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    logo_image: Mapped[str | None] = mapped_column(String(24), nullable=True)   # key of a SurveyImage: the logo or cover picture shown at the top
     questions_json: Mapped[str] = mapped_column(Text, default="[]")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+
+
+class SurveyImage(Base):
+    """A picture used in a survey (a logo on an option, a picture above a question, the survey's logo). Stored already checked and shrunk, as WebP, in the database, and served at /survey-img/<key>.webp."""
+    __tablename__ = "stx_survey_images"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String(24), unique=True, index=True)
+    survey_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)   # empty until the survey that uses it is saved
+    filename: Mapped[str] = mapped_column(String(160), default="")
+    width: Mapped[int] = mapped_column(Integer, default=0)
+    height: Mapped[int] = mapped_column(Integer, default=0)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
+    created_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
 
 
 class SurveyResponse(Base):

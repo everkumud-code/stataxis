@@ -9,6 +9,9 @@ Sending an answer is limited by address (and per survey), a hidden trap field ca
 
 from __future__ import annotations
 
+import base64
+import binascii
+import hashlib
 import json
 import time
 from datetime import UTC, datetime
@@ -24,6 +27,7 @@ from api.rate_limit import client_ip, limiter
 from collector.storage import Survey, SurveyResponse, User
 
 MAX_BODY = 600_000
+MAX_IMAGE_BODY = 3_800_000   # a 2.5 MB picture as base64 inside JSON
 _CACHE: dict[tuple[int, str], tuple[float, Any]] = {}
 
 
@@ -115,18 +119,29 @@ def _admin(session: Any, user: User, method: str, route: str, q: dict[str, str],
         return _json(start_response, 404, {"error": "not found"})
     if method != "POST":
         return _json(start_response, 405, {"error": "method not allowed"})
+    if route == "images/upload":
+        body = _read_body(environ, MAX_IMAGE_BODY)
+        try:
+            raw = base64.b64decode(str(body.get("data") or "").split(",", 1)[-1], validate=True)
+        except (binascii.Error, ValueError):
+            raise ValueError("The picture could not be read. Please try another file.") from None
+        purpose = str(body.get("purpose") or "option")
+        return _json(start_response, 200, core.store_image(session, str(body.get("filename") or "picture"), raw, user.email, purpose if purpose in core.SIZE_LIMITS else "option"))
     body = _read_body(environ)
     if route == "save":
         saved = core.save_survey(session, user.email, body, _int(body["id"], "id") if body.get("id") else None)
         _CACHE.clear()
+        _HOME.clear()
         return _json(start_response, 200, {"survey": saved})
     if route == "status":
         saved = core.set_status(session, user.email, _int(body.get("id"), "id"), str(body.get("status") or ""))
         _CACHE.clear()
+        _HOME.clear()
         return _json(start_response, 200, {"survey": saved})
     if route == "delete":
         out = core.delete_survey(session, user.email, _int(body.get("id"), "id"))
         _CACHE.clear()
+        _HOME.clear()
         return _json(start_response, 200, out)
     if route == "duplicate":
         return _json(start_response, 200, {"survey": core.duplicate_survey(session, user.email, _int(body.get("id"), "id"))})
@@ -206,10 +221,51 @@ def _respond(session: Any, row: Survey, environ: dict[str, Any], start_response:
     core.submit_response(session, row, body.get("answers"), contact=body.get("contact"), consent=bool(body.get("consent")), token=str(body.get("token") or "")[:100], device=device,
                          started_ms=body.get("started_ms"), invite=str(body.get("invite") or "")[:100])
     _CACHE.clear()
+    _HOME.clear()
     return _json(start_response, 200, {"ok": True})
 
 
 # ----------------------------------------------------------------------------------------------- the pages
+def _image_response(session: Any, path: str, environ: dict[str, Any], start_response: Callable[..., Any], extra: list[tuple[str, str]], method: str):
+    """A picture of a survey, by its random key. Pictures never change under their key, so browsers and caches may keep them for a year; they are served as images only, in a sandbox."""
+    name = path[len("/survey-img/"):]
+    key = name[:-5] if name.endswith(".webp") else ""
+    image = core.get_image(session, key)
+    if image is None:
+        body = b"Not found"
+        start_response("404 Not Found", [("Content-Type", "text/plain; charset=utf-8"), ("Content-Length", str(len(body)))] + extra)
+        return [b"" if method == "HEAD" else body]
+    etag = '"' + hashlib.sha1(image.data).hexdigest()[:20] + '"'
+    headers = [("Content-Type", "image/webp"), ("Cache-Control", "public, max-age=31536000, immutable"), ("ETag", etag), ("Content-Security-Policy", "default-src 'none'; sandbox"), ("X-Content-Type-Options", "nosniff")] + extra
+    if environ.get("HTTP_IF_NONE_MATCH") == etag:
+        start_response("304 Not Modified", headers)
+        return [b""]
+    start_response("200 OK", headers + [("Content-Length", str(len(image.data)))])
+    return [b"" if method == "HEAD" else bytes(image.data)]
+
+
+_HOME: dict[int, tuple[float, list[dict[str, Any]]]] = {}
+
+
+def inject_home_polls(session_factory: Callable[[], Any], body: bytes) -> bytes:
+    """The home page with the open polls on it (kept for 20 seconds). Any failure leaves the page exactly as it was."""
+    try:
+        key = id(session_factory)
+        hit = _HOME.get(key)
+        if hit and time.monotonic() - hit[0] < 20:
+            items = hit[1]
+        else:
+            session = session_factory()
+            try:
+                items = core.home_polls(session)
+            finally:
+                session.close()
+            _HOME[key] = (time.monotonic(), items)
+        return survey_pages.inject_home(body, items)
+    except Exception:
+        return body
+
+
 def _respond_html(start_response: Callable[..., Any], status: int, html: str, extra: list[tuple[str, str]], method: str):
     body = html.encode("utf-8")
     names = {200: "200 OK", 404: "404 Not Found"}
@@ -220,10 +276,12 @@ def _respond_html(start_response: Callable[..., Any], status: int, html: str, ex
 def survey_site_response(session_factory: Callable[[], Any], environ: dict[str, Any], start_response: Callable[..., Any], extra: list[tuple[str, str]]):
     """/polls, /survey/<slug> and /survey/<slug>/results; None when the path is not one of them."""
     path, method = environ.get("PATH_INFO", ""), environ.get("REQUEST_METHOD", "GET")
-    if method not in ("GET", "HEAD") or not (path == "/polls" or path.startswith("/survey/")):
+    if method not in ("GET", "HEAD") or not (path == "/polls" or path.startswith(("/survey/", "/survey-img/"))):
         return None
     session = session_factory()
     try:
+        if path.startswith("/survey-img/"):
+            return _image_response(session, path, environ, start_response, extra, method)
         if path == "/polls":
             items = [core.serialize(r) for r in session.query(Survey).filter(Survey.listed.is_(True), Survey.access == "public", Survey.status == "live").order_by(Survey.id.desc()).all()]
             return _respond_html(start_response, 200, survey_pages.polls_index([i for i in items if i["state"] == "open"]), extra, method)

@@ -23,7 +23,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from collector.storage import Survey, SurveyInvite, SurveyResponse, SurveyRevision
+from collector.storage import Survey, SurveyImage, SurveyInvite, SurveyResponse, SurveyRevision
 
 KINDS = ("poll", "survey")
 CATEGORIES = ("opinion", "political", "brand", "customer", "employee", "media", "other")
@@ -45,11 +45,11 @@ STRINGS = {   # the words of the buttons and messages, by survey language; the q
     "en": {"submit": "Submit", "next": "Next", "back": "Back", "required": "This question needs an answer.", "other": "Please say what", "thanks": "Thank you. Your answer has been recorded.", "closed": "This is closed.",
            "not_yet": "This has not opened yet.", "invite": "This survey is by invitation. Please use the link you were sent.", "already": "You have already answered this.", "consent": "I agree that my details may be used for this survey.",
            "results": "See the results", "select_up_to": "Choose up to", "one_per_rank": "Give each choice its own rank", "choose": "Choose…", "name": "Your name", "mobile": "Mobile number", "email": "E-mail",
-           "progress": "Question", "of": "of", "powered": "Conducted by StatAxis", "private_note": "Your answers are anonymous unless this survey asks for your contact details."},
+           "progress": "Question", "of": "of", "powered": "Conducted by StatAxis", "cta_poll": "Take the poll", "cta_survey": "Take the survey", "live_poll": "Live now", "not_now": "Not now", "private_note": "Your answers are anonymous unless this survey asks for your contact details."},
     "hi": {"submit": "जमा करें", "next": "आगे", "back": "पीछे", "required": "इस प्रश्न का उत्तर ज़रूरी है।", "other": "कृपया बताएं", "thanks": "धन्यवाद। आपका उत्तर दर्ज हो गया है।", "closed": "यह बंद हो चुका है।",
            "not_yet": "यह अभी शुरू नहीं हुआ है।", "invite": "यह सर्वे केवल आमंत्रित लोगों के लिए है। कृपया भेजे गए लिंक का उपयोग करें।", "already": "आप इसका उत्तर पहले ही दे चुके हैं।",
            "consent": "मैं सहमत हूँ कि मेरी जानकारी इस सर्वे के लिए इस्तेमाल हो सकती है।", "results": "नतीजे देखें", "select_up_to": "अधिकतम चुनें", "one_per_rank": "हर विकल्प को अलग क्रम दें",
-           "choose": "चुनें…", "name": "आपका नाम", "mobile": "मोबाइल नंबर", "email": "ई-मेल", "progress": "प्रश्न", "of": "में से", "powered": "स्टैटएक्सिस द्वारा संचालित",
+           "choose": "चुनें…", "name": "आपका नाम", "mobile": "मोबाइल नंबर", "email": "ई-मेल", "progress": "प्रश्न", "of": "में से", "powered": "स्टैटएक्सिस द्वारा संचालित", "cta_poll": "पोल में भाग लें", "cta_survey": "सर्वे में भाग लें", "live_poll": "अभी चालू", "not_now": "अभी नहीं",
            "private_note": "आपके उत्तर गोपनीय हैं, जब तक यह सर्वे आपसे संपर्क जानकारी न माँगे।"},
 }
 INDIA_STATES = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
@@ -132,6 +132,107 @@ def slugify(text: str) -> str:
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", str(text or "").lower())).strip("-")[:70]
 
 
+# ----------------------------------------------------------------------------------------------- pictures
+MAX_UPLOAD_BYTES, MAX_PIXELS = 2_500_000, 40_000_000
+SIZE_LIMITS = {"option": 480, "logo": 600, "question": 1200}   # the longest side after shrinking, by use
+_KEY = re.compile(r"^[0-9a-f]{20}$")
+_MAGIC = ((b"\x89PNG\r\n\x1a\n", "PNG"), (b"\xff\xd8\xff", "JPEG"), (b"GIF87a", "GIF"), (b"GIF89a", "GIF"))
+
+
+def _image_key(value: Any) -> str:
+    v = str(value or "")
+    return v if _KEY.fullmatch(v) else ""
+
+
+def image_url(key: str | None) -> str:
+    return f"/survey-img/{key}.webp" if key else ""
+
+
+def process_image(raw: bytes, purpose: str = "option") -> tuple[bytes, int, int]:
+    """A picture made safe for the page: only PNG, JPEG, WebP or GIF (checked by the file's own first bytes, never by its name; SVG is refused because it can carry script), turned upright, stripped of
+    camera data and location, shrunk to a sensible size and stored as WebP. Raises ValueError with a plain sentence."""
+    from PIL import Image, ImageOps, UnidentifiedImageError
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise ValueError("The picture is too large: the most is 2.5 MB.")
+    if not (any(raw.startswith(m) for m, _ in _MAGIC) or (raw[:4] == b"RIFF" and raw[8:12] == b"WEBP")):
+        raise ValueError("Only PNG, JPEG, WebP or GIF pictures are accepted.")
+    try:
+        img = Image.open(io.BytesIO(raw))
+        if img.width * img.height > MAX_PIXELS:
+            raise ValueError("The picture has too many pixels. Please use a smaller one.")
+        img.load()
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError, SyntaxError) as exc:
+        raise ValueError("That file is not a picture that can be read.") from exc
+    img = ImageOps.exif_transpose(img)
+    img = img.convert("RGBA") if (img.mode in ("P", "LA", "RGBA") or "transparency" in img.info) else img.convert("RGB")
+    limit = SIZE_LIMITS.get(purpose, 480)
+    img.thumbnail((limit, limit), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, "WEBP", quality=88, method=4)
+    return buf.getvalue(), img.width, img.height
+
+
+def store_image(session: Session, filename: str, raw: bytes, by: str | None, purpose: str = "option", survey_id: int | None = None) -> dict[str, Any]:
+    data, w, h = process_image(raw, purpose)
+    session.query(SurveyImage).filter(SurveyImage.survey_id.is_(None), SurveyImage.created_at < _now() - timedelta(hours=48)).delete(synchronize_session=False)   # pictures uploaded but never used
+    key = secrets.token_hex(10)
+    session.add(SurveyImage(key=key, survey_id=survey_id, filename=re.sub(r"[^\w.\- ]", "", str(filename or ""))[:160], width=w, height=h, data=data, created_at=_now(), created_by=by))
+    session.commit()
+    return {"key": key, "url": image_url(key), "width": w, "height": h}
+
+
+def get_image(session: Session, key: str) -> SurveyImage | None:
+    return session.query(SurveyImage).filter_by(key=key).first() if _image_key(key) else None
+
+
+def referenced_image_keys(questions: list[dict[str, Any]], logo: str | None = None) -> set[str]:
+    keys = {logo} if logo else set()
+    for q in questions:
+        if q.get("image"):
+            keys.add(q["image"])
+        keys.update(o["image"] for o in q.get("options", []) if o.get("image"))
+    return keys
+
+
+def _verify_images(session: Session, keys: set[str], survey_id: int | None) -> None:
+    if not keys:
+        return
+    rows = session.query(SurveyImage).filter(SurveyImage.key.in_(keys)).all()
+    if len(rows) != len(keys):
+        raise ValueError("A picture in this survey is missing. Please add it again.")
+    if any(r.survey_id not in (None, survey_id) for r in rows):
+        raise ValueError("A picture belongs to another survey. Please upload it again.")
+
+
+def _attach_images(session: Session, keys: set[str], survey_id: int) -> None:
+    if keys:
+        session.query(SurveyImage).filter(SurveyImage.key.in_(keys), SurveyImage.survey_id.is_(None)).update({"survey_id": survey_id}, synchronize_session=False)
+
+
+def _clone_images(session: Session, questions: list[dict[str, Any]], logo: str | None) -> tuple[list[dict[str, Any]], str | None]:
+    """Copies of the pictures for a copy of a survey, so that deleting one survey never takes a picture from the other."""
+    made: dict[str, str] = {}
+
+    def clone(key: str) -> str:
+        if key not in made:
+            src = session.query(SurveyImage).filter_by(key=key).first()
+            if src is None:
+                return ""
+            new = secrets.token_hex(10)
+            session.add(SurveyImage(key=new, survey_id=None, filename=src.filename, width=src.width, height=src.height, data=src.data, created_at=_now(), created_by=src.created_by))
+            made[key] = new
+        return made[key]
+    out = json.loads(json.dumps(questions))
+    for q in out:
+        if q.get("image"):
+            q["image"] = clone(q["image"]) or None
+        for o in q.get("options", []):
+            if o.get("image"):
+                o["image"] = clone(o["image"]) or None
+    session.flush()
+    return out, (clone(logo) if logo else None)
+
+
 # ----------------------------------------------------------------------------------------------- questions
 def _next_id(prefix: str, used: set[str]) -> str:
     n = 1 + max((int(x[len(prefix):]) for x in used if re.fullmatch(prefix + r"\d+", x)), default=0)
@@ -160,6 +261,8 @@ def clean_questions(raw: Any, previous: list[dict[str, Any]] | None = None, has_
         seen.add(qid)
         q: dict[str, Any] = {"id": qid, "type": qtype, "text": _text(item.get("text"), f"the text of question {index}", 400, required=True), "help": _text(item.get("help"), "the help text", 300),
                              "required": bool(item.get("required")) and qtype != "section", "archived": bool(item.get("archived"))}
+        if _image_key(item.get("image")):
+            q["image"] = _image_key(item.get("image"))
         if qtype in CHOICE:
             options, used_o = [], set()
             for o in item.get("options") or []:
@@ -176,7 +279,7 @@ def clean_questions(raw: Any, previous: list[dict[str, Any]] | None = None, has_
                     oid = _next_id("o", used_o | taken)
                 taken.add(oid)
                 options.append({"id": oid, "text": _text(o.get("text"), "an option", 200), "other": bool(o.get("other")) and qtype in ("single", "multi", "dropdown"),
-                                "exclusive": bool(o.get("exclusive")) and qtype == "multi", "archived": bool(o.get("archived"))})
+                                "exclusive": bool(o.get("exclusive")) and qtype == "multi", "archived": bool(o.get("archived")), **({"image": _image_key(o.get("image"))} if _image_key(o.get("image")) else {})})
             if len([o for o in options if not o["archived"]]) < 2:
                 raise ValueError(f"question {index} needs at least two options")
             if len(options) > MAX_OPTIONS:
@@ -295,7 +398,8 @@ def clean_survey(payload: dict[str, Any], session: Session, current: Survey | No
             "sampling": sampling, "population_size": population if sampling == "random_sample" else None, "contact_mode": contact_mode, "contact_fields": ",".join(fields) if contact_mode != "none" else "", "consent_text": consent,
             "sponsor": _text(payload.get("sponsor"), "who paid for it", 200), "method_note": _text(payload.get("method_note"), "the method note", 1500), "opens_at": opens, "closes_at": closes,
             "max_responses": _int(payload.get("max_responses"), "the most answers", 1, 10_000_000), "allow_repeat": bool(payload.get("allow_repeat")), "listed": bool(payload.get("listed")),
-            "redirect_url": redirect or None, "questions": questions}
+            "promote": bool(payload["promote"]) if "promote" in payload else (bool(current.promote) if current else True),
+            "redirect_url": redirect or None, "logo_image": _image_key(payload.get("logo_image") if "logo_image" in payload else (current.logo_image if current else None)) or None, "questions": questions}
 
 
 def serialize(row: Survey, session: Session | None = None) -> dict[str, Any]:
@@ -303,7 +407,7 @@ def serialize(row: Survey, session: Session | None = None) -> dict[str, Any]:
            "status": row.status, "state": state_of(row), "access": row.access, "results_mode": row.results_mode, "results_hold": bool(row.results_hold), "min_results": row.min_results, "sampling": row.sampling,
            "population_size": row.population_size, "contact_mode": row.contact_mode, "contact_fields": [f for f in (row.contact_fields or "").split(",") if f], "consent_text": row.consent_text, "sponsor": row.sponsor,
            "method_note": row.method_note, "opens_at": row.opens_at.isoformat() if row.opens_at else None, "closes_at": row.closes_at.isoformat() if row.closes_at else None, "max_responses": row.max_responses,
-           "allow_repeat": bool(row.allow_repeat), "listed": bool(row.listed), "redirect_url": row.redirect_url or "", "questions": json.loads(row.questions_json or "[]"),
+           "allow_repeat": bool(row.allow_repeat), "listed": bool(row.listed), "promote": bool(row.promote), "redirect_url": row.redirect_url or "", "logo_image": row.logo_image or "", "logo_url": image_url(row.logo_image), "questions": json.loads(row.questions_json or "[]"),
            "created_at": row.created_at.isoformat() if row.created_at else None, "updated_at": row.updated_at.isoformat() if row.updated_at else None, "updated_by": row.updated_by}
     if session is not None:
         out["responses"] = response_count(session, row.id)
@@ -359,6 +463,8 @@ def save_survey(session: Session, by: str, payload: dict[str, Any], survey_id: i
         raise ValueError("the state must be draft, live or closed")
     if status == "live":
         _go_live_checks(data)
+    keys = referenced_image_keys(data["questions"], data.get("logo_image"))
+    _verify_images(session, keys, row.id if row else None)
     created = row is None
     if created:
         row = Survey(created_at=_now())
@@ -367,6 +473,7 @@ def save_survey(session: Session, by: str, payload: dict[str, Any], survey_id: i
     _apply(row, data)
     row.status, row.updated_at, row.updated_by = status, _now(), by
     session.flush()
+    _attach_images(session, keys, row.id)
     _revise(session, row, "create" if created else ("open" if status == "live" and before != "live" else "close" if status == "closed" and before != "closed" else "update"), by)
     session.commit()
     return serialize(row, session)
@@ -396,6 +503,7 @@ def delete_survey(session: Session, by: str, survey_id: int) -> dict[str, Any]:
         session.delete(r)
     for i in session.query(SurveyInvite).filter_by(survey_id=row.id).all():
         session.delete(i)
+    session.query(SurveyImage).filter_by(survey_id=row.id).delete(synchronize_session=False)
     session.delete(row)
     session.commit()
     return {"deleted": snap["slug"]}
@@ -408,8 +516,8 @@ def duplicate_survey(session: Session, by: str, survey_id: int) -> dict[str, Any
     while session.query(Survey).filter_by(slug=slug).first():
         n += 1
         slug = f"{base}-{n}"
-    questions = [{k: v for k, v in q.items()} for q in src["questions"]]
-    return save_survey(session, by, {**src, "slug": slug, "title": src["title"] + " (copy)", "status": "draft", "questions": questions, "opens_at": None, "closes_at": None, "listed": False})
+    questions, logo = _clone_images(session, src["questions"], src.get("logo_image"))
+    return save_survey(session, by, {**src, "slug": slug, "title": src["title"] + " (copy)", "status": "draft", "questions": questions, "logo_image": logo, "opens_at": None, "closes_at": None, "listed": False})
 
 
 def list_surveys(session: Session) -> list[dict[str, Any]]:
@@ -421,13 +529,36 @@ def revisions(session: Session, survey_id: int) -> list[dict[str, Any]]:
 
 
 # ----------------------------------------------------------------------------------------------- the page a respondent sees
+def _with_urls(questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    for q in questions:
+        if q.get("image"):
+            q["image_url"] = image_url(q["image"])
+        for o in q.get("options", []):
+            if o.get("image"):
+                o["image_url"] = image_url(o["image"])
+    return questions
+
+
 def public_definition(row: Survey) -> dict[str, Any]:
     """Only what the respondent's page needs: no settings of the administrator, no archived questions or options."""
     s = serialize(row)
     strings = STRINGS[s["language"]]
     return {"slug": s["slug"], "title": s["title"], "kind": s["kind"], "category": s["category"], "description": s["description"], "intro": s["intro"], "thank_you": s["thank_you"] or strings["thanks"], "language": s["language"],
             "strings": strings, "contact": {"mode": s["contact_mode"], "fields": s["contact_fields"], "consent": s["consent_text"]}, "sponsor": s["sponsor"], "redirect_url": s["redirect_url"],
-            "questions": active_questions(s["questions"]), "access": s["access"], "results_mode": s["results_mode"]}
+            "logo_url": s["logo_url"], "questions": _with_urls(active_questions(s["questions"])), "access": s["access"], "results_mode": s["results_mode"]}
+
+
+def home_polls(session: Session, limit: int = 3, now: datetime | None = None) -> list[dict[str, Any]]:
+    """The open, public polls and surveys that are shown on the home page (a popup for the newest, and a section for up to three), newest first. Invitation-only and full ones never appear."""
+    out = []
+    for row in session.query(Survey).filter(Survey.status == "live", Survey.access == "public", Survey.promote.is_(True)).order_by(Survey.id.desc()).all():
+        if accepting(session, row, now)[0]:
+            s = STRINGS[row.language]
+            out.append({"slug": row.slug, "title": row.title, "kind": row.kind, "category": row.category, "description": row.description or row.intro[:160], "logo_url": image_url(row.logo_image),
+                        "cta": s["cta_poll"] if row.kind == "poll" else s["cta_survey"], "label": s["live_poll"], "later": s["not_now"]})
+        if len(out) >= limit:
+            break
+    return out
 
 
 def accepting(session: Session, row: Survey, now: datetime | None = None) -> tuple[bool, str]:
@@ -706,7 +837,7 @@ def _question_result(q: dict[str, Any], answers: list[dict[str, Any]], sampling:
                     counts[oid] += 1
             if a.get("t"):
                 others.append(a["t"])
-        out["options"] = [{"id": o["id"], "text": o["text"], "count": counts[o["id"]], "pct": round(100 * counts[o["id"]] / n, 1) if n else 0.0, "archived": bool(o.get("archived")),
+        out["options"] = [{"id": o["id"], "text": o["text"], "count": counts[o["id"]], "pct": round(100 * counts[o["id"]] / n, 1) if n else 0.0, "archived": bool(o.get("archived")), **({"image_url": image_url(o["image"])} if o.get("image") else {}),
                            **({"moe": margin_of_error(counts[o["id"]] / n, n, population)} if scientific and n else {})} for o in q["options"]]
         out["other_texts"] = others[-100:]
     elif q["type"] == "ranking":
@@ -715,7 +846,7 @@ def _question_result(q: dict[str, Any], answers: list[dict[str, Any]], sampling:
             for rank, oid in enumerate(a.get("o") or [], 1):
                 if oid in pos:
                     pos[oid].append(rank)
-        out["options"] = sorted([{"id": o["id"], "text": o["text"], "avg_rank": round(sum(pos[o["id"]]) / len(pos[o["id"]]), 2) if pos[o["id"]] else None,
+        out["options"] = sorted([{"id": o["id"], "text": o["text"], **({"image_url": image_url(o["image"])} if o.get("image") else {}), "avg_rank": round(sum(pos[o["id"]]) / len(pos[o["id"]]), 2) if pos[o["id"]] else None,
                                   "first_choice": sum(1 for x in pos[o["id"]] if x == 1), "first_pct": round(100 * sum(1 for x in pos[o["id"]] if x == 1) / n, 1) if n else 0.0}
                                  for o in q["options"]], key=lambda x: (x["avg_rank"] is None, x["avg_rank"] or 0))
     elif q["type"] in ("rating", "nps", "number"):
