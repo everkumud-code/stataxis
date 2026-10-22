@@ -1,0 +1,77 @@
+/* StatAxis public site: skeuomorphic controls. Only the shape and the light change: raised, bevelled keys with a lit top edge and a dark underside that press in when used, round knobs, sunk-in
+   check boxes with a small lit mark. Every colour is the page's own: a blue button stays blue, a dark glass button stays dark. Nothing here moves layout (no size changes), so no page shifts. */
+
+/* ---------- raised keys ---------- */
+.vx-btn,.vx-menu a.cta,.vx-menu a.login,.sx-btn,main button,html .sx-consent button,.sxpop-box .vx-btn{
+  border-radius:12px;
+  background-image:linear-gradient(180deg,rgba(255,255,255,.22) 0%,rgba(255,255,255,.05) 46%,rgba(0,0,0,.26) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -2px 3px rgba(0,0,0,.38),0 0 0 1px rgba(0,0,0,.6),0 7px 14px rgba(0,0,0,.45),0 1px 0 rgba(255,255,255,.08);
+  text-shadow:0 1px 0 rgba(0,0,0,.35);
+  transition:transform .12s ease,box-shadow .12s ease,filter .12s ease,background-color .2s,border-color .2s,color .2s;
+}
+.vx-btn:hover,.vx-menu a.cta:hover,.vx-menu a.login:hover,.sx-btn:hover,main button:hover,html .sx-consent button:hover,.vx-btn.solid:hover,.sx-btn.alt:hover{
+  background-image:linear-gradient(180deg,rgba(255,255,255,.3) 0%,rgba(255,255,255,.08) 46%,rgba(0,0,0,.22) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 3px rgba(0,0,0,.34),0 0 0 1px rgba(0,0,0,.6),0 10px 18px rgba(0,0,0,.5),0 1px 0 rgba(255,255,255,.1);
+  transform:translateY(-1px);
+}
+.vx-btn:active,.vx-menu a.cta:active,.vx-menu a.login:active,.sx-btn:active,main button:active,html .sx-consent button:active,.vx-btn.solid:active{
+  transform:translateY(1px);filter:brightness(.95);
+  background-image:linear-gradient(180deg,rgba(0,0,0,.3) 0%,rgba(0,0,0,.08) 55%,rgba(255,255,255,.08) 100%);
+  box-shadow:inset 0 3px 7px rgba(0,0,0,.6),inset 0 -1px 0 rgba(255,255,255,.14),0 0 0 1px rgba(0,0,0,.6),0 1px 0 rgba(255,255,255,.08);
+}
+.vx-btn:focus-visible,.sx-btn:focus-visible,main button:focus-visible,.vx-menu a:focus-visible{outline:2px solid #fff;outline-offset:3px}
+main button:disabled,html .sx-consent button:disabled{filter:saturate(.6);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 0 0 1px rgba(0,0,0,.5)}
+
+/* a glass button on a dark page keeps its glass; a solid one keeps its colour and gets a convex, glossy face */
+.vx-btn.solid,.sx-btn,main button.btn.primary,html .sx-consent button.primary{
+  background-image:linear-gradient(180deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,.12) 48%,rgba(0,0,0,.2) 100%);
+}
+
+/* ---------- round knobs ---------- */
+.vx-burger{
+  border-radius:50%;
+  background-image:linear-gradient(180deg,rgba(255,255,255,.2),rgba(0,0,0,.28));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -2px 3px rgba(0,0,0,.4),0 0 0 1px rgba(0,0,0,.6),0 6px 12px rgba(0,0,0,.45);
+}
+.vx-burger:active{transform:translateY(1px);box-shadow:inset 0 3px 6px rgba(0,0,0,.6),0 0 0 1px rgba(0,0,0,.6)}
+.vx-faq summary i{
+  background-image:linear-gradient(180deg,rgba(255,255,255,.22),rgba(0,0,0,.3));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -2px 3px rgba(0,0,0,.4),0 0 0 1px rgba(0,0,0,.55),0 4px 8px rgba(0,0,0,.45);
+}
+.vx-faq details[open] summary i{box-shadow:inset 0 3px 6px rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.55),0 0 12px rgba(29,161,255,.35)}
+
+/* ---------- sunk-in check boxes and round selectors, with a lit mark ---------- */
+input[type=checkbox],input[type=radio]{
+  -webkit-appearance:none;appearance:none;flex:0 0 auto;width:20px;height:20px;margin:0;vertical-align:middle;cursor:pointer;position:relative;
+  border:1px solid rgba(0,0,0,.65);border-radius:6px;background-color:#0a1522;
+  background-image:linear-gradient(180deg,rgba(0,0,0,.45),rgba(255,255,255,.1));
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.7),0 1px 0 rgba(255,255,255,.14);
+  transition:box-shadow .15s,background-color .15s;
+}
+input[type=radio]{border-radius:50%}
+input[type=checkbox]:checked,input[type=radio]:checked{
+  background-color:var(--blue,#159de8);
+  background-image:linear-gradient(180deg,rgba(255,255,255,.38),rgba(255,255,255,.04) 55%,rgba(0,0,0,.2));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 3px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.6),0 0 10px color-mix(in srgb,var(--blue,#159de8) 55%,transparent);
+}
+input[type=checkbox]:checked::after{content:"";position:absolute;left:6px;top:2px;width:5px;height:10px;border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg);filter:drop-shadow(0 1px 0 rgba(0,0,0,.4))}
+input[type=radio]:checked::after{content:"";position:absolute;inset:5px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.5)}
+input[type=checkbox]:focus-visible,input[type=radio]:focus-visible{outline:2px solid #fff;outline-offset:2px}
+input[type=checkbox]:disabled,input[type=radio]:disabled{opacity:.5;cursor:not-allowed}
+
+/* ---------- poll pages: keys for the scale, tiles for the options, ranking arrows ---------- */
+.scale button{border-radius:12px}
+.scale button.on{
+  background-image:linear-gradient(180deg,rgba(0,0,0,.3),rgba(0,0,0,.05) 55%,rgba(255,255,255,.12));
+  box-shadow:inset 0 3px 7px rgba(0,0,0,.55),0 0 0 1px rgba(0,0,0,.6),0 0 14px color-mix(in srgb,var(--blue,#159de8) 60%,transparent);
+}
+.opt{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 0 0 1px rgba(0,0,0,.55),0 5px 10px rgba(0,0,0,.4);
+  background-image:linear-gradient(180deg,rgba(255,255,255,.07),rgba(0,0,0,.18));
+}
+.opt.on{box-shadow:inset 0 3px 7px rgba(0,0,0,.5),0 0 0 1px rgba(0,0,0,.6),0 0 14px color-mix(in srgb,var(--blue,#159de8) 45%,transparent)}
+.rank button{border-radius:10px;background-image:linear-gradient(180deg,rgba(255,255,255,.18),rgba(0,0,0,.26));box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 0 0 1px rgba(0,0,0,.55),0 3px 6px rgba(0,0,0,.4)}
+.sxpop-x{border-radius:50%;width:34px;height:34px;top:10px;right:10px;background-image:linear-gradient(180deg,rgba(255,255,255,.18),rgba(0,0,0,.3));box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 0 0 1px rgba(0,0,0,.6),0 4px 8px rgba(0,0,0,.45)}
+
+@media (prefers-reduced-motion:reduce){.vx-btn,.sx-btn,main button,.vx-menu a.cta,.vx-menu a.login{transition:none}.vx-btn:hover,.sx-btn:hover,main button:hover{transform:none}}
+@media print{.vx-btn,.sx-btn,main button{box-shadow:none;background-image:none}}

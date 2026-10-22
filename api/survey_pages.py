@@ -123,7 +123,7 @@ def _shell(title: str, description: str, path: str, robots: str, body: str, extr
             f'<title>{e(title)}</title><meta name="description" content="{e(description)}"><meta name="robots" content="{robots}"><meta name="theme-color" content="#061322"><link rel="canonical" href="{e(canonical)}">'
             f'<meta property="og:site_name" content="StatAxis"><meta property="og:type" content="website"><meta property="og:title" content="{e(title)}"><meta property="og:description" content="{e(description)}"><meta property="og:url" content="{e(canonical)}">'
             f'<meta name="twitter:card" content="{"summary_large_image" if logo_url else "summary"}">' + (f'<meta property="og:image" content="{e(sc.BASE_URL + logo_url)}">' if logo_url else "")
-            + f'<link rel="icon" href="/assets/stataxis-favicon.svg"><style>{CSS}</style>{extra_head}</head><body><main>'
+            + f'<link rel="icon" href="/assets/stataxis-favicon.svg"><link rel="stylesheet" href="/skeuo.css"><style>{CSS}</style>{extra_head}</head><body><main>'
             + (f'<div class="brand"><img class="brandlogo" src="{e(logo_url)}" alt="{e(title.split(" | ")[0])}"></div>' if logo_url else '<div class="brand"><a href="/"><img src="/assets/stataxis-logo.svg" alt="StatAxis"></a></div>') + body + "</main></body></html>")
 
 

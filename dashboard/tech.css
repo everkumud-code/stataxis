@@ -1,3 +1,4 @@
+@import url("skeuo.css");
 /* StatAxis public site: a near-black, instrument-panel look. Huge tight headlines with one italic serif word, small mono labels, dot-matrix fields that answer the cursor, paper / blue / dark panels.
    Fonts are the system's own (nothing is loaded from outside). Every moving part stops for people who ask their device for less motion. The logo is untouched. */
 :root{--bg:#05070b;--bg2:#0a0e15;--panel:#0d121a;--line:#1a2230;--line2:#26324a;--ink:#eef2f7;--mute:#8a97a8;--dim:#5b6878;--blue:#1da1ff;--blue2:#0b86e0;--paper:#e8ecf1;--paper-ink:#0b1017;--gold:#e1b94f;--green:#35d399;--red:#ff7180;
