@@ -406,6 +406,82 @@ class RecoveryCode(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class Survey(Base):
+    """A poll or survey run from the workspace (Surveys). The questions are kept as JSON so a question or an option can be added without a migration; every question and option has a stable id, so results keep their meaning
+    when the wording is corrected. Respondents are anonymous unless the survey asks for contact details."""
+    __tablename__ = "stx_surveys"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slug: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str] = mapped_column(String(8), default="survey")           # poll | survey
+    category: Mapped[str] = mapped_column(String(12), default="opinion")     # opinion | political | brand | customer | employee | media | other
+    description: Mapped[str] = mapped_column(String(700), default="")
+    intro: Mapped[str] = mapped_column(Text, default="")
+    thank_you: Mapped[str] = mapped_column(Text, default="")
+    language: Mapped[str] = mapped_column(String(4), default="en")           # en | hi: the words of the buttons and messages
+    status: Mapped[str] = mapped_column(String(8), default="draft", index=True)   # draft | live | closed
+    access: Mapped[str] = mapped_column(String(8), default="public")         # public | invite
+    results_mode: Mapped[str] = mapped_column(String(12), default="private") # private | after_vote | public | after_close
+    results_hold: Mapped[bool] = mapped_column(Boolean, default=False)       # forces every public result off (for example around an election)
+    min_results: Mapped[int] = mapped_column(Integer, default=10)            # public results appear only after this many answers
+    sampling: Mapped[str] = mapped_column(String(14), default="self_selected")
+    population_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    contact_mode: Mapped[str] = mapped_column(String(8), default="none")     # none | optional | required
+    contact_fields: Mapped[str] = mapped_column(String(60), default="")
+    consent_text: Mapped[str] = mapped_column(Text, default="")
+    sponsor: Mapped[str] = mapped_column(String(200), default="")
+    method_note: Mapped[str] = mapped_column(Text, default="")
+    opens_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closes_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    max_responses: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    allow_repeat: Mapped[bool] = mapped_column(Boolean, default=False)      # several answers from one device (a kiosk, a shared phone)
+    listed: Mapped[bool] = mapped_column(Boolean, default=False)            # shown on the public Polls page
+    redirect_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    questions_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    updated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+
+
+class SurveyResponse(Base):
+    """One person's answers. No address or name is kept unless the survey asked for contact details; the device mark is a salted hash that cannot be turned back into an address."""
+    __tablename__ = "stx_survey_responses"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    survey_id: Mapped[int] = mapped_column(ForeignKey("stx_surveys.id"), index=True)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
+    duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    answers_json: Mapped[str] = mapped_column(Text, default="{}")
+    contact_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(8), default="valid", index=True)   # valid | flagged | removed
+    flags: Mapped[str] = mapped_column(String(200), default="")
+    token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    device_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    invite_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+
+
+class SurveyInvite(Base):
+    """A personal link to an invite-only survey. Only a hash of the link's code is kept, so the codes can be shown only once, when they are made."""
+    __tablename__ = "stx_survey_invites"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    survey_id: Mapped[int] = mapped_column(ForeignKey("stx_surveys.id"), index=True)
+    code_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    label: Mapped[str] = mapped_column(String(160), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SurveyRevision(Base):
+    """Every change to a survey's definition, kept whole; survives the deletion of the survey."""
+    __tablename__ = "stx_survey_revisions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    survey_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    slug: Mapped[str] = mapped_column(String(80), default="")
+    action: Mapped[str] = mapped_column(String(12), default="update")
+    snapshot: Mapped[str] = mapped_column(Text, default="{}")
+    by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
+
+
 def _add_column_if_missing(connection, table: str, name: str, definition: str, known_columns: set[str]) -> None:
     if name in known_columns:
         return

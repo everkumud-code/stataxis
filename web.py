@@ -26,6 +26,7 @@ from api.my_channels_http import my_channels_application
 from api.public_http import public_application
 from api import blog_cms, services_cms
 from api.services_http import cms_application, site_response
+from api.survey_http import survey_admin_application, survey_public_application, survey_site_response
 from api.social_http import social_application
 from collector.storage import create_database
 
@@ -82,7 +83,7 @@ def _make_routes(session_factory: Callable[[], Session]) -> dict[str, Callable[.
         "api": gated(protect_application(wsgi_application(session_factory))), "auth": auth_application(session_factory), "evaluate": gated(evaluate_application(session_factory)),
         "live": gated(live_application(session_factory)), "admin": gated(admin_application(session_factory)), "insight": gated(protect_application(insight_application(session_factory))),
         "market": gated(market_application(session_factory)), "my": gated(my_channels_application(session_factory)), "public": public_application(session_factory),
-        "me": gated(me_application(session_factory)), "lab": gated(lab_application(session_factory)), "social": gated(social_application(session_factory)), "cms": gated(cms_application(session_factory)),
+        "me": gated(me_application(session_factory)), "lab": gated(lab_application(session_factory)), "social": gated(social_application(session_factory)), "cms": gated(cms_application(session_factory)), "surveys": gated(survey_admin_application(session_factory)), "survey_public": survey_public_application(session_factory),
     }
 
 
@@ -108,6 +109,10 @@ def _dispatch_api(routes: dict[str, Callable[..., Any]], environ: dict[str, Any]
         return routes["evaluate"](environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
     if path.startswith("/api/v1/admin/"):
         return routes["admin"](environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
+    if path.startswith("/api/v1/public/survey/"):
+        return routes["survey_public"](environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
+    if path.startswith("/api/v1/surveys/"):
+        return routes["surveys"](environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
     if path.startswith("/api/v1/public/"):
         return routes["public"](environ, lambda status, headers, *args: _start_response(start_response, status, headers))
     if path == "/api/v1/me" or path.startswith("/api/v1/me/"):
@@ -159,6 +164,9 @@ def application(environ: dict[str, Any], start_response: Callable[..., Any]):
         return [body]
 
     page = site_response(_session, environ, lambda status, headers, *args: _start_response(start_response, status, headers), [])   # /services, /sitemap.xml, /robots.txt, /llms.txt
+    if page is not None:
+        return page
+    page = survey_site_response(_session, environ, lambda status, headers, *args: _start_response(start_response, status, headers), [])   # /polls and /survey/<address>
     if page is not None:
         return page
 

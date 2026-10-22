@@ -453,7 +453,12 @@ def sitemap_xml(session: Any) -> str:
         rows.append(f"<url><loc>{BASE_URL}/services/{_e(s['slug'])}</loc><lastmod>{(s['updated_at'] or '')[:10]}</lastmod><priority>0.8</priority></url>")
     for f in sorted((DASHBOARD / "blog").glob("*.html")):
         rows.append(f"<url><loc>{BASE_URL}/blog/{f.stem}</loc><priority>0.6</priority></url>")
-    from api import blog_cms   # the articles written in the workspace (imported here: blog_cms builds on this module)
+    from api import blog_cms, survey_core   # the articles and the polls written in the workspace (imported here: they build on this module)
+    from collector.storage import Survey
+    polls = [r for r in session.query(Survey).filter(Survey.listed.is_(True), Survey.access == "public", Survey.status == "live").all() if survey_core.state_of(r) == "open"]
+    if polls:
+        rows.append(f"<url><loc>{BASE_URL}/polls</loc><priority>0.5</priority></url>")
+        rows.extend(f"<url><loc>{BASE_URL}/survey/{_e(r.slug)}</loc><priority>0.4</priority></url>" for r in polls)
     for p in blog_cms.live_posts(session):
         if not p["noindex"] and (not p["canonical_url"] or p["canonical_url"] == f"{BASE_URL}/blog/{p['slug']}"):
             rows.append(f"<url><loc>{BASE_URL}/blog/{_e(p['slug'])}</loc><lastmod>{(p['updated_at'] or '')[:10]}</lastmod><priority>0.6</priority></url>")

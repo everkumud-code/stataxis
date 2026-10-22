@@ -248,7 +248,7 @@ def test_the_workspace_script_still_parses():
         path.write_text(script, encoding="utf-8")
         done = subprocess.run([node, "--check", str(path)], capture_output=True, text=True)
     assert done.returncode == 0, done.stderr[:500]
-    for name in ("cms.js", "social.js", "market.js", "me.js"):
+    for name in ("cms.js", "surveys.js", "social.js", "market.js", "me.js"):
         done = subprocess.run([node, "--check", str(DASH / name)], capture_output=True, text=True)
         assert done.returncode == 0, (name, done.stderr[:300])
 
