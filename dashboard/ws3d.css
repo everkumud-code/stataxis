@@ -1,68 +1,75 @@
-/* StatAxis workspace: white 3D keys on a yellow strip. The dark theme stays exactly as it is; only the controls change. A button is a white, raised, round-edged key with a lit rim; it presses in when used.
-   Where a row holds nothing but buttons it sits on a yellow strip, like keys on a rail. Not for printing: the print rules of the page still hide every button. */
-:root{--k-hi:#ffffff;--k-mid:#f1f2f5;--k-lo:#d7dae0;--k-edge:#a9afbb;--k-ink:#17202c;--strip-hi:#fac93f;--strip-lo:#e6a30c;--strip-edge:#b97b05}
+/* StatAxis workspace: dark glass keys with a thin glowing blue rim, like the owner's power-button picture. A key is a soft, near-black capsule with a lit top edge and a deep underside, outlined by a
+   fine blue-to-cyan line; the main action has a brighter cyan rim and glow, a key that is switched on glows. It presses in when used. The dark theme of the page is untouched and there is no strip behind
+   the keys. Print rules of the page still hide every button. */
+:root{--n-rim-a:#1b57c8;--n-rim-b:#21d3ff;--n-ink:#e2f4ff;--n-glow:rgba(33,211,255,.5)}
 
 /* ---------- the key ---------- */
 .btn,.ub,.menubtn{
   -webkit-appearance:none;appearance:none;
-  color:var(--k-ink);font-weight:800;text-shadow:0 1px 0 rgba(255,255,255,.85);
-  border:1px solid var(--k-edge);border-radius:999px;padding:8px 16px;
-  background:linear-gradient(180deg,var(--k-hi) 0%,var(--k-mid) 48%,var(--k-lo) 100%);
-  box-shadow:inset 0 1px 0 #fff,inset 0 -3px 5px rgba(0,0,0,.15),0 0 0 3px rgba(255,255,255,.26),0 6px 10px rgba(0,0,0,.5),0 2px 3px rgba(0,0,0,.55);
-  transition:transform .12s ease,box-shadow .12s ease,filter .12s ease;
+  color:var(--n-ink);font-weight:700;letter-spacing:.01em;text-shadow:0 0 8px rgba(33,211,255,.28);
+  border:1.5px solid transparent;border-radius:999px;padding:8px 18px;
+  background:
+    linear-gradient(180deg,#252f39 0%,#141c24 42%,#091016 100%) padding-box,
+    linear-gradient(180deg,#2c78ee 0%,var(--n-rim-b) 48%,var(--n-rim-a) 100%) border-box;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -7px 12px rgba(0,0,0,.5),0 0 0 1px rgba(0,0,0,.85),0 7px 13px rgba(0,0,0,.6),0 0 12px rgba(33,150,255,.14);
+  transition:transform .12s ease,box-shadow .15s ease,filter .15s ease,color .15s;
 }
-.ub{padding:5px 12px}
+.ub{padding:5px 13px}
 .btn:hover,.ub:hover,.menubtn:hover{
-  color:#000;border-color:#8d94a2;filter:brightness(1.04);transform:translateY(-1px);
-  box-shadow:inset 0 1px 0 #fff,inset 0 -3px 5px rgba(0,0,0,.13),0 0 0 3px rgba(255,255,255,.4),0 9px 14px rgba(0,0,0,.52),0 2px 3px rgba(0,0,0,.55);
+  color:#fff;border-color:transparent;filter:brightness(1.1);transform:translateY(-1px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),inset 0 -7px 12px rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.85),0 10px 16px rgba(0,0,0,.62),0 0 18px var(--n-glow);
 }
 .btn:active,.ub:active,.menubtn:active{
   transform:translateY(1px);filter:none;
-  background:linear-gradient(180deg,#e4e6eb 0%,#f3f4f7 100%);
-  box-shadow:inset 0 3px 7px rgba(0,0,0,.32),0 0 0 3px rgba(255,255,255,.2),0 1px 1px rgba(0,0,0,.55);
+  background:
+    linear-gradient(180deg,#05090d 0%,#0e151c 60%,#131b23 100%) padding-box,
+    linear-gradient(180deg,#2c78ee 0%,var(--n-rim-b) 48%,var(--n-rim-a) 100%) border-box;
+  box-shadow:inset 0 4px 9px rgba(0,0,0,.75),0 0 0 1px rgba(0,0,0,.85),0 1px 1px rgba(0,0,0,.6),0 0 14px rgba(33,211,255,.35);
 }
-.btn:focus-visible,.ub:focus-visible,.menubtn:focus-visible{outline:2px solid #fac93f;outline-offset:3px}
-.btn[disabled],.ub[disabled]{opacity:.5;filter:grayscale(.4);box-shadow:inset 0 1px 0 #fff,0 0 0 3px rgba(255,255,255,.12),0 2px 3px rgba(0,0,0,.4);transform:none}
+.btn:focus-visible,.ub:focus-visible,.menubtn:focus-visible{outline:2px solid var(--n-rim-b);outline-offset:3px}
+.btn[disabled],.ub[disabled]{opacity:.45;filter:grayscale(.5);transform:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px rgba(0,0,0,.8)}
 
-/* the main action: the same white key with a yellow rim and a bolder face */
-.btn.primary,.btn.primary:hover{background:linear-gradient(180deg,var(--k-hi) 0%,var(--k-mid) 48%,var(--k-lo) 100%)}
-.btn.primary:active{background:linear-gradient(180deg,#e4e6eb 0%,#f3f4f7 100%)}
-.btn.primary{
-  color:#000;border-color:var(--strip-edge);
-  box-shadow:inset 0 1px 0 #fff,inset 0 -3px 5px rgba(0,0,0,.15),0 0 0 3px var(--strip-hi),0 6px 10px rgba(0,0,0,.5),0 2px 3px rgba(0,0,0,.55);
+/* the main action: the same key with a brighter cyan rim, a soft glow and a lit label */
+.btn.primary,.btn.primary:hover{
+  color:#c9f6ff;
+  background:
+    linear-gradient(180deg,#1b2a36 0%,#0f1a24 45%,#07111a 100%) padding-box,
+    linear-gradient(180deg,#3ec4ff 0%,#22e3ff 50%,#1d8bff 100%) border-box;
 }
-.btn.primary:hover{
-  color:#000;border-color:var(--strip-edge);
-  box-shadow:inset 0 1px 0 #fff,inset 0 -3px 5px rgba(0,0,0,.13),0 0 0 3px #ffd861,0 9px 14px rgba(0,0,0,.52),0 2px 3px rgba(0,0,0,.55);
+.btn.primary{box-shadow:inset 0 1px 0 rgba(160,235,255,.25),inset 0 -7px 12px rgba(0,0,0,.5),0 0 0 1px rgba(0,0,0,.85),0 7px 13px rgba(0,0,0,.6),0 0 16px rgba(33,211,255,.38)}
+.btn.primary:hover{color:#fff;box-shadow:inset 0 1px 0 rgba(160,235,255,.3),inset 0 -7px 12px rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.85),0 10px 16px rgba(0,0,0,.62),0 0 26px rgba(33,211,255,.6)}
+.btn.primary:active{
+  background:
+    linear-gradient(180deg,#04090e 0%,#0b141c 60%,#101a23 100%) padding-box,
+    linear-gradient(180deg,#3ec4ff 0%,#22e3ff 50%,#1d8bff 100%) border-box;
+  box-shadow:inset 0 4px 9px rgba(0,0,0,.75),0 0 0 1px rgba(0,0,0,.85),0 0 20px rgba(33,211,255,.5)
 }
-.btn.primary:active{box-shadow:inset 0 3px 7px rgba(0,0,0,.32),0 0 0 3px var(--strip-hi),0 1px 1px rgba(0,0,0,.55)}
 
-/* a key that is switched on (the open tab, the chosen option): pressed in and lit yellow */
+/* a key that is switched on (the open tab, the chosen option): lit from inside */
 .btn.on,.btn.active,.btn[aria-pressed=true]{
-  background:linear-gradient(180deg,#f0a90f 0%,#ffd65e 100%);border-color:var(--strip-edge);color:#241700;
-  box-shadow:inset 0 3px 7px rgba(90,50,0,.45),0 0 0 3px rgba(250,201,63,.35),0 1px 1px rgba(0,0,0,.55);
+  color:#e9fbff;text-shadow:0 0 10px rgba(33,211,255,.8);
+  background:
+    linear-gradient(180deg,#0f3550 0%,#0a2438 50%,#071a2a 100%) padding-box,
+    linear-gradient(180deg,#52d4ff 0%,#22e3ff 50%,#1d8bff 100%) border-box;
+  box-shadow:inset 0 3px 8px rgba(0,0,0,.55),inset 0 0 14px rgba(33,211,255,.2),0 0 0 1px rgba(0,0,0,.85),0 0 20px rgba(33,211,255,.5);
 }
 
-/* ---------- the strip: a row that holds only keys (two or more) ---------- */
-.btnrow:has(> :nth-child(2)):not(:has(input,select,textarea,label,h1,h2,h3,b,p,span,img,details,code)){
-  align-items:center;gap:12px;width:fit-content;max-width:100%;padding:9px 16px;border-radius:30px;
-  background:linear-gradient(180deg,var(--strip-hi) 0%,var(--strip-lo) 100%);
-  box-shadow:inset 0 2px 3px rgba(255,255,255,.5),inset 0 -4px 7px rgba(120,70,0,.4),0 0 0 1px rgba(110,64,0,.7),0 9px 16px rgba(0,0,0,.5);
-}
-.pwdlg .btnrow:has(> :nth-child(2)):not(:has(input,select,textarea,label,h1,h2,h3,b,p,span,img,details,code)){margin-left:auto}
-.top .topbtns{margin-left:0}
-
-/* ---------- sunk-in boxes with a yellow mark ---------- */
+/* ---------- check boxes and round selectors: dark wells with a glowing ring when on ---------- */
 input[type=checkbox],input[type=radio]{
   -webkit-appearance:none;appearance:none;flex:0 0 auto;width:20px;height:20px;margin:0;vertical-align:middle;cursor:pointer;position:relative;
-  border:1px solid var(--k-edge);border-radius:6px;background:linear-gradient(180deg,var(--k-hi),var(--k-lo));
-  box-shadow:inset 0 1px 0 #fff,inset 0 -2px 3px rgba(0,0,0,.14),0 0 0 2px rgba(255,255,255,.2),0 3px 6px rgba(0,0,0,.5);
+  border:1.5px solid transparent;border-radius:7px;
+  background:linear-gradient(180deg,#05090d,#111a22) padding-box,linear-gradient(180deg,#2c78ee,#1b57c8) border-box;
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.8),0 0 0 1px rgba(0,0,0,.8),0 1px 0 rgba(255,255,255,.08);
+  transition:box-shadow .15s;
 }
 input[type=radio]{border-radius:50%}
-input[type=checkbox]:checked,input[type=radio]:checked{background:linear-gradient(180deg,#ffd65e,#eda70e);border-color:var(--strip-edge);box-shadow:inset 0 2px 4px rgba(90,50,0,.4),0 0 0 2px rgba(250,201,63,.3),0 1px 2px rgba(0,0,0,.5)}
-input[type=checkbox]:checked::after{content:"";position:absolute;left:6px;top:2px;width:5px;height:10px;border:solid #17202c;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
-input[type=radio]:checked::after{content:"";position:absolute;inset:5px;border-radius:50%;background:#17202c}
-input[type=checkbox]:focus-visible,input[type=radio]:focus-visible{outline:2px solid #fac93f;outline-offset:2px}
+input[type=checkbox]:checked,input[type=radio]:checked{
+  background:linear-gradient(180deg,#0b2234,#08161f) padding-box,linear-gradient(180deg,#52d4ff,#22e3ff 50%,#1d8bff) border-box;
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.6),0 0 0 1px rgba(0,0,0,.8),0 0 12px rgba(33,211,255,.55);
+}
+input[type=checkbox]:checked::after{content:"";position:absolute;left:6px;top:2px;width:5px;height:10px;border:solid #5fe9ff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg);filter:drop-shadow(0 0 4px rgba(33,211,255,.9))}
+input[type=radio]:checked::after{content:"";position:absolute;inset:4px;border-radius:50%;background:#5fe9ff;box-shadow:0 0 8px rgba(33,211,255,.95)}
+input[type=checkbox]:focus-visible,input[type=radio]:focus-visible{outline:2px solid var(--n-rim-b);outline-offset:2px}
 input[type=checkbox]:disabled,input[type=radio]:disabled{opacity:.5;cursor:not-allowed}
 
 @media (prefers-reduced-motion:reduce){.btn,.ub,.menubtn{transition:none}.btn:hover,.ub:hover{transform:none}}
