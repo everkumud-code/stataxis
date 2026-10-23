@@ -40,6 +40,7 @@ RESERVED = {"new", "results", "polls", "api", "admin"}
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MAX_QUESTIONS, MAX_OPTIONS = 60, 60
+MAX_DROPDOWN_OPTIONS = 500   # a dropdown is a list to search (the 75 districts of a state, the 403 constituencies), so it may be far longer than a list of buttons
 
 STRINGS = {   # the words of the buttons and messages, by survey language; the questions are whatever the administrator writes
     "en": {"submit": "Submit", "next": "Next", "back": "Back", "required": "This question needs an answer.", "other": "Please say what", "thanks": "Thank you. Your answer has been recorded.", "closed": "This is closed.",
@@ -282,8 +283,9 @@ def clean_questions(raw: Any, previous: list[dict[str, Any]] | None = None, has_
                                 "exclusive": bool(o.get("exclusive")) and qtype == "multi", "archived": bool(o.get("archived")), **({"image": _image_key(o.get("image"))} if _image_key(o.get("image")) else {})})
             if len([o for o in options if not o["archived"]]) < 2:
                 raise ValueError(f"question {index} needs at least two options")
-            if len(options) > MAX_OPTIONS:
-                raise ValueError(f"question {index} can have at most {MAX_OPTIONS} options")
+            limit = MAX_DROPDOWN_OPTIONS if qtype == "dropdown" else MAX_OPTIONS
+            if len(options) > limit:
+                raise ValueError(f"question {index} can have at most {limit} options")
             q["options"] = options
             q["randomize"] = bool(item.get("randomize"))
             if qtype == "multi":
