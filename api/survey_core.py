@@ -598,13 +598,21 @@ def public_definition(row: Survey) -> dict[str, Any]:
             "logo_url": s["logo_url"], "questions": _with_urls(active_questions(s["questions"])), "access": s["access"], "results_mode": s["results_mode"]}
 
 
+def english_part(text: str) -> str:
+    """For the English website: a title or description written "English / हिंदी" shows its English part; text without that pattern is left as it is."""
+    head, sep, tail = (text or "").partition(" / ")
+    if sep and re.search(r"[ऀ-ॿ]", tail) and head.strip() and not re.search(r"[ऀ-ॿ]", head):
+        return head.strip()
+    return text
+
+
 def home_polls(session: Session, limit: int = 3, now: datetime | None = None) -> list[dict[str, Any]]:
     """The open, public polls and surveys that are shown on the home page (a popup for the newest, and a section for up to three), newest first. Invitation-only and full ones never appear."""
     out = []
     for row in session.query(Survey).filter(Survey.status == "live", Survey.access == "public", Survey.promote.is_(True)).order_by(Survey.id.desc()).all():
         if accepting(session, row, now)[0]:
-            s = STRINGS[row.language]
-            out.append({"slug": row.slug, "title": row.title, "kind": row.kind, "category": row.category, "description": row.description or row.intro[:160], "logo_url": image_url(row.logo_image),
+            s = STRINGS["en"]   # the StatAxis website is in English, whatever language the survey itself is in
+            out.append({"slug": row.slug, "title": english_part(row.title), "kind": row.kind, "category": row.category, "description": english_part(row.description or row.intro[:160]), "logo_url": image_url(row.logo_image),
                         "cta": s["cta_poll"] if row.kind == "poll" else s["cta_survey"], "label": s["live_poll"], "later": s["not_now"]})
         if len(out) >= limit:
             break

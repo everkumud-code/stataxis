@@ -183,10 +183,10 @@ def test_contact_details_stay_out_of_exports_and_answer_lists_without_their_tick
     row = core.get_survey(s, sid)
     row.status = "live"
     s.commit()
-    core.submit_response(s, row, {"q1": {"o": "o1"}}, contact={"mobile": "9876543210"}, consent=True, token="c" * 20)
-    assert b"9876543210" in call(u["a"], "GET", "export", query=f"id={sid}&format=csv&contact=1")[1] and call(u["a"], "GET", "responses", query=f"id={sid}&contact=1")[1]["responses"][0]["contact"] == {"mobile": "9876543210"}
+    core.submit_response(s, row, {"q1": {"o": "o1"}}, contact={"mobile": "9876543211"}, consent=True, token="c" * 20)
+    assert b"9876543211" in call(u["a"], "GET", "export", query=f"id={sid}&format=csv&contact=1")[1] and call(u["a"], "GET", "responses", query=f"id={sid}&contact=1")[1]["responses"][0]["contact"] == {"mobile": "9876543211"}
     feature_access.set_user_feature(s, u["a"].id, "survey_contact", False, "boss@x.in")
-    assert b"9876543210" not in call(u["a"], "GET", "export", query=f"id={sid}&format=csv&contact=1")[1] and "contact" not in call(u["a"], "GET", "responses", query=f"id={sid}&contact=1")[1]["responses"][0]
+    assert b"9876543211" not in call(u["a"], "GET", "export", query=f"id={sid}&format=csv&contact=1")[1] and "contact" not in call(u["a"], "GET", "responses", query=f"id={sid}&contact=1")[1]["responses"][0]
 
 
 def test_a_client_cannot_use_a_picture_another_account_uploaded():

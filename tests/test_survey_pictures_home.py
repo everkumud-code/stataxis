@@ -219,7 +219,7 @@ def test_only_open_public_promoted_polls_are_chosen_newest_first_and_at_most_thr
     full = core.get_survey(s, [x["id"] for x in core.list_surveys(s) if x["title"] == "Full one"][0])
     core.submit_response(s, full, {"q1": {"o": "o1"}}, token="f" * 20, now=datetime.now(UTC), started_ms=(datetime.now(UTC) - timedelta(seconds=60)).timestamp() * 1000)
     items = core.home_polls(s)
-    assert [i["title"] for i in items] == ["Hindi poll", "Fourth poll", "Third poll"] and items[0]["cta"] == "पोल में भाग लें" and items[1]["cta"] == "Take the survey" and items[2]["cta"] == "Take the poll"
+    assert [i["title"] for i in items] == ["Hindi poll", "Fourth poll", "Third poll"] and items[0]["cta"] == "Take the poll" and items[1]["cta"] == "Take the survey" and items[2]["cta"] == "Take the poll"
     assert [i["title"] for i in core.home_polls(s, limit=10)] == ["Hindi poll", "Fourth poll", "Third poll", "Second poll", "Old poll"]
 
 
@@ -278,3 +278,8 @@ def test_the_home_page_is_still_served_by_the_web_app():
     res = web.application({"REQUEST_METHOD": "GET", "PATH_INFO": "/", "QUERY_STRING": "", "REMOTE_ADDR": "127.0.0.1"}, lambda st, h: out.update(st=st))
     body = b"".join(res)
     assert out["st"].startswith("200") and b"Stand on the right axis." in body
+
+
+def test_the_english_website_shows_the_english_part_of_a_bilingual_title():
+    assert core.english_part("UP Election 2027 — Survey / यूपी चुनाव 2027 — सर्वे") == "UP Election 2027 — Survey"
+    assert core.english_part("Tom / Jerry poll") == "Tom / Jerry poll" and core.english_part("हिंदी / English") == "हिंदी / English" and core.english_part("") == ""
