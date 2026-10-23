@@ -88,7 +88,7 @@ function render() {
   const hp = $("div", "hp"), hpi = $("input"); hpi.type = "text"; hpi.tabIndex = -1; hpi.autocomplete = "off"; hpi.name = "website"; hp.append(hpi); root.append(hp);
   for (const q of qs) root.append(build(q));
   let consent = null;
-  if (D.contact.mode !== "none") { const c = $("div", "card q"); c.append($("h3", "", D.contact.mode === "required" ? "*" : "")); c.firstChild.textContent = ""; const labels = {name: S.name, mobile: S.mobile, email: S.email};
+  if (D.contact.mode !== "none") { const c = $("div", "card q"); c.append($("h3", "", S.last_step + (D.contact.mode === "required" ? " *" : ""))); const labels = {name: S.name, mobile: S.mobile, email: S.email};
     for (const f of D.contact.fields) { const i = $("input"); i.type = f === "email" ? "email" : f === "mobile" ? "tel" : "text"; i.placeholder = labels[f]; i.maxLength = 160; i.style.marginBottom = "10px"; i.oninput = () => { contact[f] = i.value; }; c.append(i); }
     const l = $("label", "opt"); consent = $("input"); consent.type = "checkbox"; l.append(consent, $("span", "", D.contact.consent || S.consent)); c.append(l); const e = $("div", "errmsg"); e.hidden = true; c._err = e; c.append(e); nodes.__contact = c; root.append(c); }
   const go = $("button", "btn", S.submit); go.type = "button"; root.append(go); const top = $("div", "errmsg"); top.hidden = true; root.append(top);

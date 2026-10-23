@@ -212,11 +212,25 @@ def test_contact_details_need_consent_and_are_kept_apart():
     with pytest.raises(core.AnswerError, match="mobile"):
         answer(s, row, {"q1": {"o": "o1"}}, contact={"name": "Asha", "mobile": "12"}, consent=True)
     with pytest.raises(core.AnswerError, match="agree"):
-        answer(s, row, {"q1": {"o": "o1"}}, contact={"name": "Asha", "mobile": "98765 43210"}, consent=False)
-    r = answer(s, row, {"q1": {"o": "o1"}}, contact={"name": "Asha", "mobile": "98765 43210", "email": "ignored@x.in"}, consent=True)
-    assert json.loads(s.get(SurveyResponse, r["id"]).contact_json) == {"name": "Asha", "mobile": "9876543210"}      # only the asked fields, digits only
-    assert "Asha" not in json.dumps(core.survey_results(s, row)) and "9876543210" not in core.export_csv(s, row).decode()
-    assert "9876543210" in core.export_csv(s, row, include_contact=True).decode()
+        answer(s, row, {"q1": {"o": "o1"}}, contact={"name": "Asha", "mobile": "98765 43211"}, consent=False)
+    r = answer(s, row, {"q1": {"o": "o1"}}, contact={"name": "Asha", "mobile": "98765 43211", "email": "ignored@x.in"}, consent=True)
+    assert json.loads(s.get(SurveyResponse, r["id"]).contact_json) == {"name": "Asha", "mobile": "9876543211"}      # only the asked fields, digits only
+    assert "Asha" not in json.dumps(core.survey_results(s, row)) and "9876543211" not in core.export_csv(s, row).decode()
+    assert "9876543211" in core.export_csv(s, row, include_contact=True).decode()
+
+def test_a_mobile_number_must_look_real_and_each_number_answers_once():
+    for good, kept in (("98765 43211", "9876543211"), ("+91 98765 43211", "9876543211"), ("09876543211", "9876543211"), ("919876543211", "9876543211"), ("+44 7911 123456", "447911123456")):
+        assert core.clean_mobile(good) == kept
+    for bad in ("12", "5123456789", "1234567890", "9876543210", "9999999999", "9898989898", "98765"):
+        assert core.clean_mobile(bad) == ""
+    s, _ = make()
+    row = core.get_survey(s, live(s, title="One number once", contact_mode="required", contact_fields=["name", "mobile"], consent_text="I agree.")["id"])
+    first = answer(s, row, {"q1": {"o": "o1"}}, contact={"name": "Asha", "mobile": "98765 43211"}, consent=True)
+    with pytest.raises(core.AnswerError, match="already been used"):
+        answer(s, row, {"q1": {"o": "o1"}}, contact={"name": "Asha again", "mobile": "+91 9876543211"}, consent=True)      # the same number written another way
+    answer(s, row, {"q1": {"o": "o1"}}, contact={"name": "Ravi", "mobile": "98765 43212"}, consent=True)
+    core.set_response_status(s, first["id"], "removed")
+    answer(s, row, {"q1": {"o": "o1"}}, contact={"name": "Asha", "mobile": "98765 43211"}, consent=True)                  # a removed answer frees its number
 
 
 def test_invitation_only_links_work_once_and_only_their_hash_is_kept():

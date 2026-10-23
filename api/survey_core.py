@@ -46,11 +46,11 @@ STRINGS = {   # the words of the buttons and messages, by survey language; the q
     "en": {"submit": "Submit", "next": "Next", "back": "Back", "required": "This question needs an answer.", "other": "Please say what", "thanks": "Thank you. Your answer has been recorded.", "closed": "This is closed.",
            "not_yet": "This has not opened yet.", "invite": "This survey is by invitation. Please use the link you were sent.", "already": "You have already answered this.", "consent": "I agree that my details may be used for this survey.",
            "results": "See the results", "select_up_to": "Choose up to", "one_per_rank": "Give each choice its own rank", "choose": "Choose…", "name": "Your name", "mobile": "Mobile number", "email": "E-mail",
-           "progress": "Question", "of": "of", "powered": "Conducted by StatAxis", "cta_poll": "Take the poll", "cta_survey": "Take the survey", "live_poll": "Live now", "not_now": "Not now", "private_note": "Your answers are anonymous unless this survey asks for your contact details."},
+           "progress": "Question", "last_step": "Last step: your name and mobile number", "dup_mobile": "This mobile number has already been used for this survey.", "of": "of", "powered": "Conducted by StatAxis", "cta_poll": "Take the poll", "cta_survey": "Take the survey", "live_poll": "Live now", "not_now": "Not now", "private_note": "Your answers are anonymous unless this survey asks for your contact details."},
     "hi": {"submit": "जमा करें", "next": "आगे", "back": "पीछे", "required": "इस प्रश्न का उत्तर ज़रूरी है।", "other": "कृपया बताएं", "thanks": "धन्यवाद। आपका उत्तर दर्ज हो गया है।", "closed": "यह बंद हो चुका है।",
            "not_yet": "यह अभी शुरू नहीं हुआ है।", "invite": "यह सर्वे केवल आमंत्रित लोगों के लिए है। कृपया भेजे गए लिंक का उपयोग करें।", "already": "आप इसका उत्तर पहले ही दे चुके हैं।",
            "consent": "मैं सहमत हूँ कि मेरी जानकारी इस सर्वे के लिए इस्तेमाल हो सकती है।", "results": "नतीजे देखें", "select_up_to": "अधिकतम चुनें", "one_per_rank": "हर विकल्प को अलग क्रम दें",
-           "choose": "चुनें…", "name": "आपका नाम", "mobile": "मोबाइल नंबर", "email": "ई-मेल", "progress": "प्रश्न", "of": "में से", "powered": "स्टैटएक्सिस द्वारा संचालित", "cta_poll": "पोल में भाग लें", "cta_survey": "सर्वे में भाग लें", "live_poll": "अभी चालू", "not_now": "अभी नहीं",
+           "choose": "चुनें…", "name": "आपका नाम", "mobile": "मोबाइल नंबर", "email": "ई-मेल", "progress": "प्रश्न", "last_step": "अंतिम चरण: आपका नाम और मोबाइल नंबर", "dup_mobile": "इस मोबाइल नंबर से इस सर्वे में उत्तर पहले ही दिया जा चुका है।", "of": "में से", "powered": "स्टैटएक्सिस द्वारा संचालित", "cta_poll": "पोल में भाग लें", "cta_survey": "सर्वे में भाग लें", "live_poll": "अभी चालू", "not_now": "अभी नहीं",
            "private_note": "आपके उत्तर गोपनीय हैं, जब तक यह सर्वे आपसे संपर्क जानकारी न माँगे।"},
 }
 INDIA_STATES = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
@@ -733,6 +733,30 @@ def new_invite_code() -> str:
     return secrets.token_urlsafe(18)
 
 
+def clean_mobile(raw: str) -> str:
+    """The mobile number as digits, or "" when it cannot be real. An Indian number (10 digits starting 6 to 9, with or without +91 or 0) is stored as those 10 digits; a number written with another country code
+    (+ then 8 to 15 digits) is kept as typed digits. Numbers made of one repeated digit or a straight run (1234567890) are refused. This checks the shape only; it cannot know that the person owns the number."""
+    text = raw.strip()
+    digits = re.sub(r"\D", "", text)
+    if text.startswith("+") and not digits.startswith("91"):
+        return digits if 8 <= len(digits) <= 15 else ""
+    if len(digits) == 12 and digits.startswith("91"):
+        digits = digits[2:]
+    elif len(digits) == 11 and digits.startswith("0"):
+        digits = digits[1:]
+    if not re.fullmatch(r"[6-9]\d{9}", digits) or len(set(digits)) <= 2 or digits in "01234567890123456789" or digits in "98765432109876543210":
+        return ""
+    return digits
+
+
+def _mobile_used(session: Session, row: Survey, mobile: str) -> bool:
+    """Whether a response that was not removed already came with this mobile number."""
+    if not mobile:
+        return False
+    like = f'%"mobile": "{mobile}"%'
+    return session.query(SurveyResponse).filter(SurveyResponse.survey_id == row.id, SurveyResponse.status != "removed", SurveyResponse.contact_json.like(like)).first() is not None
+
+
 def _clean_contact(row: Survey, contact: Any, consent: Any) -> dict[str, str] | None:
     mode = row.contact_mode
     if mode == "none":
@@ -744,10 +768,10 @@ def _clean_contact(row: Survey, contact: Any, consent: Any) -> dict[str, str] | 
     for f in fields:
         v = _text(contact.get(f), f, 160)
         if f == "mobile" and v:
-            digits = re.sub(r"\D", "", v)
-            if not 8 <= len(digits) <= 15:
+            v = clean_mobile(v)
+            if not v:
                 errors["contact"] = "Please give a valid mobile number."
-            v = digits
+                continue
         if f == "email" and v and not EMAIL_RE.fullmatch(v):
             errors["contact"] = "Please give a valid e-mail address."
         if v:
@@ -780,6 +804,8 @@ def submit_response(session: Session, row: Survey, answers: Any, *, contact: Any
     if not clean:
         raise AnswerError("Please answer at least one question.")
     contact_clean = _clean_contact(row, contact, consent)
+    if contact_clean and not row.allow_repeat and _mobile_used(session, row, contact_clean.get("mobile", "")):
+        raise AnswerError(strings["dup_mobile"], {"contact": strings["dup_mobile"]})
     token_hash = hash_value("token", token, row.id) if token and len(token) >= 16 else None
     if token_hash and not row.allow_repeat and session.query(SurveyResponse).filter(SurveyResponse.survey_id == row.id, SurveyResponse.token_hash == token_hash, SurveyResponse.status != "removed").first():
         raise ValueError(strings["already"])
