@@ -36,6 +36,8 @@ ROUTE_FEATURE = {
     ("GET", "/api/v1/market/live-event"): "live_compare",
     ("GET", "/api/v1/market/briefing"): "briefing",
     ("GET", "/api/v1/market/briefing.pdf"): "report_builder",
+    ("GET", "/api/v1/market/stx-report"): "stx",
+    ("GET", "/api/v1/market/stx-report.pdf"): "stx",
     ("POST", "/api/v1/market/planner"): "planner",
     ("GET", "/api/v1/market/authenticity"): "authenticity",
     ("POST", "/api/v1/market/authenticity/review"): "authenticity",
@@ -131,6 +133,15 @@ def market_application(session_factory: Callable[[], Any]):
                         start_response("200 OK", [("Content-Type", "application/pdf"), ("Content-Disposition", f'attachment; filename="{filename(report)}"'), ("Content-Length", str(len(body))), ("Cache-Control", "no-store")])
                         return [body]
                     return _json(start_response, 200, report)
+                if (method, path) in {("GET", "/api/v1/market/stx-report"), ("GET", "/api/v1/market/stx-report.pdf")}:
+                    # the STX Index report: every channel's score out of 100, what each factor gave, and its audience; as data for the screen, or as the branded PDF
+                    from api import stx_report
+                    rep = stx_report.build(session, period=q.get("period") or "7d", language=language, segment=segment, cards=_int(q.get("cards"), "cards", 12))
+                    if path.endswith(".pdf"):
+                        body = stx_report.pdf(rep, user.email + (f" ({user.organization})" if user.organization else ""))
+                        start_response("200 OK", [("Content-Type", "application/pdf"), ("Content-Disposition", f'attachment; filename="{stx_report.filename(rep)}"'), ("Content-Length", str(len(body))), ("Cache-Control", "no-store")])
+                        return [body]
+                    return _json(start_response, 200, rep)
                 if (method, path) == ("POST", "/api/v1/market/screen-report.pdf"):
                     # a branded PDF of the screen the person is looking at: any screen, one tap. The figures are what their browser shows them; the letterhead and the download time are ours.
                     from api.report_pdf import clean_screen, screen_filename, screen_pdf

@@ -24,7 +24,7 @@ VIEWS: list[tuple[str, str, str]] = [
     ("dashboard", "Channel dashboard", "dashboard"), ("stream", "Streams", "streams"), ("content", "Content", "content"), ("competition", "Competition", "competition"),
     ("trends", "Audience and trends", "trends"), ("live", "Live audience", "live"), ("stx", "STX Index", "stx"), ("changed", "What changed", "changed"),
     ("research", "Research signals", "research"), ("evaluate", "Evaluate a video", "evaluate"), ("weekly", "Weekly report", "weekly"), ("primetime", "Prime time", "prime_time"),
-    ("builder", "Report builder", "report_builder"), ("creators", "IFX Score", "creators"), ("planner", "Media planner", "planner"), ("authenticity", "Authenticity radar", "authenticity"),
+    ("stxreport", "STX Index report", "stx"), ("builder", "Report builder", "report_builder"), ("creators", "IFX Score", "creators"), ("planner", "Media planner", "planner"), ("authenticity", "Authenticity radar", "authenticity"),
     ("audience", "Audience (geography and age)", "audience"), ("liveevent", "Live event compare", "live_compare"),
     ("operations", "Operations", "operations"), ("integrity", "Data integrity", "integrity"),
     ("spikes", "Spikes and movement", "spikes"), ("forecasts", "Forecasts", "forecasts"), ("notes", "Notes", "notes"), ("alerts", "Alerts", "alerts"), ("completeness", "Data completeness", "integrity"), ("reportmail", "Report e-mails", "report_email"),

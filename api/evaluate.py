@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -36,6 +37,7 @@ class EvaluationResult:
     view: str
     display_stx_index: float | None = None
     preliminary: bool = True
+    details: dict[str, object] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -54,7 +56,96 @@ class EvaluationResult:
             "data": self.data,
             "analysis": self.analysis,
             "view": self.view,
+            "details": self.details,
         }
+
+
+def _aware(value):
+    """A stored or API timestamp as an aware datetime (ISO text from YouTube, or a datetime from the database); None when absent or unreadable."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
+def _iso(value):
+    value = _aware(value)
+    return value.isoformat() if value else None
+
+
+def _number(value):
+    try:
+        return None if value in (None, "") else int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def video_details(session: Session, video: Video, channel: Channel, channel_meta: dict) -> dict[str, object]:
+    """What was measured about this video and its channel, straight from the stored observations and the channel record: views, likes, comments, when it was uploaded or went live, and how it moved since the last look.
+    Nothing here is estimated; a figure YouTube did not give (hidden likes, no live audience) stays None so the screen shows a dash."""
+    rows = session.query(Observation).filter_by(video_id=video.id).order_by(Observation.observed_at).all()
+    now = rows[-1] if rows else None
+    before = rows[-2] if len(rows) > 1 else None
+    published = _aware(video.published_at)
+    started, ended = _aware(video.live_started_at), _aware(video.live_ended_at)
+    clock = datetime.now(UTC)
+    views, likes, comments = (now.view_count, now.like_count, now.comment_count) if now else (None, None, None)
+    live_minutes = None
+    if started:
+        live_minutes = max(0, round(((ended or clock) - started).total_seconds() / 60))
+    concurrent = [r.concurrent_viewers for r in rows if r.concurrent_viewers is not None]
+    since = None
+    if now and before:
+        gap = (_aware(now.observed_at) - _aware(before.observed_at)).total_seconds() / 3600
+        gain = lambda a, b: None if a is None or b is None else a - b
+        views_gained = gain(now.view_count, before.view_count)
+        since = {
+            "from": _iso(before.observed_at),
+            "hours": round(gap, 2),
+            "views_gained": views_gained,
+            "likes_gained": gain(now.like_count, before.like_count),
+            "comments_gained": gain(now.comment_count, before.comment_count),
+            "views_per_hour": round(views_gained / gap, 1) if views_gained is not None and gap > 0 else None,
+        }
+    stats = channel_meta.get("statistics", {}) or {}
+    snippet = channel_meta.get("snippet", {}) or {}
+    return {
+        "youtube_url": f"https://www.youtube.com/watch?v={video.youtube_video_id}",
+        "thumbnail_url": video.thumbnail_url,
+        "status": (now.classification if now else "UNKNOWN"),
+        "is_live": bool(now and now.is_live),
+        "uploaded_at": _iso(published),
+        "age_hours": round((clock - published).total_seconds() / 3600, 1) if published else None,
+        "live_started_at": _iso(started),
+        "live_ended_at": _iso(ended),
+        "live_minutes": live_minutes,
+        "views": views,
+        "likes": likes,
+        "comments": comments,
+        "likes_per_100_views": round(likes * 100 / views, 2) if likes is not None and views else None,
+        "comments_per_1000_views": round(comments * 1000 / views, 2) if comments is not None and views else None,
+        "views_per_hour_since_upload": round(views / ((clock - published).total_seconds() / 3600), 1) if views is not None and published and clock > published else None,
+        "concurrent_now": now.concurrent_viewers if now else None,
+        "concurrent_peak": max(concurrent) if concurrent else None,
+        "concurrent_average": round(sum(concurrent) / len(concurrent)) if concurrent else None,
+        "first_observed_at": _iso(rows[0].observed_at) if rows else None,
+        "last_observed_at": _iso(now.observed_at) if now else None,
+        "since_previous": since,
+        "channel": {
+            "name": channel.name,
+            "handle": snippet.get("customUrl"),
+            "url": f"https://www.youtube.com/channel/{channel.youtube_channel_id}" if getattr(channel, "youtube_channel_id", None) else None,
+            "created_at": snippet.get("publishedAt"),
+            "country": snippet.get("country"),
+            "subscribers": None if stats.get("hiddenSubscriberCount") else _number(stats.get("subscriberCount")),
+            "total_views": _number(stats.get("viewCount")),
+            "video_count": _number(stats.get("videoCount")),
+        },
+    }
 
 
 def evaluate_youtube_url(
@@ -102,6 +193,7 @@ def evaluate_youtube_url(
                 display_stx_index=None,
                 preliminary=True,
                 available_signals=0,
+                details=video_details(session, video, channel, channel_meta),
                 data=[observation.title],
                 analysis=["A baseline is not yet established. A second observation is required for change-based intelligence."],
                 view="Signal captured. STX Index is withheld until a valid comparison window exists.",
@@ -124,6 +216,7 @@ def evaluate_youtube_url(
             data=list(payload.get("data", [])),
             analysis=list(payload.get("analysis", [])),
             view=str(payload.get("view", "")),
+            details=video_details(session, video, channel, channel_meta),
         )
     finally:
         if owns_client:

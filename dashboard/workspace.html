@@ -836,6 +836,21 @@ add("research", "Research & output", "Research signals", async el => {
     ${evidence("Tone is counted from words in video and live-stream titles, not from viewers’ comments, and is a rough guide, not a finding. A channel whose titles contain few of the listed words shows a low ‘words recognised’ share and should be read as Mixed. No cause is inferred from either signal.")}`;
 });
 
+const evalDetails = d => {
+  if (!d) return "";
+  const hrs = h => h == null ? "—" : h < 48 ? dec(h, 1) + " hours" : dec(h / 24, 1) + " days", mins = m => m == null ? "—" : m < 120 ? whole(m) + " min" : dec(m / 60, 1) + " hours", plus = v => v == null ? "—" : (v > 0 ? "+" : "") + whole(v), c = d.channel || {}, p = d.since_previous;
+  return `<h3 style="margin-top:18px">Video details</h3><dl class="kv"><dt>Status</dt><dd>${d.is_live ? "Live now" : esc(String(d.status || "—").toLowerCase())}</dd><dt>Uploaded / published</dt><dd>${when(d.uploaded_at)} <span class="muted">(${hrs(d.age_hours)} ago)</span></dd>
+    ${d.live_started_at ? `<dt>Live started</dt><dd>${when(d.live_started_at)}</dd>` : ""}${d.live_ended_at ? `<dt>Live ended</dt><dd>${when(d.live_ended_at)}</dd>` : ""}${d.live_minutes != null ? `<dt>Live for</dt><dd>${mins(d.live_minutes)}${d.live_ended_at ? "" : " so far"}</dd>` : ""}
+    <dt>Views</dt><dd>${whole(d.views)}</dd><dt>Likes</dt><dd>${whole(d.likes)}</dd><dt>Comments</dt><dd>${whole(d.comments)}</dd>
+    <dt>Likes per 100 views</dt><dd>${dec(d.likes_per_100_views, 2)}</dd><dt>Comments per 1,000 views</dt><dd>${dec(d.comments_per_1000_views, 2)}</dd><dt>Average views per hour since upload</dt><dd>${dec(d.views_per_hour_since_upload, 1)}</dd>
+    ${d.concurrent_now != null || d.concurrent_peak != null ? `<dt>Watching now</dt><dd>${whole(d.concurrent_now)}</dd><dt>Peak watching (our readings)</dt><dd>${whole(d.concurrent_peak)}</dd><dt>Average watching (our readings)</dt><dd>${whole(d.concurrent_average)}</dd>` : ""}
+    <dt>Our first reading</dt><dd>${when(d.first_observed_at)}</dd><dt>Latest reading</dt><dd>${when(d.last_observed_at)}</dd>
+    ${p ? `<dt>Since the previous reading</dt><dd>${hrs(p.hours)} apart: views ${plus(p.views_gained)}, likes ${plus(p.likes_gained)}, comments ${plus(p.comments_gained)}${p.views_per_hour != null ? ` (${dec(p.views_per_hour, 1)} views an hour)` : ""}</dd>` : ""}
+    <dt>Link</dt><dd><a href="${esc(d.youtube_url)}" target="_blank" rel="noopener noreferrer">Open on YouTube</a></dd></dl>
+    <h3 style="margin-top:18px">Channel</h3><dl class="kv"><dt>Name</dt><dd>${c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">${esc(c.name)}</a>` : esc(c.name || "—")}${c.handle ? ` <span class="muted">${esc(c.handle)}</span>` : ""}</dd>
+    <dt>Subscribers</dt><dd>${c.subscribers == null ? "hidden or not given" : whole(c.subscribers)}</dd><dt>Total views</dt><dd>${whole(c.total_views)}</dd><dt>Videos</dt><dd>${whole(c.video_count)}</dd><dt>Channel created</dt><dd>${when(c.created_at)}</dd>${c.country ? `<dt>Country</dt><dd>${esc(c.country)}</dd>` : ""}</dl>`;
+};
+
 add("evaluate", "Research & output", "Evaluate & reports", async el => {
   const free = acct && acct.plan === "sx_free";
   el.innerHTML = head("Evaluate a video", "Paste a public YouTube link to add it to the record and read its STX Index.") +
@@ -851,7 +866,7 @@ add("evaluate", "Research & output", "Evaluate & reports", async el => {
       const r = await api("/api/v1/evaluate/youtube", {}, {method: "POST", body: {url: fd.get("url"), display_name: fd.get("name")}});
       out.innerHTML = `<dl class="kv"><dt>Video</dt><dd>${esc(r.display_name)}</dd><dt>Channel</dt><dd>${esc(r.channel_name)}</dd><dt>Observations stored</dt><dd>${whole(r.observation_count)}</dd>
         <dt>STX Index</dt><dd>${r.stx_index == null ? "Withheld" : dec(r.stx_index)}</dd><dt>Confidence</dt><dd>${r.stx_index == null ? "—" : pct(r.confidence)}</dd></dl>
-        <p>${esc(r.view)}</p>${(r.analysis || []).map(a => `<p class="muted">${esc(a)}</p>`).join("")}`;
+        <p>${esc(r.view)}</p>${(r.analysis || []).map(a => `<p class="muted">${esc(a)}</p>`).join("")}${evalDetails(r.details)}`;
     } catch (e) { out.innerHTML = state("Could not evaluate this link", friendly(e), "", "err"); }
     btn.disabled = free;
   };
@@ -973,7 +988,7 @@ function downloadCsv(rows, name) {
 const MENU_LAYOUT = [
   ["Start here", ["briefing", "overview"]],
   ["Live now", ["live", "liveevent", "spikes", "alerts"]],
-  ["Reports and downloads", ["builder", "primetime", "weekly", "stream", "notes", "reportmail"]],
+  ["Reports and downloads", ["stxreport", "builder", "primetime", "weekly", "stream", "notes", "reportmail"]],
   ["Channels and rivals", ["market", "competition", "channel", "dashboard", "trends", "stx"]],
   ["Social media", ["social", "socialpresence", "socialchannel", "socialposts"]],
   ["What moved and why", ["content", "changed", "research", "forecasts"]],
@@ -986,7 +1001,7 @@ const MENU_LAYOUT = [
   ["Website", ["adm-services", "adm-blog"]],
   ["Polls and surveys", ["surveys"]],
 ];
-const MENU_LABEL = {social: "Rankings: Facebook, Instagram, X", socialpresence: "Beside YouTube", socialchannel: "One channel and compare", socialposts: "Top posts", "adm-social": "Social media setup", "adm-services": "Website services", "adm-blog": "Website blog", surveys: "Polls & surveys", reportmail: "Report e-mails (daily to yearly)", "adm-email": "Email delivery (Resend)", builder: "Report builder (day and hours)", stream: "Live, replay, video, Shorts", evaluate: "Check a video", trends: "Audience over time", audience: "Audience: place and age", creators: "IFX Score (creators)"};
+const MENU_LABEL = {stxreport: "STX Index report", social: "Rankings: Facebook, Instagram, X", socialpresence: "Beside YouTube", socialchannel: "One channel and compare", socialposts: "Top posts", "adm-social": "Social media setup", "adm-services": "Website services", "adm-blog": "Website blog", surveys: "Polls & surveys", reportmail: "Report e-mails (daily to yearly)", "adm-email": "Email delivery (Resend)", builder: "Report builder (day and hours)", stream: "Live, replay, video, Shorts", evaluate: "Check a video", trends: "Audience over time", audience: "Audience: place and age", creators: "IFX Score (creators)"};
 const MENU_HINT = {
   briefing: "What the data says this week, written for your role", overview: "The market today at a glance", live: "Who is live right now and how many are watching", liveevent: "Up to 30 channels on one live event, side by side",
   primetime: "Which channel owns each evening hour", stream: "Live, replay, video and Shorts audiences compared", market: "Every channel ranked by views gained", channel: "One channel: audience, momentum, content",
@@ -996,7 +1011,7 @@ const MENU_HINT = {
   spikes: "Sudden rises in a channel's audience, with the stream behind each, and who gained while who lost", forecasts: "What we expected each channel's prime time to be, and how close it was", notes: "A dated note on what the data said, each day and each week",
   alerts: "Tell us a level or a change on a channel's live audience; it shows here when it happens", completeness: "How many of the live readings that should be there are there, per channel per day",
   reportmail: "Choose how often, the layout and the parts: the report arrives in your e-mail, STX first", "adm-email": "The mail service report e-mails go through: key, From address, test",
-  social: "Followers, growth and reactions on Facebook, Instagram and X, ranked", socialpresence: "Each channel's YouTube subscribers and its followers on the three platforms, side by side", socialchannel: "One channel on every platform, its best posts, and several channels compared", socialposts: "The posts that got the most reactions", "adm-social": "Platform keys, linked accounts, and sheets of figures", "adm-services": "Write, order and publish the Services pages of the public website, with their search settings", "adm-blog": "Write, schedule and publish blog articles for the Insights page, with their search settings", surveys: "Opinion, political and brand polls and full surveys: build, share, read the results, export",
+  social: "Followers, growth and reactions on Facebook, Instagram and X, ranked", socialpresence: "Each channel's YouTube subscribers and its followers on the three platforms, side by side", socialchannel: "One channel on every platform, its best posts, and several channels compared", socialposts: "The posts that got the most reactions", "adm-social": "Platform keys, linked accounts, and sheets of figures", "adm-services": "Write, order and publish the Services pages of the public website, with their search settings", "adm-blog": "Write, schedule and publish blog articles for the Insights page, with their search settings", surveys: "Opinion, political and brand polls and full surveys: build, share, read the results, export", stxreport: "Every channel's STX Index out of 100, what each factor gave it, and its audience, with a PDF",
   mychannels: "Map your own channels to your login", profile: "Your details, your menu, your password", operations: "How collection is running", integrity: "Checks on the stored data",
   "adm-users": "Create logins, reset passwords, tick privileges", "adm-apps": "People who asked for access", "adm-access": "Packages on or off, and who may use what", "adm-claims": "Who says which channel is theirs", "adm-packages": "Package names and prices",
   "adm-channels": "Every channel, with its On/Off switch", "adm-groups": "Which group each channel belongs to", "adm-audience": "Audience profiles supplied for channels", "adm-quota": "YouTube quota: what we use and what we need",
@@ -1237,6 +1252,7 @@ window.addEventListener("beforeprint", () => {
 <script src="social.js"></script>
 <script src="cms.js"></script>
 <script src="surveys.js"></script>
+<script src="stxreport.js"></script>
 <script src="reportbar.js"></script>
 <script src="me.js"></script>
 <p class="sx-derived-note" style="max-width:1100px;margin:24px auto;padding:0 16px;font-size:12px;line-height:1.5;color:#64748b;text-align:center">STX Index and other scores on this page are generated independently by StatAxis. They are not sourced from, provided by or endorsed by YouTube. Underlying statistics come from public YouTube API data. <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms &amp; Conditions</a></p>

@@ -68,18 +68,25 @@ def logo_png(*_ignored: Any, scale: float = 3.0, **_ignored_kw: Any) -> bytes:
 
 
 def _watermark(canvas: Any, size: tuple[float, float] = A4) -> None:
-    """The logo, faint and tilted, repeated over the whole page so a screenshot or a crop still carries it."""
-    img = ImageReader(BytesIO(logo_png()))
+    """The logo, faint and tilted, repeated over the whole page so a screenshot or a crop still carries it. It is drawn once into a reusable form and then placed on every page: drawing the 140 logos
+    again on each page made a long report take minutes on a busy server."""
+    name = "sxwm"
+    if getattr(canvas, "_sx_wm_size", None) != size:
+        img = ImageReader(BytesIO(logo_png()))
+        canvas.beginForm(name + f"{int(size[0])}x{int(size[1])}", 0, 0, size[0], size[1])
+        canvas.translate(size[0] / 2, size[1] / 2)
+        canvas.rotate(32)
+        w, h = 70 * mm, 70 * mm * LOGO_RATIO
+        for row in range(-6, 7):
+            for col in range(-5, 6):
+                x = col * 105 * mm + (row % 2) * 52 * mm - w / 2
+                y = row * 36 * mm - h / 2
+                canvas.drawImage(img, x, y, w, h, mask="auto")
+        canvas.endForm()
+        canvas._sx_wm_size = size
     canvas.saveState()
-    canvas.setFillAlpha(0.075)
-    canvas.translate(size[0] / 2, size[1] / 2)
-    canvas.rotate(32)
-    w, h = 70 * mm, 70 * mm * LOGO_RATIO
-    for row in range(-6, 7):
-        for col in range(-5, 6):
-            x = col * 105 * mm + (row % 2) * 52 * mm - w / 2
-            y = row * 36 * mm - h / 2
-            canvas.drawImage(img, x, y, w, h, mask="auto")
+    canvas.setFillAlpha(0.075)   # the form takes the graphics state of the page it is placed on, so the faintness is set here, not inside it
+    canvas.doForm(name + f"{int(size[0])}x{int(size[1])}")
     canvas.restoreState()
 
 
