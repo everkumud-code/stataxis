@@ -186,7 +186,7 @@ var box=document.getElementById('sxpop'),go=box.querySelector('[data-go]');funct
 function key(e){if(e.key==='Escape')close()}
 function show(){box.hidden=false;document.addEventListener('keydown',key);setTimeout(function(){go.focus()},50)}
 box.addEventListener('click',function(e){if(e.target===box)close()});box.querySelectorAll('[data-close]').forEach(function(b){b.onclick=close});go.addEventListener('click',function(){try{localStorage.setItem('sxpop_'+p.slug,String(Date.now()))}catch(e){}});
-function ready(){try{return localStorage.getItem('stataxis_cookie_consent_v1')&&localStorage.getItem('stataxis_terms_consent_v1')}catch(e){return true}}
+function ready(){if(window.SX_GATE_ON===false)return true;try{return localStorage.getItem('stataxis_cookie_consent_v1')&&localStorage.getItem('stataxis_terms_consent_v1')}catch(e){return true}}
 var n=0,t=setInterval(function(){n++;if(ready()){clearInterval(t);setTimeout(show,2500)}else if(n>900)clearInterval(t)},1000)})();"""
 
 

@@ -33,10 +33,12 @@ const path = location.pathname.replace(/\/$/, "") || "/";
 document.querySelectorAll(".vx-menu a").forEach(a => { if (a.getAttribute("href") === path) a.style.color = "#fff"; });
 
 const SX_COOKIE_KEY = "stataxis_cookie_consent_v1", SX_TERMS_KEY = "stataxis_terms_consent_v1";
+window.SX_GATE_ON = false;   // the "Before you enter" terms-and-cookies gate is switched off for now; set to true to bring it back
 (function () {
   const style = document.createElement("style");
   style.textContent = ".sx-consent{position:fixed;inset:0;z-index:10000;background:rgba(3,5,9,.95);backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;padding:22px}.sx-consent-box{width:min(720px,100%);background:#0d121a;border:1px solid #26324a;border-radius:16px;padding:32px;box-shadow:0 28px 80px rgba(0,0,0,.65);color:#eef2f7;font-family:var(--sans,system-ui)}.sx-consent-kicker{color:#1da1ff;font-family:var(--mono,monospace);font-size:11px;letter-spacing:.2em}.sx-consent h2{font-size:34px;letter-spacing:-.035em;margin:10px 0 10px}.sx-consent p{color:#9aa7b8;line-height:1.65}.sx-consent-section{border:1px solid #1a2230;background:#080c12;border-radius:12px;padding:16px;margin:14px 0}.sx-consent-section strong{color:#eef2f7}.sx-consent-check{display:flex;gap:10px;align-items:flex-start;color:#d3dbe7;font-size:13.5px;margin:15px 0}.sx-consent-check input{accent-color:#1da1ff;margin-top:3px}.sx-consent a{color:#4db6ff}.sx-consent-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.sx-consent button{border:1px solid #26324a;background:#101826;color:#eef2f7;border-radius:7px;padding:12px 18px;font-weight:600;cursor:pointer;font-family:inherit}.sx-consent button:hover{border-color:#1da1ff}.sx-consent button.primary{background:#1da1ff;border-color:#1da1ff;color:#001018}.sx-consent button.primary:disabled{opacity:.4;cursor:not-allowed}.sx-consent button.primary:not(:disabled):hover{background:#4db6ff}.sx-consent-note{font-size:12px;color:#6c7b8d}.sx-consent-deny{font-size:12px;color:#ff7180;margin-top:10px}";
   document.head.appendChild(style);
+  if (!window.SX_GATE_ON) return;
   if (location.pathname.endsWith("/terms") || location.pathname.endsWith("/terms") || location.pathname.endsWith("/privacy") || location.pathname.endsWith("/privacy")) return;
   if (localStorage.getItem(SX_COOKIE_KEY) && localStorage.getItem(SX_TERMS_KEY)) return;
   document.documentElement.style.overflow = "hidden";
