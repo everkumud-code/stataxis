@@ -280,12 +280,24 @@ def clean_questions(raw: Any, previous: list[dict[str, Any]] | None = None, has_
                     oid = _next_id("o", used_o | taken)
                 taken.add(oid)
                 options.append({"id": oid, "text": _text(o.get("text"), "an option", 200), "other": bool(o.get("other")) and qtype in ("single", "multi", "dropdown"),
-                                "exclusive": bool(o.get("exclusive")) and qtype == "multi", "archived": bool(o.get("archived")), **({"image": _image_key(o.get("image"))} if _image_key(o.get("image")) else {})})
+                                "exclusive": bool(o.get("exclusive")) and qtype == "multi", "archived": bool(o.get("archived")), **({"group": str(o["group"])} if re.fullmatch(r"o\d+", str(o.get("group") or "")) else {}), **({"image": _image_key(o.get("image"))} if _image_key(o.get("image")) else {})})
             if len([o for o in options if not o["archived"]]) < 2:
                 raise ValueError(f"question {index} needs at least two options")
             limit = MAX_DROPDOWN_OPTIONS if qtype == "dropdown" else MAX_OPTIONS
             if len(options) > limit:
                 raise ValueError(f"question {index} can have at most {limit} options")
+            parent_id = str(item.get("depends_on") or "") if qtype == "dropdown" else ""
+            if parent_id:   # a dropdown that lists only the options belonging to the answer of an earlier question (a district's constituencies)
+                parent = next((p for p in out if p["id"] == parent_id), None)
+                if parent is None or parent["type"] not in ("single", "dropdown"):
+                    raise ValueError(f"question {index}: the options can depend only on an earlier one-choice or dropdown question")
+                known = {p["id"] for p in parent["options"]}
+                if any(o.get("group") not in known for o in options):
+                    raise ValueError(f"question {index}: every option must belong to one answer of the question it depends on")
+                q["depends_on"] = parent_id
+            else:
+                for o in options:
+                    o.pop("group", None)
             q["options"] = options
             q["randomize"] = bool(item.get("randomize"))
             if qtype == "multi":
@@ -353,6 +365,8 @@ def _answer_values(ans: dict[str, Any] | None) -> list[str]:
 
 
 def _shown(q: dict[str, Any], answers: dict[str, Any]) -> bool:
+    if q.get("depends_on") and not _answer_values(answers.get(q["depends_on"])):
+        return False   # the options depend on an answer that has not been given
     cond = q.get("show_if")
     if not cond:
         return True
@@ -635,6 +649,11 @@ def validate_answers(questions: list[dict[str, Any]], answers: Any, language: st
             continue
         try:
             clean[qid] = _check_one(q, ans, strings)
+            if q.get("depends_on"):
+                chosen = next((o for o in q["options"] if o["id"] == clean[qid].get("o")), None)
+                if chosen is not None and chosen.get("group") not in _answer_values(clean.get(q["depends_on"])):
+                    clean.pop(qid)
+                    raise ValueError("That answer is not valid.")
         except ValueError as exc:
             errors[qid] = str(exc)
     if errors:

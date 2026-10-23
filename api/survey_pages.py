@@ -37,7 +37,7 @@ const ans = {}, touched = {}, errs = {}, key = "sxs_" + D.slug;
 let token = ""; try { token = localStorage.getItem(key) || ""; if (!token) { token = Array.from(crypto.getRandomValues(new Uint8Array(18)), b => b.toString(16).padStart(2, "0")).join(""); localStorage.setItem(key, token); } } catch (e) { token = Array.from({length: 36}, () => Math.floor(Math.random() * 16).toString(16)).join(""); }
 const started = Date.now(), invite = new URLSearchParams(location.search).get("i") || "", qs = D.questions, shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const vals = id => { const a = ans[id]; if (!a) return []; if (a.o != null) return [].concat(a.o).map(String); if (a.n != null) return [String(a.n)]; return []; };
-const shown = q => !q.show_if || ((v) => q.show_if.op === "is" ? v : !v)(vals(q.show_if.q).some(x => q.show_if.values.includes(x)));
+const shown = q => (!q.depends_on || vals(q.depends_on).length > 0) && (!q.show_if || ((v) => q.show_if.op === "is" ? v : !v)(vals(q.show_if.q).some(x => q.show_if.values.includes(x))));
 const nodes = {};
 const fix = o => o.other || o.exclusive;
 function opts(q) { const list = q.options.slice(); if (!q.randomize) return list; const fixed = list.filter(fix), free = shuffle(list.filter(o => !fix(o))); return free.concat(fixed); }
@@ -61,7 +61,9 @@ function build(q) {
         setA(q, cur.length ? Object.assign({o: multi ? cur : cur[0]}, hasOther ? {t: other.value} : {}) : null); }; }
     body.append(other);
   } else if (q.type === "dropdown") {
-    const s = $("select"), other = $("input"); s.append(Object.assign($("option", "", S.choose), {value: ""})); for (const o of opts(q)) s.append(Object.assign($("option", "", o.text), {value: o.id}));
+    const s = $("select"), other = $("input"); s.append(Object.assign($("option", "", S.choose), {value: ""}));
+    const fill = () => { const p = q.depends_on ? (vals(q.depends_on)[0] || "") : null; while (s.options.length > 1) s.remove(1); for (const o of opts(q)) if (p === null || o.group === p) s.append(Object.assign($("option", "", o.text), {value: o.id})); s.value = (ans[q.id] && ans[q.id].o) || ""; };
+    box._fill = q.depends_on ? (() => { const p = vals(q.depends_on)[0] || ""; if (box._p !== p) { box._p = p; delete ans[q.id]; other.hidden = true; fill(); } }) : null; fill();
     other.type = "text"; other.placeholder = S.other; other.hidden = true; other.maxLength = 300; other.oninput = () => { if (ans[q.id]) ans[q.id].t = other.value; };
     s.onchange = () => { const o = q.options.find(z => z.id === s.value); other.hidden = !(o && o.other); setA(q, s.value ? Object.assign({o: s.value}, o && o.other ? {t: other.value} : {}) : null); }; body.append(s, other);
   } else if (q.type === "rating" || q.type === "nps") {
@@ -78,7 +80,7 @@ function build(q) {
   return box;
 }
 function showErr(q, m) { const b = nodes[q.id]; if (!b) return; b.classList.add("err"); b._err.hidden = false; b._err.textContent = m; }
-function refresh() { for (const q of qs) { const b = nodes[q.id]; if (!b) continue; const s = shown(q); b.hidden = !s; if (!s && ans[q.id]) delete ans[q.id]; if (s && !errs[q.id]) { b.classList.remove("err"); if (b._err) b._err.hidden = true; } } }
+function refresh() { for (const q of qs) { const b = nodes[q.id]; if (!b) continue; const s = shown(q); b.hidden = !s; if (b._fill) b._fill(); if (!s && ans[q.id]) delete ans[q.id]; if (s && !errs[q.id]) { b.classList.remove("err"); if (b._err) b._err.hidden = true; } } }
 const contact = {};
 function render() {
   const head = $("div"); head.append($("h1", "", D.title)); for (const p of (D.intro || D.description || "").split(/\n+/).filter(Boolean)) head.append($("p", "lead", p)); root.append(head);
