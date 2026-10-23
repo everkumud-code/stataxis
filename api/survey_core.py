@@ -1167,6 +1167,7 @@ def from_template(key: str) -> dict[str, Any]:
 def list_responses(session: Session, row: Survey, *, page: int = 1, size: int = 50, status: str = "", include_contact: bool = False) -> dict[str, Any]:
     """One page of the individual answers, newest first, for reading and for removing the ones that should not count."""
     questions = {q["id"]: q for q in json.loads(row.questions_json or "[]")}
+    size = max(1, min(int(size), 200))
     query = session.query(SurveyResponse).filter(SurveyResponse.survey_id == row.id)
     if status in ("valid", "flagged", "removed"):
         query = query.filter(SurveyResponse.status == status)

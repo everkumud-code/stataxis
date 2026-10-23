@@ -492,3 +492,14 @@ def test_the_web_app_serves_the_poll_pages_and_keeps_the_admin_api_private():
         return out["status"], b"".join(res)
     assert get("/polls")[0].startswith("200") and get("/survey/not-a-survey")[0].startswith("404")
     assert get("/api/v1/surveys/list")[0].startswith("401") and get("/api/v1/public/survey/not-a-survey")[0].startswith("404")
+
+
+def test_the_answer_list_can_be_read_in_pages_of_up_to_two_hundred_with_the_contact_beside_each_answer():
+    s, _ = make()
+    row = core.get_survey(s, live(s, title="Many answers", contact_mode="required", contact_fields=["name", "mobile"], consent_text="I agree.")["id"])
+    for i in range(5):
+        answer(s, row, {"q1": {"o": "o1"}}, contact={"name": f"Person {i}", "mobile": f"98765 4321{i}".replace("98765 43210", "98765 43219")}, consent=True)
+    page = core.list_responses(s, row, size=2, include_contact=True)
+    assert page["total"] == 5 and page["size"] == 2 and len(page["responses"]) == 2 and page["responses"][0]["contact"]["name"] == "Person 4"
+    assert core.list_responses(s, row, size=1000)["size"] == 200 and core.list_responses(s, row, size=0)["size"] == 1
+    assert "contact" not in core.list_responses(s, row)["responses"][0]

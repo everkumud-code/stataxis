@@ -13,6 +13,7 @@
     + ".svtabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}.svbar{height:10px;border-radius:6px;background:#11283d;overflow:hidden}.svbar i{display:block;height:100%;background:var(--blue)}"
     + ".svres .row{display:grid;grid-template-columns:minmax(120px,1fr) 2fr 90px;gap:10px;align-items:center;margin:7px 0;font-size:14px}.svx td,.svx th{padding:6px 8px;border:1px solid var(--line);font-size:13px}.svwarn{border:1px solid #b08a2e;background:#2a2210;border-radius:10px;padding:12px;margin:12px 0;font-size:13.5px;line-height:1.55}"
     + ".svstarter{display:block;text-align:left;padding:14px;border:1px solid var(--line);border-radius:12px;background:#08192a;color:inherit;cursor:pointer}.svstarter:hover{border-color:var(--blue)}.svstarter b{display:block;margin-bottom:4px}";
+  css.textContent += ".svdata{border-collapse:collapse;font-size:13px}.svdata th{position:sticky;top:0;background:#0b1e33;text-align:left;z-index:1}.svdata td,.svdata th{white-space:nowrap;padding:6px 10px;border-bottom:1px solid var(--line);max-width:280px;overflow:hidden;text-overflow:ellipsis}.svdata tr:hover td{background:rgba(21,157,232,.08)}";
   document.head.appendChild(css);
   const TYPE_LABEL = {single: "One choice", multi: "Many choices", dropdown: "Dropdown", rating: "Rating", nps: "Recommend (0 to 10)", number: "Number", text: "Short text", longtext: "Long text", ranking: "Ranking", section: "Heading"};
   const CHOICE = ["single", "multi", "dropdown", "ranking"];
@@ -54,14 +55,14 @@
 
     /* ------------------------------------------------------------------ one survey */
     const edit = () => {
-      const tabs = [["questions", "Questions"], ["settings", "Settings"], ["share", "Share and open"], ["results", "Results"], ["answers", "Answers"]];
+      const tabs = [["questions", "Questions"], ["settings", "Settings"], ["share", "Share and open"], ["results", "Results"], ["data", "Data table"], ["answers", "Answers"]];
       out.innerHTML = `<div id="svmsg" class="msg" hidden></div><div class="btnrow" style="margin:12px 0"><button class="btn" id="svback">← All polls and surveys</button><b style="align-self:center">${esc(cur.title || "New survey")}</b>${cur.id ? stateTag(cur) : '<span class="tag">not saved yet</span>'}<span style="flex:1"></span><button class="btn primary" id="svsave">Save</button><button class="btn" id="svprev">Preview</button></div>
-        <div class="svtabs">${tabs.map(([k, l]) => `<button class="btn${tab === k ? " on" : ""}" data-tab="${k}"${(k === "results" || k === "answers" || k === "share") && !cur.id ? " disabled title=\"Save first\"" : ""}>${l}</button>`).join("")}</div><div id="svbody"></div>`;
+        <div class="svtabs">${tabs.map(([k, l]) => `<button class="btn${tab === k ? " on" : ""}" data-tab="${k}"${(k === "results" || k === "answers" || k === "data" || k === "share") && !cur.id ? " disabled title=\"Save first\"" : ""}>${l}</button>`).join("")}</div><div id="svbody"></div>`;
       $("#svback", out).onclick = list;
       out.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; edit(); });
       $("#svsave", out).onclick = save;
       $("#svprev", out).onclick = async () => { try { const r = await post("/api/v1/surveys/preview", payload()); modal("Preview: " + (cur.title || "survey") + " (nothing is saved or public)", `<iframe srcdoc="${esc(r.html)}" title="Preview"></iframe>`); } catch (e) { say(e.message); } };
-      ({questions: drawQuestions, settings: drawSettings, share: drawShare, results: drawResults, answers: drawAnswers})[tab]($("#svbody", out));
+      ({questions: drawQuestions, settings: drawSettings, share: drawShare, results: drawResults, data: drawData, answers: drawAnswers})[tab]($("#svbody", out));
     };
     const payload = () => ({...cur, opens_at: cur.opens_at, closes_at: cur.closes_at});
     const save = async () => { try { const r = await post("/api/v1/surveys/save", payload()); cur = r.survey; edit(); say("Saved.", true); } catch (e) { say(e.message); } };
@@ -211,6 +212,31 @@
     };
 
     /* ------------------------------------------------------------------ the individual answers */
+    /* Every answer of this poll in one grid: a row per person, a column per question (and the name and mobile when this account may see them), with a filter, a search and the downloads. */
+    const drawData = async body => {
+      let page = 1, status = "", withContact = false, find = "";
+      const cols = (cur.questions || []).filter(q => q.type !== "section" && !q.archived), cell = v => v == null || v === "" ? '<span class="muted">–</span>' : esc(v);
+      let last = null;
+      const load = async () => { last = await fresh("/api/v1/surveys/responses", {id: cur.id, page, status, size: 100, contact: withContact ? "1" : "0"}); render(); };
+      const render = () => {
+        const r = last, needle = find.trim().toLowerCase();
+        const shown = needle ? r.responses.filter(x => JSON.stringify([x.answers, x.contact || {}]).toLowerCase().includes(needle)) : r.responses, pages = Math.max(1, Math.ceil(r.total / r.size));
+        body.innerHTML = `<div class="btnrow" style="margin-bottom:10px;align-items:center"><label>Show<select id="svds"><option value="">All</option><option value="valid"${status === "valid" ? " selected" : ""}>Valid</option><option value="flagged"${status === "flagged" ? " selected" : ""}>Flagged</option><option value="removed"${status === "removed" ? " selected" : ""}>Removed</option></select></label>
+            <input type="search" id="svdf" placeholder="Search this page (district, name, mobile, any answer)" value="${esc(find)}" style="min-width:260px">${CAN.contact ? `<label><input type="checkbox" id="svdc"${withContact ? " checked" : ""}> show name and mobile</label>` : ""}<span style="flex:1"></span>
+            ${CAN.export ? '<button class="btn" data-dx="csv">Download CSV</button><button class="btn" data-dx="xlsx">Download Excel</button>' : ""}<button class="btn" id="svdr">Refresh</button></div>
+          <p class="muted">${Number(r.total).toLocaleString("en-IN")} answer(s) in all · page ${page} of ${pages}${needle ? ` · ${shown.length} match "${esc(find)}" on this page` : ""}</p>
+          <div style="overflow:auto;max-height:70vh"><table class="svdata"><thead><tr><th>#</th><th>Time (IST)</th><th>State</th>${withContact ? "<th>Name</th><th>Mobile</th>" : ""}${cols.map(q => `<th title="${esc(q.text)}">${esc(q.text.split(" / ")[0].slice(0, 42))}</th>`).join("")}</tr></thead>
+            <tbody>${shown.map(x => `<tr><td>${x.id}</td><td>${esc(x.time)}</td><td>${esc(x.status)}</td>${withContact ? `<td>${cell((x.contact || {}).name)}</td><td>${cell((x.contact || {}).mobile)}</td>` : ""}${cols.map(q => `<td>${cell(x.answers[q.id])}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${3 + cols.length + (withContact ? 2 : 0)}" class="muted">No answers to show.</td></tr>`}</tbody></table></div>
+          <div class="btnrow" style="margin-top:12px"><button class="btn" id="svdp"${page <= 1 ? " disabled" : ""}>← Newer</button><button class="btn" id="svdn"${page >= pages ? " disabled" : ""}>Older →</button></div>`;
+        $("#svds", body).onchange = e => { status = e.target.value; page = 1; load(); }; $("#svdr", body).onclick = () => load();
+        $("#svdp", body).onclick = () => { page--; load(); }; $("#svdn", body).onclick = () => { page++; load(); };
+        const f = $("#svdf", body); f.oninput = () => { find = f.value; const pos = f.selectionStart; render(); const g = $("#svdf", body); g.focus(); g.setSelectionRange(pos, pos); };
+        const c = $("#svdc", body); if (c) c.onchange = () => { withContact = c.checked; load(); };
+        body.querySelectorAll("[data-dx]").forEach(b => b.onclick = async () => { try { await download("/api/v1/surveys/export", {id: cur.id, format: b.dataset.dx, contact: withContact ? "1" : "0", flagged: "1"}, `${cur.slug}.${b.dataset.dx}`); } catch (e) { say(e.message); } });
+      };
+      body.innerHTML = '<p class="muted">Loading…</p>'; try { await load(); } catch (e) { body.innerHTML = `<p class="msg bad">${esc(e.message)}</p>`; }
+    };
+
     const drawAnswers = async body => {
       let page = 1, status = "";
       const load = async () => { const r = await fresh("/api/v1/surveys/responses", {id: cur.id, page, status}); const qs = Object.fromEntries((cur.questions || []).map(q => [q.id, q.text]));

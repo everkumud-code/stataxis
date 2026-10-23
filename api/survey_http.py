@@ -157,7 +157,7 @@ def _admin(session: Any, user: User, method: str, route: str, q: dict[str, str],
         if route == "crosstab":
             return _json(start_response, 200, core.crosstab(session, row, q.get("target", ""), q.get("by", ""), include_flagged=q.get("flagged", "1") != "0"))
         if route == "responses":
-            return _json(start_response, 200, core.list_responses(session, row, page=_int(q.get("page"), "page", 1), status=q.get("status", ""), include_contact=q.get("contact") == "1" and caps["contact"]))
+            return _json(start_response, 200, core.list_responses(session, row, page=_int(q.get("page"), "page", 1), size=_int(q.get("size"), "size", 50), status=q.get("status", ""), include_contact=q.get("contact") == "1" and caps["contact"]))
         if route == "invites":
             return _json(start_response, 200, core.invite_summary(session, row.id))
         if route == "history":
