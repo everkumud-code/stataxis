@@ -1,7 +1,7 @@
 """Audience geography and age (only where really known), the planner's target audience, and the branded, machine-unreadable PDF."""
 import io
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from sqlalchemy import create_engine
@@ -175,3 +175,26 @@ def test_audience_route_is_for_analyst_and_above_and_the_admin_route_sets_a_prof
     status, body = call(market, "GET", "/api/v1/market/audience", 2, "an@x.com", "sx_analyst")
     assert body["with_profile"] == 1 and body["channels"][0]["profile"]["as_of"] == "2026-10-01"
     assert call(admin_app, "POST", "/api/v1/admin/audience/remove", 3, "boss@x.com", "sx_enterprise", True, {"channel_id": cid})[0] == 200
+
+
+def test_a_profile_dated_today_in_india_is_accepted_even_when_the_server_clock_is_still_on_yesterday(monkeypatch):
+    """From midnight to 5:30 am Indian time the date in UTC is still yesterday. A profile dated today (Indian date) was refused as 'in the future', which also stopped the public demo from being built at night."""
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            moment = datetime(2026, 10, 25, 18, 40, tzinfo=UTC)
+            return moment.astimezone(tz) if tz else moment.replace(tzinfo=None)
+
+    class UtcDate(date):   # what a server on UTC calls today at that moment: still 25 October
+        @classmethod
+        def today(cls):
+            return date(2026, 10, 25)
+
+    monkeypatch.setattr(audience, "datetime", Clock)
+    monkeypatch.setattr(audience, "date", UtcDate)
+    s, _ = make()
+    c = chan(s, "tz", "Zone")
+    kw = dict(channel_id=c.id, source="channel_media_kit", source_note="a media kit", age={"18-24": 100}, gender=None, states=None, countries=None, by="t")
+    assert audience.set_profile(s, as_of="2026-10-26", **kw)             # 26 October in India, still 25 October in UTC
+    with pytest.raises(ValueError, match="future"):
+        audience.set_profile(s, as_of="2026-10-27", **kw)

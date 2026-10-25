@@ -8,7 +8,7 @@ The media planner can then match a target (age bands, states, gender) against th
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -69,7 +69,7 @@ def set_profile(session: Session, *, channel_id: int, source: str, source_note: 
         when = date.fromisoformat(str(as_of))
     except ValueError as exc:
         raise ValueError("as_of must look like 2026-10-09") from exc
-    if when > date.today():
+    if when > datetime.now(timezone(timedelta(hours=5, minutes=30))).date():   # today in India: the product runs on Indian time, and a server in UTC is a day behind from midnight to 5:30 am
         raise ValueError("as_of cannot be in the future")
     data = {"age": _clean_shares(age, AGE_BANDS, "age", total_min=97), "gender": _clean_shares(gender, GENDERS, "gender", total_min=97),
             "states": _clean_shares(states, STATES, "states"), "countries": _clean_shares(countries, None, "countries")}
