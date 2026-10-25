@@ -84,6 +84,14 @@ def public_application(session_factory: Callable[[], Any]):
             return _unsubscribe(session_factory, environ, start_response)
         if method != "GET":
             return _json(start_response, 405, {"error": "method not allowed"})
+        if path == "/api/v1/public/manual.pdf":   # the user manual as a PDF, made from the page /manual; public, like the page
+            retry = limiter.check(f"public-manual:{client_ip(environ)}", 8, 60)
+            if retry:
+                return _json(start_response, 429, {"error": "too many requests"}, retry)
+            from api.manual_pdf import filename as manual_filename, manual_pdf
+            body = manual_pdf()
+            start_response("200 OK", [("Content-Type", "application/pdf"), ("Content-Disposition", f'attachment; filename="{manual_filename()}"'), ("Content-Length", str(len(body))), ("Cache-Control", "no-store")])
+            return [body]
         if path not in {"/api/v1/public/pulse", "/api/v1/public/packages", "/api/v1/public/status", "/api/v1/public/methodology", "/api/v1/public/services"}:
             return _json(start_response, 404, {"error": "not found"})
         retry = limiter.check(f"public:{client_ip(environ)}", 90, 60)
