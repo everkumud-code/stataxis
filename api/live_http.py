@@ -108,7 +108,7 @@ def live_application(session_factory: Callable[[], Any]):
                 ids = tuple(int(x) for x in (query.get("channels") or "").split(",") if x.strip().isdigit()) or None
                 session = session_factory()
                 try:
-                    payload = live_channel_series(session, start_at=start_at, end_at=end_at, bucket_seconds=int(query.get("bucket_seconds", "900")), feed=query.get("feed") or "all",
+                    payload = live_channel_series(session, start_at=start_at, end_at=end_at, bucket_seconds=int(query.get("bucket_seconds", "900")), feed=query.get("feed") or "all", measure=query.get("measure") or "concurrent",
                                                   language=query.get("language"), segment=query.get("segment"), channel_ids=ids)
                 finally:
                     session.close()

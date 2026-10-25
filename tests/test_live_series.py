@@ -151,3 +151,84 @@ def test_the_route_needs_a_login(monkeypatch, engine):
     monkeypatch.setattr("api.live_http.authenticate", refuse)
     status, body = _call(live_application(lambda: Session(engine)), "bucket_seconds=900")
     assert status.startswith("401")
+
+
+# ------------------------------------------------------------------ Data of: views gained and total views
+@pytest.fixture()
+def engine_views():
+    from collector.storage import Observation
+    engine = create_engine("sqlite://", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as s:
+        alpha = _channel(s, "a", "Alpha")
+        beta = _channel(s, "b", "Beta", language="English")
+        a_main = _stream(s, alpha, "a-main", T0 - timedelta(days=45))
+        a_event = _stream(s, alpha, "a-event", T0 + timedelta(minutes=30))
+        b_main = _stream(s, beta, "b-main", T0 - timedelta(days=45))
+
+        def put(video, minute, viewers, views):
+            s.add(Observation(video_id=video.id, channel_id=video.channel_id, observed_at=T0 + timedelta(minutes=minute), view_count=views, concurrent_viewers=viewers, is_live=True, classification="LIVE", source="test"))
+        for m in range(0, 120):
+            put(a_main, m, 1000, 1_000_000 + 60 * m)                 # gains 60 views a minute
+            if 30 <= m < 60:
+                put(a_event, m, 3000, 5_000 + 100 * (m - 30))        # gains 100 a minute
+            if m < 60:
+                put(b_main, m, 500, 200_000 + 10 * m)                # gains 10 a minute
+        s.commit()
+    return engine
+
+
+def measured(engine, **kw):
+    with Session(engine) as s:
+        return live_channel_series(s, start_at=T0, end_at=T0 + timedelta(minutes=119), **kw)
+
+
+def test_views_gained_are_the_rises_of_each_streams_own_count_and_a_new_stream_adds_no_jump(engine_views):
+    out = measured(engine_views, bucket_seconds=900, feed="all", measure="gained")
+    a, b = by_name(out)["Alpha"], by_name(out)["Beta"]
+    assert out["measure"] == "gained"
+    assert a["values"][0] == 840 and a["values"][1] == 900                       # 60 a minute; the first minute has nothing before it
+    assert 2200 <= a["values"][2] <= 2400                                          # the event stream (100 a minute) comes in without its 5,000 starting count being a gain
+    assert a["values"][5] == 900
+    assert b["values"][1] == 150 and b["values"][6] is None                        # Beta stopped; a time with no live stream is empty, not zero
+    assert a["total"] == sum(v for v in a["values"] if v is not None)
+
+
+def test_gained_by_feed(engine_views):
+    primary = by_name(measured(engine_views, bucket_seconds=900, feed="primary", measure="gained"))["Alpha"]
+    assert primary["values"][2] == 900 and primary["streams"][2] == 1
+    secondary = by_name(measured(engine_views, bucket_seconds=900, feed="secondary", measure="gained"))["Alpha"]
+    assert 1300 <= secondary["values"][2] <= 1500 and secondary["values"][0] is None
+
+
+def test_total_views_is_the_running_total_at_the_end_of_each_bucket(engine_views):
+    out = measured(engine_views, bucket_seconds=900, feed="all", measure="views")
+    a = by_name(out)["Alpha"]
+    assert a["values"][0] == 1_000_840.0                                           # minute 14
+    assert a["values"][2] == 1_002_640.0 + 5_000 + 1_400                           # the main stream and the event, at minute 44
+    assert by_name(measured(engine_views, bucket_seconds=900, feed="primary", measure="views"))["Alpha"]["values"][2] == 1_002_640.0
+    assert a["total"] == a["values"][-1] and out["totals"]["latest"] is not None
+
+
+def test_six_hours_of_gained_is_the_whole_days_gain_in_one_bucket(engine_views):
+    out = measured(engine_views, bucket_seconds=21600, feed="all", measure="gained")
+    a = by_name(out)["Alpha"]
+    assert len(out["grid"]) == 1 and 7_000 + 2_900 <= a["values"][0] <= 7_300 + 3_100   # 60 a minute for two hours, and 100 a minute for half an hour
+    assert out["totals"]["sum"] == a["values"][0] + by_name(out)["Beta"]["values"][0]
+
+
+def test_the_default_is_still_concurrent_viewers_and_unknown_measures_are_refused(engine_views):
+    assert measured(engine_views, bucket_seconds=900)["measure"] == "concurrent"
+    with pytest.raises(ValueError):
+        measured(engine_views, bucket_seconds=900, measure="likes")
+
+
+def test_the_route_takes_the_measure(engine_views, monkeypatch):
+    monkeypatch.setattr("api.live_http.authenticate", lambda header: SimpleNamespace(user_id=1))
+    monkeypatch.setattr("api.live_http.policy_for_identity", lambda identity: SimpleNamespace())
+    monkeypatch.setattr("api.live_http.require_capability", lambda policy, name: None)
+    app = live_application(lambda: Session(engine_views))
+    status, body = _call(app, f"start={T0.isoformat()}&end={(T0 + timedelta(minutes=119)).isoformat()}&bucket_seconds=900&measure=views".replace("+", "%2B"))
+    assert status == "200 OK" and body["measure"] == "views" and body["channels"][0]["name"] == "Alpha"
+    status, body = _call(app, f"start={T0.isoformat()}&end={(T0 + timedelta(minutes=119)).isoformat()}&bucket_seconds=900&measure=likes".replace("+", "%2B"))
+    assert status == "400 Bad Request"

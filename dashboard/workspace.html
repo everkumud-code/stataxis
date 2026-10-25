@@ -766,9 +766,11 @@ add("trends", "Intelligence", "Audience & trends", async el => {
 });
 
 /* ---------- Live audience, channel by channel: the feed (All / Primary / Secondary), "View by" 1 min to 6 hours, one day, and a line for every channel ---------- */
-const LVX = {feed: "all", by: "900", date: "", from: "", to: "", sel: null, token: 0};   /* sel: null = the ten leading channels, otherwise the ids that are switched on */
+const LVX = {feed: "all", measure: "concurrent", by: "900", date: "", from: "", to: "", sel: null, token: 0};   /* sel: null = the ten leading channels, otherwise the ids that are switched on */
 const LVX_PALETTE = ["#6b8cff", "#ff7a7a", "#35d07f", "#ffd166", "#b388ff", "#2ec4b6", "#ff9f43", "#ff6fb5", "#4dd0e1", "#c3e88d", "#f78c6c", "#82aaff", "#e5c07b", "#56b6c2"];
 const LVX_BY = [["60", "1 minute"], ["300", "5 minutes"], ["900", "15 minutes"], ["1800", "30 minutes"], ["21600", "6 hours"]];
+const LVX_MEASURES = [["concurrent", "Concurrent viewers"], ["gained", "Views gained"], ["views", "Total views"]];
+const LVX_TXT = {concurrent: {chart: "Concurrent viewers", y: "Concurrent viewers", main: "Average", peak: "Peak", peakAt: "Peak at (IST)"}, gained: {chart: "Views gained in each bucket", y: "Views gained", main: "Gained in this window", peak: "Best bucket", peakAt: "Best bucket at (IST)"}, views: {chart: "Total views at the end of each bucket", y: "Total views", main: "Total views now", peak: "Highest", peakAt: "Highest at (IST)"}};
 const LVX_FEEDS = [["all", "All feed"], ["primary", "Primary feed"], ["secondary", "Secondary feeds"]];
 const istDay = d => new Date(d).toLocaleDateString("en-CA", {timeZone: "Asia/Kolkata"});
 const istClock = (iso, withDay) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("en-IN", {timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false, ...(withDay ? {day: "numeric", month: "short"} : {})}); };
@@ -815,6 +817,7 @@ async function liveByChannel(el) {
   const hours = Array.from({length: 25}, (_, h) => h);
   host.innerHTML = `<section class="card"><h2>Channel by channel</h2>
     <p class="muted">Every channel's live viewers through the day. Pick the feed, how finely to read it, and the day.</p>
+    <div class="tabs" role="group" aria-label="Data of" id="lvx-measure" style="margin-bottom:8px">${LVX_MEASURES.map(([k, l]) => `<button class="tab" type="button" data-measure="${k}" aria-pressed="${LVX.measure === k}">${l}</button>`).join("")}</div>
     <div class="tabs" role="group" aria-label="Feed" id="lvx-feed">${LVX_FEEDS.map(([k, l]) => `<button class="tab" type="button" data-feed="${k}" aria-pressed="${LVX.feed === k}">${l}</button>`).join("")}</div>
     <form class="filters" id="lvx-form" style="margin-top:10px">
       <label>View by<select name="by">${LVX_BY.map(([k, l]) => `<option value="${k}" ${LVX.by === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
@@ -824,10 +827,11 @@ async function liveByChannel(el) {
       <button class="btn primary" type="submit">Show</button></form>
     <div id="lvx-body"><p class="muted">Loading…</p></div></section>`;
   host.querySelectorAll("[data-feed]").forEach(b => b.onclick = () => { LVX.feed = b.dataset.feed; liveByChannel(el); });
+  host.querySelectorAll("[data-measure]").forEach(b => b.onclick = () => { LVX.measure = b.dataset.measure; liveByChannel(el); });
   $("#lvx-form", host).onsubmit = e => { e.preventDefault(); const f = new FormData(e.target); LVX.by = f.get("by"); LVX.date = f.get("date") || istDay(Date.now()); LVX.from = f.get("from"); LVX.to = f.get("to"); liveByChannel(el); };
   const mine = ++LVX.token, body = $("#lvx-body", host);
   let d;
-  try { d = await api("/api/v1/audience/live/series", {date: LVX.date, from: LVX.from, to: LVX.to, bucket_seconds: LVX.by, feed: LVX.feed, language: F.language}); }
+  try { d = await api("/api/v1/audience/live/series", {date: LVX.date, from: LVX.from, to: LVX.to, bucket_seconds: LVX.by, feed: LVX.feed, measure: LVX.measure, language: F.language}); }
   catch (e) { if (mine === LVX.token) body.innerHTML = `<p class="muted">${esc(e.message || "Could not load this.")}</p>`; return; }
   if (mine !== LVX.token) return;   // a newer choice was made while this was loading
   const chans = d.channels || [];
@@ -835,25 +839,31 @@ async function liveByChannel(el) {
   chans.forEach((c, i) => { c.color = LVX_PALETTE[i % LVX_PALETTE.length]; });
   const visible = () => (LVX.sel ? chans.filter(c => LVX.sel.has(c.channel_id)) : chans.slice(0, 10));
   const draw = () => {
-    const vis = visible(), lastIdx = (() => { for (let i = d.totals.concurrent.length - 1; i >= 0; i--) if (d.totals.concurrent[i] != null) return i; return -1; })();
-    $("#lvx-kpis", body).innerHTML = `${kpi("Channels live", whole(chans.length), LVX.feed === "all" ? "At any time in this window" : (LVX.feed === "primary" ? "With a primary feed" : "With a secondary stream"))}${kpi("Latest total", lastIdx < 0 ? "—" : whole(Math.round(d.totals.concurrent[lastIdx])), lastIdx < 0 ? "" : "At " + istClock(d.grid[lastIdx]) + " IST")}${kpi("Peak total", whole(Math.round(d.totals.peak)), "Highest bucket, all channels together")}${kpi("Average total", whole(Math.round(d.totals.average)), "Over the times anything was live")}`;
+    const vis = visible();
+    const T = LVX_TXT[LVX.measure], tv = d.totals.values, lastIdx = (() => { for (let i = tv.length - 1; i >= 0; i--) if (tv[i] != null) return i; return -1; })(), r0 = n => whole(Math.round(n)), live = LVX.feed === "all" ? "At any time in this window" : (LVX.feed === "primary" ? "With a primary feed" : "With a secondary stream");
+    $("#lvx-kpis", body).innerHTML = LVX.measure === "gained"
+      ? `${kpi("Channels live", whole(chans.length), live)}${kpi("Gained in the last bucket", lastIdx < 0 ? "—" : r0(tv[lastIdx]), lastIdx < 0 ? "" : "At " + istClock(d.grid[lastIdx]) + " IST")}${kpi("Best bucket", r0(d.totals.peak), "All channels together")}${kpi("Gained in this window", r0(d.totals.sum), "Views, all channels together")}`
+      : LVX.measure === "views"
+        ? `${kpi("Channels live", whole(chans.length), live)}${kpi("Total views now", lastIdx < 0 ? "—" : r0(tv[lastIdx]), lastIdx < 0 ? "" : "At " + istClock(d.grid[lastIdx]) + " IST")}${kpi("Highest total", r0(d.totals.peak), "All channels together")}${kpi("Lowest total", r0(Math.min(...tv.filter(v => v != null))), "All channels together")}`
+        : `${kpi("Channels live", whole(chans.length), live)}${kpi("Latest total", lastIdx < 0 ? "—" : r0(tv[lastIdx]), lastIdx < 0 ? "" : "At " + istClock(d.grid[lastIdx]) + " IST")}${kpi("Peak total", r0(d.totals.peak), "Highest bucket, all channels together")}${kpi("Average total", r0(d.totals.average), "Over the times anything was live")}`;
     $("#lvx-legend", body).innerHTML = chans.map((c, i) => { const on = LVX.sel ? LVX.sel.has(c.channel_id) : i < 10; return `<button type="button" class="chip" data-ch="${c.channel_id}" aria-pressed="${on}" style="opacity:${on ? 1 : .45}"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${c.color};margin-right:6px"></span>${esc(c.name)}</button>`; }).join("");
     body.querySelectorAll("[data-ch]").forEach(b => b.onclick = () => { const id = Number(b.dataset.ch), now = new Set(visible().map(c => c.channel_id)); if (now.has(id)) now.delete(id); else now.add(id); LVX.sel = now; draw(); });
-    lvxChart($("#lvx-c1", body), d.grid, vis.map(c => ({name: c.name, color: c.color, values: c.concurrent})), {label: "Concurrent viewers by channel", yTitle: "Concurrent viewers"});
+    lvxChart($("#lvx-c1", body), d.grid, vis.map(c => ({name: c.name, color: c.color, values: c.values})), {label: T.chart + " by channel", yTitle: T.y});
     lvxChart($("#lvx-c2", body), d.grid, vis.map(c => ({name: c.name, color: c.color, values: c.streams})), {label: "Live streams running by channel", yTitle: "Live streams", integer: true});
   };
   body.innerHTML = `<div class="grid kpis" id="lvx-kpis"></div>
     <div class="chips" style="margin:10px 0"><button class="btn" type="button" id="lvx-top">Top 10</button> <button class="btn" type="button" id="lvx-all">All channels</button> <button class="btn" type="button" id="lvx-none">None</button></div>
     <div class="chips" id="lvx-legend" style="margin-bottom:8px"></div>
-    <h3 style="margin:10px 0 4px">Concurrent viewers</h3><div id="lvx-c1"></div>
+    <h3 style="margin:10px 0 4px" id="lvx-c1h"></h3><div id="lvx-c1"></div>
     <h3 style="margin:16px 0 4px">Live streams running</h3><div id="lvx-c2"></div>
     <h3 style="margin:16px 0 4px">Ranking for this window</h3><div id="lvx-rank"></div>
     ${evidence((d.method || "") + " Times with no live stream are left empty, not drawn as zero.")}`;
+  $("#lvx-c1h", body).textContent = LVX_TXT[LVX.measure].chart;
   $("#lvx-top", body).onclick = () => { LVX.sel = null; draw(); };
   $("#lvx-all", body).onclick = () => { LVX.sel = new Set(chans.map(c => c.channel_id)); draw(); };
   $("#lvx-none", body).onclick = () => { LVX.sel = new Set(); draw(); };
-  $("#lvx-rank", body).innerHTML = table([{h: "#", n: 1, v: r => r.rank}, {h: "Channel", v: r => r.name}, {h: "Language", v: r => r.language || "—"}, {h: "Average", n: 1, v: r => whole(Math.round(r.average))}, {h: "Peak", n: 1, v: r => whole(r.peak)},
-    {h: "Peak at (IST)", n: 1, v: r => r.peak_at ? istClock(r.peak_at, true) : "—"}, {h: "Time live", n: 1, v: r => r.coverage_percent + "%"}], chans, "No channels.");
+  $("#lvx-rank", body).innerHTML = table([{h: "#", n: 1, v: r => r.rank}, {h: "Channel", v: r => r.name}, {h: "Language", v: r => r.language || "—"}, {h: LVX_TXT[LVX.measure].main, n: 1, v: r => whole(Math.round(LVX.measure === "concurrent" ? r.average : r.total))}, {h: LVX_TXT[LVX.measure].peak, n: 1, v: r => whole(Math.round(r.peak))},
+    {h: LVX_TXT[LVX.measure].peakAt, n: 1, v: r => r.peak_at ? istClock(r.peak_at, true) : "—"}, {h: "Time live", n: 1, v: r => r.coverage_percent + "%"}], chans, "No channels.");
   draw();
 }
 

@@ -67,15 +67,17 @@ def seed(session: Session, now: datetime | None = None, *, days: int = 8, seed_v
         session.add(v)
         live_videos.append((ch, v, base))
     session.flush()
-    for ch, v, base in live_videos:
+    for n, (ch, v, base) in enumerate(live_videos):
         t = start
+        views = 4_000_000 + n * 750_000   # a stream's view count only ever grows: each two minutes adds a share of the people watching
         while t <= now:
             hour = ((t + IST).hour + (t + IST).minute / 60)
             weekday_boost = 1.12 if (t + IST).weekday() >= 5 else 1.0
             level = base * _evening_curve(hour) * weekday_boost * (0.93 + 0.14 * rnd.random())
             if ch.name == FLAT:
                 level = base * 0.9   # a flat line, not a wobble
-            rows.append({"video_id": v.id, "channel_id": ch.id, "observed_at": t, "view_count": 1, "concurrent_viewers": int(level), "is_live": True, "classification": "LIVE", "source": "demo"})
+            views += int(level * 0.35)
+            rows.append({"video_id": v.id, "channel_id": ch.id, "observed_at": t, "view_count": views, "concurrent_viewers": int(level), "is_live": True, "classification": "LIVE", "source": "demo"})
             t += timedelta(minutes=2)
     for i in range(0, len(rows), 5000):
         session.execute(insert(Observation), rows[i:i + 5000])
