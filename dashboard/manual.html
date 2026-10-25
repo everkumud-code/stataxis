@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="The StatAxis user manual: how to use the workspace, what each figure means, how the STX Index and the IFX Score are worked out, the methodology, how to read the data, and answers to common questions.">
+<title>User manual — StatAxis</title><link rel="icon" href="assets/stataxis-favicon.svg"><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="tech.css">
+<style>
+.man{max-width:1180px;margin:auto;padding:48px 24px 90px;display:grid;grid-template-columns:250px minmax(0,1fr);gap:34px;align-items:start}
+.man-toc{position:sticky;top:90px;background:var(--sx-card);border:1px solid var(--sx-line);border-radius:16px;padding:18px 16px;font-size:14px;max-height:calc(100vh - 120px);overflow:auto}
+.man-toc b{display:block;color:var(--sx-ink);margin-bottom:8px;font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+.man-toc a{display:block;color:var(--sx-muted);text-decoration:none;padding:5px 0;line-height:1.35}.man-toc a:hover{color:var(--sx-ink)}
+.man-body{background:var(--sx-card);border:1px solid var(--sx-line);border-radius:18px;padding:36px 38px;min-width:0}
+.man h1{font-size:clamp(36px,5.5vw,56px);margin:10px 0 12px}
+.man h2{font-size:27px;margin:46px 0 10px;color:var(--sx-ink);scroll-margin-top:90px;padding-top:6px;border-top:1px solid var(--sx-line)}
+.man h2:first-of-type{border-top:0;margin-top:26px}
+.man h3{font-size:18px;margin:24px 0 6px;color:var(--sx-ink)}
+.man p,.man li{color:var(--sx-muted);line-height:1.7}.man li{margin:6px 0}.man b,.man strong{color:var(--sx-ink)}
+.man table{width:100%;border-collapse:collapse;margin:12px 0 18px;font-size:14.5px}.man td,.man th{padding:9px 8px;border-bottom:1px solid var(--sx-line);text-align:left;vertical-align:top;color:var(--sx-muted)}.man th{color:var(--sx-ink)}
+.man .tw{overflow-x:auto}
+.callout{border-left:3px solid var(--sx-gold);background:rgba(120,140,255,.07);border-radius:0 12px 12px 0;padding:12px 16px;margin:16px 0}.callout p{margin:4px 0}
+.formula{font-family:ui-monospace,Menlo,Consolas,monospace;background:rgba(255,255,255,.05);border:1px solid var(--sx-line);border-radius:10px;padding:12px 14px;color:var(--sx-ink);font-size:14px;overflow-x:auto;white-space:pre-wrap}
+.bars{margin:10px 0 18px}.bar{display:grid;grid-template-columns:150px 1fr 48px;gap:10px;align-items:center;margin:6px 0;font-size:14px;color:var(--sx-muted)}.bar i{display:block;height:12px;border-radius:7px;background:linear-gradient(90deg,#2d6bff,#7aa2ff)}.bar span{color:var(--sx-ink);font-weight:700;text-align:right}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:12px 0}.cardx{border:1px solid var(--sx-line);border-radius:14px;padding:14px 16px}.cardx b{display:block;margin-bottom:4px}
+.calc{border:1px solid var(--sx-line);border-radius:16px;padding:18px;margin:14px 0}.calc .g{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.calc label{font-size:13px;color:var(--sx-muted);display:block}.calc input{width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;border:1px solid var(--sx-line);background:transparent;color:var(--sx-ink);font:inherit}
+.calc .out{margin-top:14px;display:flex;flex-wrap:wrap;gap:14px}.calc .out div{border:1px solid var(--sx-line);border-radius:12px;padding:10px 16px;min-width:140px}.calc .out small{display:block;color:var(--sx-muted)}.calc .out strong{font-size:26px}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}.btnrow a,.btnrow button{border:1px solid var(--sx-line);background:transparent;color:var(--sx-ink);border-radius:99px;padding:8px 16px;font:inherit;font-weight:700;cursor:pointer;text-decoration:none}
+details.faq{border:1px solid var(--sx-line);border-radius:12px;margin:8px 0;padding:2px 16px}details.faq summary{cursor:pointer;padding:12px 0;font-weight:700;color:var(--sx-ink)}details.faq p{margin:0 0 14px}
+@media (max-width:900px){.man{grid-template-columns:1fr}.man-toc{position:static;max-height:none}.man-body{padding:24px 18px}.bar{grid-template-columns:110px 1fr 40px}}
+@media print{body.sx-site{background:#fff!important;color:#111!important}#nav,#footer,.man-toc,.btnrow,.calc{display:none!important}.man{display:block;padding:0}.man-body{border:0;padding:0;background:#fff;color:#111}.man p,.man li,.man td,.man th,.man b,.man h1,.man h2,.man h3,.man summary{color:#111!important}.man h2{page-break-after:avoid}.man table,.callout,.cardx{page-break-inside:avoid}details.faq{border-color:#999}details.faq[open] p,details.faq p{display:block}.callout{background:#f1f4fb}.formula{background:#f4f4f4;color:#111}}
+</style>
+</head>
+<body class="sx-site"><div id="nav"></div>
+<main class="man">
+<nav class="man-toc" aria-label="Contents"><b>Contents</b>
+<a href="#what">1 · What StatAxis is</a><a href="#start">2 · Getting started</a><a href="#screens">3 · The screens</a><a href="#source">4 · Where the data comes from</a><a href="#figures">5 · What each figure means</a><a href="#stx">6 · The STX Index</a><a href="#ifx">7 · The IFX Score</a><a href="#method">8 · Methodology in short</a><a href="#read">9 · How to read the data</a><a href="#use">10 · How to use it, by role</a><a href="#reports">11 · Reports and downloads</a><a href="#different">12 · Why it is different</a><a href="#privacy">13 · Privacy and access</a><a href="#faq">14 · FAQ</a>
+</nav>
+<article class="man-body">
+<span class="sx-kicker">STATAXIS · USER MANUAL</span>
+<h1>How to use StatAxis</h1>
+<p>This manual explains what StatAxis shows, where every number comes from, how the <b>STX Index</b> and the <b>IFX Score</b> are worked out, how to read the screens without being misled, and what to ask of any audience-data tool. It is written for people who decide things with the numbers: programme heads, advertisers and agencies, campaign teams, researchers, creators and journalists.</p>
+<div class="btnrow"><button type="button" onclick="window.print()">Print or save as PDF</button><a href="/methodology">Open the live methodology page</a><a href="/demo">Try the demo (invented data)</a></div>
+<div class="callout"><p><b>One sentence to remember.</b> StatAxis measures what people do on YouTube, minute by minute, from YouTube's own official data; it shows how sure it is of every score; and it leaves a gap instead of inventing a number.</p></div>
+
+<h2 id="what">1 · What StatAxis is</h2>
+<p>StatAxis is an audience-measurement workspace for news, business and creator channels on YouTube. It reads live audiences and uploads of the channels it tracks, turns them into ranked, comparable figures, and explains each figure: what it is, when it was read, how many readings stand behind it and what it cannot tell you.</p>
+<div class="cards">
+<div class="cardx"><b>For media companies</b>See where you stand against your market, which streams carried a spike, and how your prime time did against what was expected.</div>
+<div class="cardx"><b>For advertisers and agencies</b>Compare channels on live audience, hours watched and cost per 1,000 live viewers before you spend.</div>
+<div class="cardx"><b>For campaigns and researchers</b>Check what people are watching, the tone of titles, and run your own polls and surveys.</div>
+<div class="cardx"><b>For creators and journalists</b>Get an IFX Score that judges your content, not only the size of your following.</div>
+</div>
+<h3>What StatAxis is not</h3>
+<ul><li><b>It is not television ratings.</b> The figures are measured on YouTube. A channel's TV audience is not in them.</li>
+<li><b>It does not prove anything about a channel's honesty.</b> A flag on the authenticity radar is an unusual pattern in public numbers, nothing more.</li>
+<li><b>It does not guess.</b> If something cannot be measured it is shown as “—”, never as zero and never filled in.</li></ul>
+
+<h2 id="start">2 · Getting started</h2>
+<ol>
+<li><b>Request access.</b> Use <a href="/apply">Apply for access</a>. You are told when your login is ready. Until then the <a href="/demo">demo</a> shows the real workspace on invented “Sample” channels, so you can learn the screens without risk.</li>
+<li><b>Sign in.</b> Use your login at <a href="/login">/login</a>. If you forget the password use <a href="/forgot">Forgot password</a>; recovery codes can be made from your workspace.</li>
+<li><b>Choose your menu.</b> On the first sign-in you tick the screens you want in your own menu. You can change this later. A screen you cannot see was not given to you: ask your administrator.</li>
+<li><b>Find your way.</b> The left menu groups the screens. Press <b>/</b> (slash) anywhere to jump to a screen by name. The top bar shows where you are.</li>
+<li><b>Read the three controls that matter on almost every screen:</b> the <b>period</b> (the window of time), the <b>language or market</b>, and the <b>feed</b> (All, Primary or Secondary, explained below). Press <b>Update</b> or <b>Apply</b> after changing them.</li>
+<li><b>All times are Indian time (IST).</b> A window called “Today” starts at midnight Indian time. Every download carries the time it was made.</li>
+</ol>
+<div class="callout"><p><b>Tip.</b> Start each day on <b>Briefing</b>: it lists what changed for your role and what to do about it. Then open the screen behind any finding to see the evidence.</p></div>
+
+<h2 id="screens">3 · The screens</h2>
+<p>The menu has seven groups. Which screens you see depends on your package and on what your administrator ticked for you.</p>
+<div class="tw"><table>
+<tr><th>Group</th><th>Screen</th><th>Use it to…</th></tr>
+<tr><td rowspan="6">Market and channels</td><td>Overview, Market</td><td>See who leads today, grouped by language and market, with share.</td></tr>
+<tr><td>Channel, Dashboard, Streams, Content, Trends</td><td>Go deep on one channel: audience, views, growth, rank, its primary and secondary streams, and the videos, Shorts and live streams it published.</td></tr>
+<tr><td>STX Index</td><td>See a channel's STX Index with its confidence and every part behind it.</td></tr>
+<tr><td>What changed, Competition</td><td>Find the videos that moved, with the evidence; compare channels, markets and periods without hiding uncertainty.</td></tr>
+<tr><td>Research signals</td><td>Read the tone and topics of titles, with the method and confidence stated.</td></tr>
+<tr><td>Briefing, Notes</td><td>Read findings for your role; read the dated note the findings engine writes each day and each week.</td></tr>
+<tr><td rowspan="4">Live</td><td>Live audience</td><td>Who is live now and how many are watching. <b>Channel by channel</b> shows every channel through the day for the All, Primary or Secondary feed, by 1, 5, 15 or 30 minutes or 6 hours, as concurrent viewers, views gained or total views, with a chart of how many streams ran.</td></tr>
+<tr><td>Live event compare</td><td>Up to 30 channels covering one event, side by side, with STX and the tone of what each is showing.</td></tr>
+<tr><td>Spikes and movement</td><td>See sudden rises in a live audience with the stream that carried them, and who gained while who lost in the same minutes.</td></tr>
+<tr><td>Alerts</td><td>Set an alert on a channel's live audience (a level, a rise or a fall). Alerts appear inside StatAxis.</td></tr>
+<tr><td rowspan="5">Reports and exports</td><td>Weekly views, Prime time</td><td>Views of every video uploaded in chosen dates; average live viewers for each evening hour.</td></tr>
+<tr><td>Report builder, STX Index report</td><td>Choose days, hours, live / videos / Shorts, feed and genre; download a branded PDF. The STX Index report shows how each channel scored and why.</td></tr>
+<tr><td>Report e-mails</td><td>Have a report e-mailed to you on the schedule you choose, from daily to yearly, as a one-pager or a booklet.</td></tr>
+<tr><td>Forecasts</td><td>See what StatAxis expected each channel's prime-time audience to be, written down before the slot and scored afterwards, with the hit rate.</td></tr>
+<tr><td>Evaluate, Data export</td><td>Check one public video and download its report; download Excel files with the raw numbers.</td></tr>
+<tr><td rowspan="2">Creators, audience, planning</td><td>IFX Score</td><td>Rank creators and independent journalists on Impact, Followership and eXposure.</td></tr>
+<tr><td>Authenticity radar, Audience, Planner</td><td>See viewership that looks unusual, with the evidence; see audience geography and age where supplied; work out cost per 1,000 live viewers and a suggested split of a budget.</td></tr>
+<tr><td>Social media</td><td>Social media</td><td>Followers, growth, reactions and best posts of channels' Facebook, Instagram and X accounts, set beside YouTube.</td></tr>
+<tr><td>Polls and surveys</td><td>Polls and surveys</td><td>Build a poll, share the link, read the results. You see only your own.</td></tr>
+<tr><td>System health</td><td>Operations, Integrity</td><td>See how collection is running and the checks on the stored data. The public <a href="/status">status page</a> shows availability.</td></tr>
+</table></div>
+<p><b>Under every screen</b> there is a report bar: one tap gives a PDF of the screen or a picture to post, and every block has its own picture card. Under most figures a short <b>Evidence</b> line says how many readings stand behind them.</p>
+
+<h2 id="source">4 · Where the data comes from</h2>
+<ul>
+<li><b>Source.</b> The official YouTube Data API only. Nothing is scraped, and nothing is bought from anyone else.</li>
+<li><b>Live streams.</b> Each live stream is read about every 75 seconds. The interval is set by the quota YouTube allows and is shown on the status page.</li>
+<li><b>Uploads and channel totals.</b> Read in a pass about every 107 minutes. New live streams of the tracked channels are looked for about every 30 minutes in between, and each is followed as a secondary stream from the moment it is found.</li>
+<li><b>Which channels.</b> The list of tracked channels is the list shown on the Market and Operations screens. A channel that is switched off is not collected.</li>
+<li><b>Facebook, Instagram, X.</b> Only through each platform's own official access, or from sheets a channel supplies or StatAxis staff enter. Each figure carries the time it was read.</li>
+<li><b>Time.</b> Every reading is stored with the moment it was taken; screens show Indian time.</li>
+</ul>
+
+<h2 id="figures">5 · What each figure means</h2>
+<div class="tw"><table>
+<tr><th>Figure</th><th>What it is</th><th>How it is worked out</th></tr>
+<tr><td><b>Concurrent viewers</b></td><td>People watching a live stream at that moment.</td><td>The latest reading of each live stream, counted for up to 180 seconds, added together for the channel, on a one-minute grid.</td></tr>
+<tr><td><b>Average concurrent</b></td><td>The typical live audience of a channel while it was live.</td><td>The one-minute totals averaged over the minutes the channel was live. Minutes with no live stream are not counted as zero.</td></tr>
+<tr><td><b>Peak concurrent</b></td><td>The highest it reached.</td><td>The highest one-minute total.</td></tr>
+<tr><td><b>Hours watched (live)</b></td><td>How much live viewing happened.</td><td>The sum over the grid of the minute's concurrent viewers × one minute, in hours.</td></tr>
+<tr><td><b>Views</b></td><td>The view count YouTube shows for a video or stream.</td><td>A running total that only grows. For a 24×7 stream it is a very large number.</td></tr>
+<tr><td><b>Views gained</b></td><td>New views in a window.</td><td>For each video, its last reading in the window minus its first (never below zero); a channel's figure adds its videos. In the live channel-by-channel view, the rises of each stream's own count from minute to minute, so a stream that starts or stops adds no jump.</td></tr>
+<tr><td><b>Share</b></td><td>A channel's part of its market.</td><td>Its figure divided by the total of its market (group and language).</td></tr>
+<tr><td><b>Primary feed</b></td><td>The channel's long-running, main live stream.</td><td>Among a channel's live streams, the one that has been live the longest, and for at least the primary threshold (30 days), by YouTube's own start time.</td></tr>
+<tr><td><b>Secondary feeds</b></td><td>Event or parallel streams.</td><td>Every other live stream of the channel.</td></tr>
+<tr><td><b>All feed</b></td><td>Everything the channel had live.</td><td>Primary plus secondary. If no stream has been live long enough to be primary, all viewers count as secondary, so All is never understated.</td></tr>
+<tr><td><b>Shorts</b></td><td>Short vertical videos.</td><td>A video of 180 seconds or less (60 seconds or less if uploaded before 15 October 2024). Collected and viewable, but not counted in rankings, STX or analysis.</td></tr>
+<tr><td><b>View by</b></td><td>How finely a day is read.</td><td>1, 5, 15 or 30 minutes or 6 hours. A bucket is the average of its minutes (or the sum of gains, or the total at its end), never one lucky minute.</td></tr>
+<tr><td><b>Time live / coverage</b></td><td>How much of the window the channel was live.</td><td>The share of buckets with a live stream. A low figure means the average was taken over a short time.</td></tr>
+<tr><td><b>Confidence</b></td><td>How much of a score is backed by data.</td><td>For STX: the share of the seven signals' weights that could be worked out. For IFX: how much of the weight of the sixteen parts could be measured.</td></tr>
+<tr><td><b>Rank</b></td><td>Position among the channels compared.</td><td>Sorted on the figure shown; changes when you change the language, market, window or feed.</td></tr>
+</table></div>
+
+<h2 id="stx">6 · The STX Index</h2>
+<p>The <b>STX Index</b> is one transparent score for a channel: how strongly its audience is moving, compared with the window before and with the channels it is compared with. It is a score for <b>live channels</b> and it uses YouTube data only. It is built from seven signals, each on a scale of 0 to 100 where <b>50 is neutral</b>.</p>
+<div class="bars" id="stxbars"></div>
+<div class="tw"><table id="stxtable"><tr><th>Signal</th><th>Weight</th><th>How it is worked out</th></tr></table></div>
+<h3>How the score is put together</h3>
+<div class="formula">STX            = sum(signal × weight) ÷ sum(weights of the signals that exist)
+Confidence     = sum(weights of the signals that exist) ÷ 1.00 × 100
+Shown score    = 50 + (STX − 50) × Confidence ÷ 100
+Under 50% confidence the score is marked “preliminary”.</div>
+<p>Two things follow, and they are the heart of the method. <b>A signal that cannot be worked out is left out, and the rest are rescaled</b>, so a missing number never drags a score down by being zero. And <b>the shown score is pulled toward 50 in proportion to how little data there is</b>, so thin data cannot produce a confident-looking score. A channel's STX is withheld until it has a second reading to compare with.</p>
+<h3>Worked example</h3>
+<p>A channel's signals this week: audience 60, growth 55, momentum 48, acceleration 50, consistency 70; it ranks 4th of the channels compared, so competition = 100 ÷ 4 = 25; anomaly 52.</p>
+<div class="formula">All seven exist:
+60×0.30 + 55×0.20 + 48×0.15 + 50×0.10 + 70×0.10 + 25×0.10 + 52×0.05
+= 18 + 11 + 7.2 + 5 + 7 + 2.5 + 2.6 = 53.3      Confidence 100%      Shown 53.3
+
+Acceleration and anomaly are missing (weights 0.10 and 0.05):
+available weight = 0.85;  (18 + 11 + 7.2 + 7 + 2.5) = 45.7;  STX = 45.7 ÷ 0.85 = 53.8
+Confidence = 85%;  Shown = 50 + (53.8 − 50) × 0.85 = 53.2</div>
+<h3>Try it yourself</h3>
+<p>Type the signals you have (leave a box empty if it could not be worked out). The calculator uses the live weights from the methodology.</p>
+<div class="calc" id="calc"><div class="g" id="calcin"></div>
+<div class="out"><div><small>STX (of the signals that exist)</small><strong id="c-stx">—</strong></div><div><small>Confidence</small><strong id="c-conf">—</strong></div><div><small>Shown score</small><strong id="c-shown">—</strong></div><div><small>Status</small><strong id="c-state" style="font-size:18px">—</strong></div></div></div>
+<h3>How to read an STX Index</h3>
+<ul>
+<li><b>Around 50:</b> the channel is about where it was in the window before and in the middle of the channels compared.</li>
+<li><b>Above 50:</b> its audience and views are rising against the earlier window, it is gaining on its peers, or both. <b>Below 50:</b> the opposite.</li>
+<li><b>Read the parts, not only the total.</b> The same 55 can mean “steady and high-ranked” or “a one-off jump”. The STX screen lists every part and how many points each added.</li>
+<li><b>Check confidence first.</b> A score under 50% confidence is preliminary. Treat it as a pointer to look closer, not as a verdict.</li>
+<li><b>Compare like with like.</b> The score depends on the window and on the channels compared. Compare scores that were worked out over the same window and market.</li>
+<li><b>It does not say why.</b> It shows that something moved, with the evidence; it does not infer causes.</li>
+</ul>
+
+<h2 id="ifx">7 · The IFX Score</h2>
+<p>The <b>IFX Score</b> (<b>I</b>mpact · <b>F</b>ollowership · e<b>X</b>posure) is for people who publish videos and Shorts instead of going live: creators, independent journalists, commentators. A creator has no live audience to measure, so the score is built from what a creator does have in public. It is ranked against the other creators in the same comparison, not against a fixed scale.</p>
+<div class="bars" id="ifxbars"></div>
+<div class="tw"><table id="ifxtable"><tr><th>Pillar</th><th>Part</th><th>Weight</th></tr></table></div>
+<h3>How it is worked out</h3>
+<ol>
+<li>Each of the sixteen parts is measured for every creator in the comparison and turned into a <b>rank position (a percentile)</b> among them.</li>
+<li>The parts are combined with the weights above into the three pillars, and the pillars into one score (<b>Impact 35% · Followership 35% · eXposure 30%</b>).</li>
+<li>A part that cannot be measured (for example, live turnout for a creator who never went live) is <b>left out and the others re-weighted</b>.</li>
+<li>The score is <b>pulled toward 50 by (1 − confidence)</b>, so thin data cannot give a confident-looking score. Every row shows its confidence, a plain-words profile and the reason behind a high or low score.</li>
+<li>A creator with open high-risk unusual-viewership flags loses 10 points; one whose flag an administrator confirmed is not scored.</li>
+</ol>
+<div class="callout"><p><b>A fair start for small creators.</b> Four parts do not depend on how big the creator already is: the best upload against audience size, reaching beyond own subscribers, momentum (newer uploads against older) and the early pull of new uploads. A small creator who makes things people want can score well on them.</p></div>
+<h3>What the parts mean in plain words</h3>
+<ul>
+<li><b>Depth of reaction</b>: likes and comments per view. <b>Conversation</b>: comments per 1,000 views. <b>Old videos still earn</b>: how fast videos older than 10 days keep gaining views.</li>
+<li><b>Audience size</b>: subscribers. <b>Loyalty</b>: views of a typical mature upload per subscriber. <b>Growth</b>: subscriber change (needs three or more days of history). <b>Live turnout</b>: the creator's own live streams against subscribers.</li>
+<li><b>Reach per upload</b>: typical views. <b>Regular publishing</b>: uploads per week and how even the gaps are. <b>Steady results</b>: how little views vary from upload to upload. <b>Hit rate</b>: how often an upload beats the typical peer upload. <b>Fresh uploads</b>: how recently the creator published.</li>
+</ul>
+<h3>How to read an IFX Score</h3>
+<ul>
+<li>It is a <b>ranking inside a group</b>: change the group and the scores change. Use it to compare creators you actually compete with.</li>
+<li>Look at the <b>pillars</b>: high Impact with low Followership is a creator whose content lands but whose audience is still small; high Followership with low Impact is a big audience that reacts little.</li>
+<li><b>Not measured:</b> saves, shares and conversions (YouTube does not publish them for other people's videos) and exposure on other platforms. This score is YouTube only, and says so.</li>
+</ul>
+
+<h2 id="method">8 · Methodology in short</h2>
+<p>The full, versioned methodology, with a dated changelog of every change to a formula, weight, window or threshold, is on the <a href="/methodology">Methodology page</a>. It is read from the same settings the calculations use, so it cannot drift from them. In short:</p>
+<ul>
+<li><b>A regular grid, no guessing.</b> Live figures are read on a one-minute grid. Each live stream counts with its latest reading for up to 180 seconds; after that it is not counted. Nothing is interpolated.</li>
+<li><b>Windows.</b> Last hour, 3 hours and 6 hours end now. “Today” runs from midnight Indian time. Prime time is the hourly slots 17:00–23:00. Each window is compared with the one of equal length before it.</li>
+<li><b>Forecasts.</b> The expected prime-time audience is the median of the same slot over up to seven earlier days, written down at 06:00 IST and scored afterwards. A hit is within 20%. The track record is shown on the Forecasts screen.</li>
+<li><b>Authenticity radar.</b> It flags unusual patterns in public numbers, with the evidence. A flag is not proof and an administrator's decision is recorded beside it.</li>
+<li><b>Social media.</b> Official access only; reach and impressions are not public on any platform, so the engagement rate says how many people reacted, not how many saw a post. STX and IFX use YouTube data only; social figures sit beside them, not inside them.</li>
+<li><b>Limits, stated plainly.</b> Figures are measured on YouTube, not on television. A flag is a pattern, not a finding.</li>
+</ul>
+
+<h2 id="read">9 · How to read the data</h2>
+<h3>A five-step habit</h3>
+<ol>
+<li><b>Check the frame.</b> Which window, which language or market, which feed? A number means little until you know all three.</li>
+<li><b>Read the size and the shape.</b> Average says what is typical; peak says what is possible. A peak far above the average is a spiky channel (an event or a breaking story). A flat line is a channel whose audience does not move with events.</li>
+<li><b>Look for gaps.</b> On a chart a broken line means no live stream then. It is not zero. “Time live” shows how much of the window the average stands on.</li>
+<li><b>Split the feeds.</b> If All is much higher than Primary, an event stream added the audience. If All equals Primary, the channel had nothing else live.</li>
+<li><b>Read the evidence line and the confidence.</b> How many readings? How much of the score is backed by data? Then decide how hard to lean on it.</li>
+</ol>
+<h3>Worked reading</h3>
+<div class="callout"><p><b>“Channel A: average 42,000, peak 91,000, time live 100%.”</b> A live audience that is usually 42,000 and reached 91,000: an event night, not a normal one. Open Spikes and movement to see which stream carried the rise.</p>
+<p><b>“Channel B: STX 61, confidence 40% (preliminary).”</b> Only 40% of the weights could be worked out, so the score is pulled strongly toward 50 and the true score may be quite different. Look at which signals are missing before using it.</p>
+<p><b>“Channel C: All 120,000, Primary 70,000, Secondary 50,000.”</b> Its 24×7 stream has 70,000 and a parallel event stream added 50,000. If you are buying the 24×7 slot, use Primary.</p></div>
+<h3>What not to conclude</h3>
+<ul><li>Do not read a ranking as “the best channel”. It is the best on the figure shown, for that window and market.</li><li>Do not compare a single peak minute across days without the average.</li><li>Do not read a flag as an accusation, or a gap as zero viewers.</li><li>Do not treat YouTube figures as TV ratings.</li></ul>
+
+<h2 id="use">10 · How to use it, by role</h2>
+<div class="tw"><table>
+<tr><th>You are…</th><th>Start here</th><th>Then</th></tr>
+<tr><td><b>Media buyer or advertiser</b></td><td>Planner and Prime time</td><td>Compare cost per 1,000 live viewers and the evening hours; use Primary feed for a 24×7 slot; check Authenticity radar before you commit.</td></tr>
+<tr><td><b>Media company</b></td><td>Briefing, then Live audience</td><td>See your rank and share, which event streams carried your spikes, and how your prime time did against its forecast; send the weekly report to your team.</td></tr>
+<tr><td><b>Campaign or political team</b></td><td>Research signals and Polls and surveys</td><td>See what channels in a market are showing and with what tone; run your own poll with the privacy options your administrator allowed.</td></tr>
+<tr><td><b>Creator or journalist</b></td><td>IFX Score</td><td>Compare with peers; read the pillars and the reason behind your score; work on the parts that do not depend on size.</td></tr>
+<tr><td><b>Researcher</b></td><td>Report builder and Data export</td><td>Choose the days and hours, download the Excel file, and cite the methodology version and the download time on the file.</td></tr>
+</table></div>
+
+<h2 id="reports">11 · Reports and downloads</h2>
+<ul>
+<li><b>Report builder.</b> Pick days, hours, live / videos / Shorts, feed and genre; download a branded PDF.</li>
+<li><b>Report bar.</b> Every screen can be saved as a PDF or a picture to post; each block has its own picture card.</li>
+<li><b>Report e-mails.</b> You choose how often (daily to yearly), the layout (a one-pager or a booklet) and the parts; the report is e-mailed to you on time, with the STX Index first.</li>
+<li><b>Excel exports</b> hold the raw numbers and are machine-readable. They are their own privilege. The branded PDFs and picture cards are made to be read and shared.</li>
+<li><b>Every download carries the time it was made</b> in Indian time, in the file name and on the page, and the line “Data via YouTube. Processed and evaluated by StatAxis.”</li>
+</ul>
+
+<h2 id="different">12 · Why StatAxis is different</h2>
+<p>You may be comparing StatAxis with other ways of getting channel audience numbers. Rather than claim anything about them, here are twelve questions to put to <b>any</b> tool, and how StatAxis answers each.</p>
+<div class="tw"><table>
+<tr><th>Ask any provider…</th><th>StatAxis</th></tr>
+<tr><td>1. Can I see the formula?</td><td>Yes. Every weight and definition is on the Methodology page, read from the same settings the calculations use, with a dated changelog.</td></tr>
+<tr><td>2. Does it tell me how sure it is?</td><td>Yes. STX and IFX carry a confidence; under 50% a score is marked preliminary, and every shown score is pulled toward 50 in proportion to how little data there is.</td></tr>
+<tr><td>3. What does it do when data is missing?</td><td>It leaves the gap and rescales the rest. It never fills a hole with zero or a guess.</td></tr>
+<tr><td>4. Does it separate a channel's 24×7 stream from its event streams?</td><td>Yes: Primary, Secondary and All feeds, defined from YouTube's own start time, so you buy and compare the right thing.</td></tr>
+<tr><td>5. Where does the data come from?</td><td>The official YouTube Data API, and each social platform's own official access. No scraping. Every figure has the time it was read.</td></tr>
+<tr><td>6. Can I check a number?</td><td>Yes. Evidence lines say how many readings stand behind it; the live screens are read on a published one-minute grid.</td></tr>
+<tr><td>7. Does it say what it cannot tell me?</td><td>Yes: it is not television ratings; a flag is a pattern, not proof; reach and impressions are not public.</td></tr>
+<tr><td>8. Does it grade its own predictions?</td><td>Yes. Prime-time forecasts are written down before the slot and scored after it, and the hit rate is shown.</td></tr>
+<tr><td>9. Can I take the results out in a form I can use?</td><td>Yes: branded PDFs and picture cards, e-mailed reports, and Excel files, all stamped with the time they were made.</td></tr>
+<tr><td>10. Is a small creator judged fairly?</td><td>The IFX Score has four parts that do not depend on size, so content that works can score well without a big following.</td></tr>
+<tr><td>11. Can I see the health of the data?</td><td>Yes: a public status page, an Operations screen, integrity checks and a data-completeness view.</td></tr>
+<tr><td>12. Does it make promises about coverage it does not have?</td><td>No. The roadmap is stated with dates (Instagram and Facebook from January 2027, X during 2027, connected TV by July 2027) and nothing is claimed before it exists.</td></tr>
+</table></div>
+<p>A tool that can answer all twelve plainly is one you can defend in front of a client, a board or a regulator. That is the standard StatAxis is built to meet.</p>
+
+<h2 id="privacy">13 · Privacy and access</h2>
+<ul>
+<li><b>Packages and privileges.</b> What you see depends on your package and on the privileges your administrator ticked for you. Excel export, social media and polls and surveys are separate choices.</li>
+<li><b>Polls and surveys.</b> You see only your own polls. Asking for a name, mobile number or e-mail is a separate privilege, with a consent text, and each number can answer a poll once. Political polls are a separate privilege because they carry fairness duties.</li>
+<li><b>What StatAxis stores.</b> Public YouTube figures, the readings taken from them, and the settings and downloads of your own login. Social post text is kept for 30 days and social figures for 36 months. See the <a href="/privacy">privacy page</a> and the <a href="/terms">terms</a>.</li>
+<li><b>Your login.</b> Change your password from your workspace; make recovery codes there too.</li>
+</ul>
+
+<h2 id="faq">14 · FAQ</h2>
+<details class="faq"><summary>What is StatAxis in one line?</summary><p>An audience-measurement workspace for YouTube news, business and creator channels, with transparent scores (STX and IFX), live figures read minute by minute, and an honest statement of how sure each number is.</p></details>
+<details class="faq"><summary>Are these television ratings?</summary><p>No. Everything is measured on YouTube. A channel's television audience is not in these figures.</p></details>
+<details class="faq"><summary>Where does the data come from?</summary><p>The official YouTube Data API, and for Facebook, Instagram and X only each platform's own official access or sheets a channel supplies. Nothing is scraped.</p></details>
+<details class="faq"><summary>How often is it updated?</summary><p>Each live stream is read about every 75 seconds; uploads and channel totals about every 107 minutes; new live streams are looked for about every 30 minutes. The exact interval is on the status page.</p></details>
+<details class="faq"><summary>What is the difference between concurrent viewers and views?</summary><p>Concurrent viewers are the people watching a live stream right now. Views are a running total of how many times a video or stream has been viewed; it only grows.</p></details>
+<details class="faq"><summary>What is the difference between average and peak?</summary><p>Average is the typical live audience over the minutes a channel was live; peak is the highest single minute. A big gap means a spiky, event-driven audience.</p></details>
+<details class="faq"><summary>What are Primary, Secondary and All feeds?</summary><p>Primary is a channel's long-running main stream (live for at least 30 days). Secondary is every other stream it has live, usually for an event. All is both together.</p></details>
+<details class="faq"><summary>Why is there no Primary feed for a channel?</summary><p>No stream of that channel has been live long enough to count as primary. Its viewers are then counted as secondary so that All is never understated.</p></details>
+<details class="faq"><summary>Why does a chart line stop and start?</summary><p>A gap means no live stream at that time. It is deliberately not drawn as zero.</p></details>
+<details class="faq"><summary>What does an STX Index of 50 mean?</summary><p>Neutral: the channel is about where it was in the window before and in the middle of the channels compared. Above 50 is rising or gaining on peers; below 50 is the opposite.</p></details>
+<details class="faq"><summary>Why does my STX show “preliminary” or “—”?</summary><p>“Preliminary” means less than half of the signals' weight could be worked out, so the shown score is pulled strongly toward 50. “—” means there is not yet a second reading to compare with.</p></details>
+<details class="faq"><summary>How is the STX Index calculated?</summary><p>Seven signals (audience 30%, growth 20%, momentum 15%, acceleration 10%, consistency 10%, competition 10%, anomaly or event 5%) are each put on a 0–100 scale. The score is the weighted average of the signals that exist, then pulled toward 50 by how much of the weight is missing. Section 6 has the formula, a worked example and a calculator.</p></details>
+<details class="faq"><summary>How is the IFX Score different from the STX Index?</summary><p>STX is for live channels and leans on live audiences. IFX is for creators who publish videos and Shorts: sixteen parts under Impact, Followership and eXposure, each ranked against the other creators in the same comparison.</p></details>
+<details class="faq"><summary>Why does my IFX Score change when I change the comparison group?</summary><p>Each part is ranked against the others in the group. A different group is a different yardstick, so the same creator can rank differently.</p></details>
+<details class="faq"><summary>Why are my numbers different from YouTube Studio or another tool?</summary><p>Studio shows your own channel's analytics with its own definitions and delays. StatAxis reads public figures on a published one-minute grid and states its definitions. Different definitions and read times give different numbers; compare the definitions first.</p></details>
+<details class="faq"><summary>Why are Shorts left out of rankings?</summary><p>They are a different kind of viewing. Shorts are collected and can be viewed but are not counted in rankings, STX or analysis.</p></details>
+<details class="faq"><summary>What time zone is used?</summary><p>Indian time (IST) everywhere, including “Today”, prime time and every download.</p></details>
+<details class="faq"><summary>What does the authenticity radar flag mean?</summary><p>An unusual pattern in public numbers, shown with the evidence. It is not proof of anything, and an administrator's decision is recorded beside it.</p></details>
+<details class="faq"><summary>How good are the forecasts?</summary><p>They are written down at 06:00 IST before the slot and scored afterwards; a hit is within 20%. The hit rate is on the Forecasts screen, so you can judge them.</p></details>
+<details class="faq"><summary>Can I download the data?</summary><p>Yes, if your administrator ticked it: Excel files with the raw numbers, branded PDFs and picture cards, and e-mailed reports. Each carries the time it was made.</p></details>
+<details class="faq"><summary>I cannot see a screen that this manual describes.</summary><p>Screens depend on your package and on the privileges your administrator ticked. Ask your administrator, or use Apply for access to request a package.</p></details>
+<details class="faq"><summary>How do I get access, and where can I try it first?</summary><p>Use Apply for access. The demo shows the real workspace on invented sample channels, with nothing real in it.</p></details>
+<details class="faq"><summary>Is Instagram, Facebook or X data included in the STX Index or IFX Score?</summary><p>No. Both use YouTube data only. Social figures are shown beside them, not inside them, and come only from official access.</p></details>
+</article>
+</main><div id="footer"></div>
+<script>
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const STX_FALLBACK = {audience: 0.30, growth: 0.20, momentum: 0.15, acceleration: 0.10, consistency: 0.10, competitive_position: 0.10, anomaly_event: 0.05};
+const STX_NAMES = {audience: "Audience", growth: "Growth", momentum: "Momentum", acceleration: "Acceleration", consistency: "Consistency", competitive_position: "Competition", anomaly_event: "Anomaly or event"};
+const IFX_PILLARS = {impact: "Impact", followership: "Followership", exposure: "eXposure"};
+let stxWeights = STX_FALLBACK;
+function drawCalc() {
+  const box = document.getElementById("calcin");
+  box.innerHTML = Object.keys(stxWeights).map(k => `<label>${esc(STX_NAMES[k] || k)} (${Math.round(stxWeights[k] * 100)}%)<input type="number" min="0" max="100" step="any" data-k="${esc(k)}" placeholder="empty = could not be worked out" inputmode="decimal"></label>`).join("");
+  const run = () => {
+    let sum = 0, wsum = 0;
+    box.querySelectorAll("input").forEach(i => { if (i.value !== "" && isFinite(Number(i.value))) { const v = Math.max(0, Math.min(100, Number(i.value))), w = stxWeights[i.dataset.k]; sum += v * w; wsum += w; } });
+    const set = (id, t) => { document.getElementById(id).textContent = t; };
+    if (!wsum) { ["c-stx", "c-conf", "c-shown"].forEach(i => set(i, "—")); set("c-state", "Enter at least one signal"); return; }
+    const stx = sum / wsum, conf = wsum * 100, shown = 50 + (stx - 50) * conf / 100;
+    set("c-stx", stx.toFixed(1)); set("c-conf", Math.round(conf) + "%"); set("c-shown", shown.toFixed(1)); set("c-state", conf < 50 ? "Preliminary" : "Normal");
+  };
+  box.addEventListener("input", run); run();
+}
+function drawTables(m) {
+  stxWeights = m.stx.weights || STX_FALLBACK;
+  const rows = Object.entries(stxWeights);
+  document.getElementById("stxbars").innerHTML = rows.map(([k, v]) => `<div class="bar"><span style="text-align:left;font-weight:600">${esc(STX_NAMES[k] || k)}</span><i style="width:${v * 100 * 3}%"></i><span>${Math.round(v * 100)}%</span></div>`).join("");
+  document.getElementById("stxtable").innerHTML = `<tr><th>Signal</th><th>Weight</th><th>How it is worked out</th></tr>` + rows.map(([k, v]) => `<tr><td><b>${esc(STX_NAMES[k] || k)}</b></td><td>${Math.round(v * 100)}%</td><td>${esc((m.stx.signals.find(s => s.name === k) || {}).definition || "")}</td></tr>`).join("");
+  if (m.ifx) {
+    const pw = m.ifx.pillar_weights;
+    document.getElementById("ifxbars").innerHTML = Object.entries(pw).map(([k, v]) => `<div class="bar"><span style="text-align:left;font-weight:600">${esc(IFX_PILLARS[k] || k)}</span><i style="width:${v * 100 * 2.4}%"></i><span>${Math.round(v * 100)}%</span></div>`).join("");
+    document.getElementById("ifxtable").innerHTML = `<tr><th>Pillar</th><th>Part</th><th>Weight</th></tr>` + m.ifx.parts.map(p => `<tr><td>${esc(IFX_PILLARS[p.pillar] || p.pillar)}</td><td>${esc(p.label)}</td><td>${Math.round(p.weight * 100)}%</td></tr>`).join("");
+  }
+  drawCalc();
+}
+fetch("/api/v1/public/methodology").then(r => r.json()).then(drawTables).catch(() => {
+  document.getElementById("stxbars").innerHTML = Object.entries(STX_FALLBACK).map(([k, v]) => `<div class="bar"><span style="text-align:left;font-weight:600">${esc(STX_NAMES[k])}</span><i style="width:${v * 300}%"></i><span>${Math.round(v * 100)}%</span></div>`).join("");
+  document.getElementById("stxtable").innerHTML = `<tr><th>Signal</th><th>Weight</th></tr>` + Object.entries(STX_FALLBACK).map(([k, v]) => `<tr><td><b>${esc(STX_NAMES[k])}</b></td><td>${Math.round(v * 100)}%</td></tr>`).join("");
+  drawCalc();
+});
+</script><script src="site.js"></script></body></html>

@@ -29,7 +29,7 @@ PAGE_KEY, SEEDED_KEY = "services_page", "services_seeded"
 PAGE_SLUG = "__services_page__"
 LISTS = {"audience": (12, 200), "deliverables": (14, 300), "limits": (8, 300)}
 STATIC_PAGES = (("/platform", "0.9"), ("/solutions", "0.9"), ("/research", "0.8"), ("/insights", "0.8"), ("/ifx", "0.7"), ("/stx", "0.7"), ("/stx-index", "0.6"), ("/stax9", "0.6"),
-                ("/methodology", "0.6"), ("/plans", "0.5"), ("/apply", "0.5"), ("/status", "0.4"), ("/privacy", "0.3"), ("/terms", "0.3"))
+                ("/methodology", "0.6"), ("/manual", "0.7"), ("/plans", "0.5"), ("/apply", "0.5"), ("/status", "0.4"), ("/privacy", "0.3"), ("/terms", "0.3"))
 
 
 # ----------------------------------------------------------------------------------------------- reading and writing
@@ -480,7 +480,7 @@ def llms_txt(session: Any) -> str:
     articles = [p for p in blog_cms.live_posts(session) if not p["noindex"]]
     if articles:
         lines += ["", "## Articles", ""] + [f"- [{p['title']}]({BASE_URL}/blog/{p['slug']}): {p['excerpt']}" for p in articles]
-    lines += ["", "## Main pages", "", f"- [Platform]({BASE_URL}/platform)", f"- [Solutions]({BASE_URL}/solutions)", f"- [Research]({BASE_URL}/research)", f"- [Methodology]({BASE_URL}/methodology)", f"- [Contact]({CONTACT})", ""]
+    lines += ["", "## Main pages", "", f"- [Platform]({BASE_URL}/platform)", f"- [Solutions]({BASE_URL}/solutions)", f"- [Research]({BASE_URL}/research)", f"- [Methodology]({BASE_URL}/methodology)", f"- [User manual]({BASE_URL}/manual)", f"- [Contact]({CONTACT})", ""]
     return "\n".join(lines)
 
 

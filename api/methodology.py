@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from api.creator_index import INDEX_NAME as IFX_NAME, LABELS as IFX_LABELS, METHOD as IFX_METHOD, NOT_MEASURED as IFX_NOT_MEASURED, PARTS as IFX_PARTS, PILLAR_WEIGHTS as IFX_PILLAR_WEIGHTS, TAGLINE as IFX_TAGLINE
 from api.social import METHOD as SOCIAL_METHOD
 from collector.classification import LEGACY_SHORT_MAX_SECONDS, SHORT_MAX_SECONDS, SHORTS_EXTENDED_FROM
 from metrics.feeds import min_primary_hours
@@ -37,6 +38,8 @@ def methodology() -> dict[str, Any]:
         "version": VERSION,
         "stx": {"formula": "STX = sum(signal x weight) / sum(weights of the signals that exist). Confidence = sum(weights of the signals that exist) / 1.00 x 100. The shown score is 50 + (STX - 50) x confidence / 100; below 50% confidence a score is marked preliminary.",
                 "weights": WEIGHTS, "signals": [{"name": n, "definition": d} for n, d in SIGNALS], "scale": "Every signal runs 0-100; 50 is neutral."},
+        "ifx": {"name": IFX_NAME, "tagline": IFX_TAGLINE, "pillar_weights": IFX_PILLAR_WEIGHTS, "method": IFX_METHOD, "not_measured": IFX_NOT_MEASURED,
+                "parts": [{"key": k, "label": IFX_LABELS.get(k, k), "pillar": pillar, "weight": weight} for k, (pillar, weight) in IFX_PARTS.items()]},
         "collection": {"source": "YouTube Data API v3 only (no scraping).", "live_reading": "Each live stream is read about every 75 seconds; the interval is set by the YouTube quota and is shown on the status page.",
                        "uploads": "Each channel's newest uploads and its channel statistics are read in a pass about every 107 minutes. New live streams of the tracked channels are looked for about every 30 minutes in between, and each is tracked as a secondary stream from the moment it is found."},
         "feeds": {"primary": f"Among a channel's concurrent live streams, the one live the longest, and for at least {min_primary_hours() / 24:g} days, by YouTube's own start time.", "secondary": "Every other live stream of the channel.",
