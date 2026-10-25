@@ -10,7 +10,7 @@ Nothing is estimated here and nothing is filled in: a channel without a figure s
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from io import BytesIO
 from typing import Any, Callable
 from xml.sax.saxutils import escape
@@ -108,7 +108,7 @@ def pdf(report: dict[str, Any], prepared_for: str | None = None, protect: bool =
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
-    from reportlab.platypus import Flowable, KeepTogether, PageBreak, SimpleDocTemplate, Spacer, Table, TableStyle
+    from reportlab.platypus import Flowable, KeepTogether, PageBreak, SimpleDocTemplate, Spacer
 
     from api import report_pdf as R
     from api.stamps import ist_stamp

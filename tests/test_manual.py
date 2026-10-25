@@ -72,8 +72,11 @@ def test_the_collection_intervals_the_shorts_rule_and_the_primary_threshold_matc
     assert "180 seconds" in t and "06:00 IST" in t and "within 20%" in t
 
 
-def test_the_manual_is_linked_from_the_site():
-    assert '["/manual", "User manual"]' in (ROOT / "dashboard" / "site.js").read_text(encoding="utf-8")
+def test_the_manual_is_in_the_main_menu_the_footer_and_the_workspace_header():
+    site = (ROOT / "dashboard" / "site.js").read_text(encoding="utf-8")
+    assert site.count('["/manual", "User manual"]') == 2           # the main menu (and its phone drawer, built from it) and the footer
+    assert re.search(r'MENU = \[.*\["/manual", "User manual"\]\];', site)
+    assert 'id="manuallink" href="/manual"' in (ROOT / "dashboard" / "workspace.html").read_text(encoding="utf-8")
     assert "/manual" in (ROOT / "api" / "services_cms.py").read_text(encoding="utf-8")
     assert 'href="/manual"' in (ROOT / "dashboard" / "guide.html").read_text(encoding="utf-8")
     assert 'href="/manual"' in (ROOT / "dashboard" / "methodology.html").read_text(encoding="utf-8")

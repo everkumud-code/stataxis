@@ -17,11 +17,11 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Flowable, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.platypus.tableofcontents import TableOfContents
 
 from api.methodology import VERSION, methodology
-from api.report_pdf import BG, BLUE, BLUE_LIGHT, DEEP, HANDLE, LINE, MUTE, PANEL, TEXT, WHITE, YOUTUBE_NOTE, _decorate, _para
+from api.report_pdf import BLUE, BLUE_LIGHT, HANDLE, LINE, MUTE, PANEL, TEXT, WHITE, YOUTUBE_NOTE, _decorate
 from api.stamps import file_stamp, ist_stamp
 
 PAGE = Path(__file__).resolve().parent.parent / "dashboard" / "manual.html"

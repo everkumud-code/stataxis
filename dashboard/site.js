@@ -1,6 +1,6 @@
 /* Shared parts of the public pages: the favicon, the navigation, the footer (with the legal notices), the mobile menu and the terms-and-cookies gate. The logo file is the original one. */
 const favicon = document.createElement("link"); favicon.rel = "icon"; favicon.type = "image/svg+xml"; favicon.href = "/assets/stataxis-favicon.svg"; document.head.appendChild(favicon);
-const MENU = [["/platform", "Platform"], ["/solutions", "Solutions"], ["/services", "Services"], ["/ifx", "IFX Score"], ["/stx", "STX Index"], ["/research", "Research"], ["/insights", "Insights"]];
+const MENU = [["/platform", "Platform"], ["/solutions", "Solutions"], ["/services", "Services"], ["/ifx", "IFX Score"], ["/stx", "STX Index"], ["/research", "Research"], ["/insights", "Insights"], ["/manual", "User manual"]];
 const nav = '<header class="vx-nav"><div class="vx-nav-in"><a class="vx-logo" href="/" aria-label="StatAxis home"><img src="/assets/stataxis-logo.svg" alt="StatAxis — Stat the View. Axis the Viewpoint."></a><nav class="vx-menu" aria-label="Main">'
   + MENU.map(([h, l]) => `<a href="${h}">${l}</a>`).join("") + '<a class="login" href="/login" data-client-login>Enter StatAxis</a><a class="cta" href="/apply">Get early access</a></nav><button class="vx-burger" aria-label="Open menu" aria-expanded="false">☰</button></div><div class="vx-drawer">'
   + MENU.map(([h, l]) => `<a href="${h}">${l}</a>`).join("") + '<a href="/stax9">STAX9</a><a href="/apply">Get early access</a><a href="/login" data-client-login>Enter StatAxis</a></div></header>';

@@ -6,7 +6,6 @@ wrote reaches the page through `textContent`, never as markup, so nothing typed 
 
 from __future__ import annotations
 
-import html
 import json
 from typing import Any
 
@@ -197,7 +196,7 @@ def home_blocks(items: list[dict[str, Any]]) -> tuple[str, str]:
     e = sc._e
     first = items[0]
     cards = "".join(
-        f'<article class="sxpoll-card">' + (f'<img src="{e(i["logo_url"])}" alt="">' if i["logo_url"] else "") + f'<span class="chip">{e(i["label"])} · {e(i["category"])}</span><h3>{e(i["title"])}</h3>'
+        '<article class="sxpoll-card">' + (f'<img src="{e(i["logo_url"])}" alt="">' if i["logo_url"] else "") + f'<span class="chip">{e(i["label"])} · {e(i["category"])}</span><h3>{e(i["title"])}</h3>'
         + (f'<p>{e(i["description"])}</p>' if i["description"] else "") + f'<a class="vx-btn solid" href="/survey/{e(i["slug"])}">{e(i["cta"])} <span class="arr">→</span></a></article>' for i in items)
     section = (f'<style>{HOME_CSS}</style><section class="vx-sec sxpoll" id="live-polls" aria-label="Live polls"><div class="vx-wrap"><div class="vx-sec-head"><b>+</b><span>{e(first["label"])}</span></div>'
                f'<h2 class="vx-h2">{"Your opinion <em>counts.</em>" if first["cta"] != "पोल में भाग लें" and first["cta"] != "सर्वे में भाग लें" else "आपकी राय <em>मायने रखती है।</em>"}</h2><div class="sxpoll-grid">{cards}</div></div></section>')
