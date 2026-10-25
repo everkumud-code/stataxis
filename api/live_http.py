@@ -13,7 +13,7 @@ from api.errors import AuthenticationError, AuthorizationError
 from api.export import export_live_audience_xlsx, export_live_stats_xlsx
 from api.stamps import file_stamp
 from api.live_monitor import live_audience_window, sample_live_url
-from api.live_stats import live_snapshot, live_window_stats
+from api.live_stats import live_channel_series, live_snapshot, live_window_stats
 
 
 def _export_privilege(session_factory: Callable[[], Any], identity: Any) -> None:
@@ -73,6 +73,43 @@ def live_application(session_factory: Callable[[], Any]):
                 session = session_factory()
                 try:
                     payload = live_audience_window(session, start_at=start_at, end_at=end_at, language=query.get("language"))
+                finally:
+                    session.close()
+                return _json(start_response, 200, payload)
+            except AuthenticationError as exc:
+                return _json(start_response, 401, {"error": str(exc)})
+            except AuthorizationError as exc:
+                return _json(start_response, 403, {"error": str(exc)})
+            except ValueError as exc:
+                return _json(start_response, 400, {"error": str(exc)})
+
+        if path == "/api/v1/audience/live/series":
+            if method != "GET":
+                return _json(start_response, 405, {"error": "method not allowed"})
+            try:
+                identity = authenticate(environ.get("HTTP_AUTHORIZATION"))
+                require_capability(policy_for_identity(identity), "can_evaluate_url")
+                query = _query(environ.get("QUERY_STRING", ""))
+                now = datetime.now(UTC)
+                if query.get("date"):   # one Indian day, optionally from one hour to another: ?date=2026-10-25&from=9&to=18
+                    try:
+                        day = datetime.strptime(query["date"][:10], "%Y-%m-%d").replace(tzinfo=UTC) - timedelta(hours=5, minutes=30)
+                        first, last = int(query.get("from") or 0), int(query.get("to") or 24)
+                    except ValueError:
+                        raise ValueError("date must be year-month-day, and from and to whole hours")
+                    if not (0 <= first < last <= 24):
+                        raise ValueError("from must be before to, between 0 and 24")
+                    start_at, end_at = day + timedelta(hours=first), min(day + timedelta(hours=last), now)
+                    if end_at <= start_at:
+                        raise ValueError("that time has not come yet")
+                else:
+                    end_at = _parse_datetime(query.get("end")) or now
+                    start_at = _parse_datetime(query.get("start")) or end_at - timedelta(hours=6)
+                ids = tuple(int(x) for x in (query.get("channels") or "").split(",") if x.strip().isdigit()) or None
+                session = session_factory()
+                try:
+                    payload = live_channel_series(session, start_at=start_at, end_at=end_at, bucket_seconds=int(query.get("bucket_seconds", "900")), feed=query.get("feed") or "all",
+                                                  language=query.get("language"), segment=query.get("segment"), channel_ids=ids)
                 finally:
                     session.close()
                 return _json(start_response, 200, payload)

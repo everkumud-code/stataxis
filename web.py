@@ -103,7 +103,7 @@ def _dispatch_api(routes: dict[str, Callable[..., Any]], environ: dict[str, Any]
     path = environ.get("PATH_INFO", "")
     if path.startswith("/api/v1/auth/"):
         return routes["auth"](environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
-    if path in {"/api/v1/evaluate/youtube/live-sample", "/api/v1/audience/live", "/api/v1/audience/live/export", "/api/v1/audience/live/stats", "/api/v1/audience/live/stats/export", "/api/v1/audience/live/snapshot"}:
+    if path in {"/api/v1/evaluate/youtube/live-sample", "/api/v1/audience/live", "/api/v1/audience/live/export", "/api/v1/audience/live/stats", "/api/v1/audience/live/series", "/api/v1/audience/live/stats/export", "/api/v1/audience/live/snapshot"}:
         return routes["live"](environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))
     if path.startswith("/api/v1/evaluate/youtube"):
         return routes["evaluate"](environ, lambda status, headers, *args: _start_response(start_response, status, headers, no_store=True))

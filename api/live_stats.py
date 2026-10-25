@@ -243,6 +243,113 @@ def live_window_stats(
     }
 
 
+SERIES_BUCKETS = (60, 300, 900, 1800, 21600)   # "View by": 1, 5, 15 and 30 minutes, and 6 hours
+SERIES_FEEDS = ("all", "primary", "secondary")
+
+
+@ttl_cache(scale=0.4)
+def live_channel_series(
+    session: Session,
+    *,
+    start_at: datetime,
+    end_at: datetime,
+    bucket_seconds: int = 900,
+    feed: str = "all",
+    language: str | None = None,
+    segment: str | None = None,
+    channel_ids: tuple[int, ...] | None = None,
+) -> dict[str, Any]:
+    """Every channel's live viewers through a window, one value per time bucket, for the All, Primary or Secondary feed, and how many live streams each channel had running.
+    The window is read on a fine one-minute grid and each bucket is the AVERAGE of the minutes in it (a bucket of 6 hours is not one lucky minute); a bucket with no live stream is None, never zero.
+    The number of streams in a bucket is the most that ran at once in it. Peak is the highest minute of the window."""
+    start_at, end_at = _utc(start_at), _utc(end_at)
+    if feed not in SERIES_FEEDS:
+        raise ValueError("feed must be all, primary or secondary")
+    bucket_seconds = int(bucket_seconds)
+    if bucket_seconds not in SERIES_BUCKETS:
+        raise ValueError("view by must be 1, 5, 15 or 30 minutes, or 6 hours")
+    if end_at <= start_at:
+        raise ValueError("end_at must be after start_at")
+    if end_at - start_at > MAX_WINDOW:
+        raise ValueError("live series window cannot exceed 24 hours")
+    step = 60
+    fine = _grid(start_at, end_at, step)
+    count = int((end_at - start_at).total_seconds() // bucket_seconds) + 1
+    grid = [start_at + timedelta(seconds=bucket_seconds * index) for index in range(count)]
+    per = max(1, bucket_seconds // step)
+    threshold = min_primary_hours()
+    streams, channels, languages = _load_streams(session, start_at=start_at, end_at=end_at, language=language, segment=segment)
+    wanted = set(channel_ids) if channel_ids else None
+    rows: list[dict[str, Any]] = []
+    total_sum = [0.0] * count
+    total_seen = [0] * count
+    total_streams = [0] * count
+    for channel_id, channel_streams in streams.items():
+        if wanted is not None and channel_id not in wanted:
+            continue
+        series = _channel_series(channel_streams, fine, threshold)
+        sums, seen, runs = [0.0] * count, [0] * count, [0] * count
+        best, best_at = None, None
+        for index, entry in enumerate(series):
+            if entry is None:
+                continue
+            moment, split, values = entry
+            value = getattr(split, feed)
+            n_streams = len(values) if feed == "all" else (1 if split.primary_video_id is not None else 0) if feed == "primary" else split.secondary_count
+            if feed == "primary" and split.primary_video_id is None:
+                continue                       # no primary feed at that moment: nothing to show, not a zero
+            if feed == "secondary" and split.secondary_count == 0:
+                continue
+            slot = min(count - 1, index // per)
+            sums[slot] += value
+            seen[slot] += 1
+            runs[slot] = max(runs[slot], n_streams)
+            if best is None or value > best:
+                best, best_at = value, moment
+        concurrent = [round(sums[i] / seen[i], 1) if seen[i] else None for i in range(count)]
+        if not any(v is not None for v in concurrent):
+            continue
+        channel = channels[channel_id]
+        live_values = [v for v in concurrent if v is not None]
+        for i in range(count):
+            if seen[i]:
+                total_sum[i] += concurrent[i]
+                total_seen[i] += 1
+                total_streams[i] += runs[i]
+        rows.append({
+            "channel_id": channel.id,
+            "name": channel.name,
+            "language": languages[channel_id],
+            "language_group": language_group(languages[channel_id]),
+            "segment": channel.segment or "news",
+            "concurrent": concurrent,
+            "streams": [runs[i] if seen[i] else None for i in range(count)],
+            "average": round(sum(live_values) / len(live_values), 1),
+            "peak": best,
+            "peak_at": best_at.isoformat() if best_at else None,
+            "coverage_percent": round(len(live_values) / count * 100, 1),
+        })
+    rows.sort(key=lambda item: item["average"], reverse=True)
+    for rank, item in enumerate(rows, start=1):
+        item["rank"] = rank
+    totals = [round(total_sum[i], 1) if total_seen[i] else None for i in range(count)]
+    live_totals = [v for v in totals if v is not None]
+    return {
+        "start_at": start_at.isoformat(),
+        "end_at": end_at.isoformat(),
+        "bucket_seconds": bucket_seconds,
+        "feed": feed,
+        "grid": [moment.isoformat() for moment in grid],
+        "channels": rows,
+        "totals": {"concurrent": totals, "streams": [total_streams[i] if total_seen[i] else None for i in range(count)],
+                   "average": round(sum(live_totals) / len(live_totals), 1) if live_totals else None, "peak": max(live_totals) if live_totals else None},
+        "filters": {"language": language, "segment": segment},
+        "primary_min_live_hours": threshold,
+        "method": ("Read minute by minute; each live stream contributes its latest sample no older than " f"{FRESHNESS_SECONDS}s (carried forward, no interpolation). "
+                   "Each bucket is the average of its minutes; a time with no live stream is left empty, not zero. Primary = the stream live for the primary threshold or longer; Secondary = every other concurrent stream; All = both."),
+    }
+
+
 def live_snapshot(
     session: Session,
     *,

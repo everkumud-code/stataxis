@@ -54,7 +54,7 @@ def test_web_routes_the_new_live_stats_paths(monkeypatch):
         return [b"ok"]
 
     monkeypatch.setitem(web._routes, "live", fake_live_api)
-    paths = ["/api/v1/audience/live/stats", "/api/v1/audience/live/stats/export", "/api/v1/audience/live/snapshot"]
+    paths = ["/api/v1/audience/live/stats", "/api/v1/audience/live/stats/export", "/api/v1/audience/live/snapshot", "/api/v1/audience/live/series"]
     for path in paths:
         status, _, _ = _call(web.application, path)
         assert status == "200 OK"
