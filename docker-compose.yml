@@ -38,5 +38,22 @@ services:
       timeout: 5s
       retries: 5
 
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-stataxis}
+      POSTGRES_USER: ${POSTGRES_USER:-stataxis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_HOUR_UTC: ${BACKUP_HOUR_UTC:-21}
+    volumes:
+      - ./scripts/pg_backup.sh:/pg_backup.sh:ro
+      - ./backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["sh", "/pg_backup.sh"]
+
 volumes:
   postgres_data:

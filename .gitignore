@@ -17,6 +17,7 @@ venv/
 *.sqlite3
 *.db
 postgres-data/
+backups/
 logs/
 
 # OS / editors

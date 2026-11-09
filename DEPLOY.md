@@ -119,13 +119,25 @@ The worker and web service use the same image, so application dependencies stay 
 
 ## PostgreSQL backup
 
-Run a logical dump from the Compose Postgres container:
+`docker compose up -d` also starts a `backup` service. Every day at `BACKUP_HOUR_UTC` (default 21:00 UTC, about 02:30 IST) it writes a compressed dump to `./backups/stataxis-YYYY-MM-DD_HHMMSS.dump` and deletes dumps older than `BACKUP_KEEP_DAYS` (default 14). A failed night is logged and retried the next night.
 
 ```bash
-docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > stataxis-$(date +%F).sql
+docker compose logs backup                                  # see the schedule and results
+docker compose run --rm -e BACKUP_ONCE=1 backup             # take a backup right now
+ls -lh backups/
 ```
 
-Store the resulting SQL dump outside the application container and test restores periodically.
+Copy `./backups` off the server regularly (another machine or object storage): a backup on the same disk does not survive losing the disk.
+
+Restore into an empty database (this replaces existing objects, so stop `web` and `worker` first):
+
+```bash
+docker compose stop web worker
+docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' < backups/stataxis-YYYY-MM-DD_HHMMSS.dump
+docker compose start web worker
+```
+
+Test a restore on a spare database now and then; an untested backup is only a hope.
 
 ## Growing the channel universe
 
